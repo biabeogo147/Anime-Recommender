@@ -6,10 +6,11 @@ from utils.custom_exception import CustomException
 
 logger = get_logger(__name__)
 
+
 class AnimeRecommendationPipeline:
     def __init__(self,persist_dir="chroma_db"):
         try:
-            logger.info("Intializing Recommdation Pipeline")
+            logger.info("Initializing Recommendation Pipeline")
 
             vector_builder = VectorStoreBuilder(csv_path="" , persist_dir=persist_dir)
 
@@ -17,20 +18,21 @@ class AnimeRecommendationPipeline:
 
             self.recommender = AnimeRecommender(retriever,GOOGLE_API_KEY,MODEL_NAME)
 
-            logger.info("Pipleine intialized sucesfully...")
+            logger.info("Pipeline initialized successfully...")
 
         except Exception as e:
-            logger.error(f"Failed to intialize pipeline {str(e)}")
-            raise CustomException("Error during pipeline intialization" , e)
+            logger.error(f"Failed to initialize pipeline {str(e)}")
+            raise CustomException("Error during pipeline initialization" , e)
         
     def recommend(self,query:str) -> str:
         try:
-            logger.info(f"Recived a query {query}")
+            logger.info(f"Received a query {query}")
 
             recommendation = self.recommender.get_recommendation(query)
 
-            logger.info("Recommendation generated sucesfulyy...")
+            logger.info("Recommendation generated successfully...")
             return recommendation
+
         except Exception as e:
             logger.error(f"Failed to get recommendation {str(e)}")
             raise CustomException("Error during getting recommendation" , e)
