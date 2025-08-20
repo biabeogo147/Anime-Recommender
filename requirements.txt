@@ -1,9 +1,10 @@
-langchain
-langchain-community
-langchain_groq
+langchain~=0.3.27
+langchain-community~=0.3.27
 chromadb
-streamlit
-pandas
-python-dotenv
+streamlit~=1.48.1
+pandas~=2.2.1
+python-dotenv~=1.0.1
 sentence-transformers
 langchain_huggingface
+langchain-google-genai~=2.1.9
+setuptools~=75.1.0
