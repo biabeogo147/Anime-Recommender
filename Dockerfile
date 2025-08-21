@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
 ## Copying ur all contents from local to app
 COPY . .
 
+## Run setup.py
 RUN pip install --no-cache-dir -e .
 
 # Used PORTS
