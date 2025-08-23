@@ -3,6 +3,7 @@
 # ===============================
 # 1) Build Docker image in Minikube
 # ===============================
+minikube start
 eval $(minikube docker-env)
 docker build -t anime-recommender-app:latest .
 
