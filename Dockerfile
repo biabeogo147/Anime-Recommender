@@ -14,14 +14,11 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy setup.py first
-COPY setup.py ./
+# Copy source code to working directory
+COPY . .
 
 # Cài đặt package ở chế độ editable
 RUN pip install --no-cache-dir -e .
-
-# Copy toàn bộ source code
-COPY . .
 
 # Expose port
 EXPOSE 8501
