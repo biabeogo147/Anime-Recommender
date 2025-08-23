@@ -1,39 +1,143 @@
+# -----------------------------
+# 1) Deployment: Run app + expose port 8501 (HTTP) and 8000 (Metrics)
+# -----------------------------
 apiVersion: apps/v1
 kind: Deployment
+
 metadata:
-  name: llmops-app
+  name: anime-recommender-app
   labels:
     app: llmops
+
 spec:
   replicas: 1
   selector:
     matchLabels:
+      # The same as template.metadata.labels
       app: llmops
   template:
     metadata:
       labels:
+        # The same as spec.selector.matchLabels
         app: llmops
     spec:
       containers:
-      - name: llmops-container
-        image: llmops-app:latest  # Use local image
-        imagePullPolicy: IfNotPresent
-        ports:
-          - containerPort: 8501
-        envFrom:
-          - secretRef:
-              name: llmops-secrets 
+        - name: llmops-container
+          image: anime-recommender-app:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: anime-recommender-secrets
+          env:
+            # config.config.METRICS_PORT
+            - name: METRICS_PORT
+              value: "8000"
+          ports:
+            - name: http
+              containerPort: 8501
+            - name: metrics
+              containerPort: 8000
+
+          # Check if app is ready to serve traffic
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          # Health check to ensure app is alive
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          # Resource requests and limits
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
 
 ---
+# -----------------------------
+# 2) Service public for web (LoadBalancer 80 -> 8501)
+# -----------------------------
 apiVersion: v1
 kind: Service
+
 metadata:
   name: llmops-service
+  labels:
+    app: llmops
+
 spec:
   type: LoadBalancer
   selector:
     app: llmops
   ports:
-    - protocol: TCP
+    - name: web        # Port outside the cluster
+      protocol: TCP
       port: 80
-      targetPort: 8501
+      targetPort: http # Target containerPort in Deployment
+
+---
+# -----------------------------
+# 3) Service private for metrics
+#    Prometheus will scrape through this service.
+# -----------------------------
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: llmops-metrics
+  labels:
+    app: llmops
+
+spec:
+  type: ClusterIP # Only accessible within the cluster, not exposed outside Internet
+  selector:
+    app: llmops
+  ports:
+    - name: metrics-outside # Port outside the cluster
+      protocol: TCP
+      port: 8000
+      targetPort: metrics   # Target containerPort in Deployment
+
+---
+# -----------------------------
+# 4) ServiceMonitor (Prometheus Operator) - CRD (Custom Resource Definition)
+#    Allow Prometheus scrape /metrics from llmops-metrics service.
+#    Requires kube-prometheus-stack installed in the cluster.
+# -----------------------------
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+
+metadata:
+  name: llmops-servicemonitor
+  namespace: monitoring
+  labels:
+    # Must be in the same namespace as kube-prometheus-stack
+    release: monitoring
+
+spec:
+  # App Namespace
+  namespaceSelector:
+    matchNames:
+      - default
+  selector:
+    matchLabels:
+      app: llmops
+  endpoints:
+    - port: metrics-outside  # Port defined in llmops-metrics Service
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
