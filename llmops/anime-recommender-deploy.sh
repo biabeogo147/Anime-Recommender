@@ -5,7 +5,6 @@
 # ===============================
 minikube start
 eval $(minikube docker-env)
-docker system prune -a --volumes -f
 docker build -t anime-recommender-app:latest .
 
 # ===============================
