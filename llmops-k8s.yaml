@@ -80,7 +80,7 @@ metadata:
     app: llmops
 
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: llmops
   ports:
@@ -141,3 +141,53 @@ spec:
       path: /metrics
       interval: 15s
       scrapeTimeout: 10s
+
+---
+# -----------------------------
+# 5) Ingress rule for Grafana
+# -----------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: grafana.local   # domain nội bộ bạn tự đặt
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: monitoring-grafana
+                port:
+                  number: 80
+
+---
+# -----------------------------
+# 6) Ingress rule for anime-recommender-app
+# -----------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: llmops-ingress
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: llmops.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: llmops-service
+                port:
+                  number: 80
