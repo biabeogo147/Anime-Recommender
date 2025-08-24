@@ -1,6 +1,7 @@
 I used source code from https://github.com/data-guru0/ANIME-RECOMMENDER-SYSTEM-LLMOPS and modified it based on my needs.
 
-Install docker / minikube / kubectl / helm / prometheus by running scripts in bash folder.
+Install docker / minikube / kubectl / helm / prometheus / ingress by running scripts in bash folder.
+Ensure minikube start before install prometheus and ingress.
 Remember to give Docker permissions to your user.
 ```bash
 sudo groupadd docker
