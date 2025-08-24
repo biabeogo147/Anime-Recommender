@@ -18,4 +18,9 @@ sudo systemctl enable containerd.service
 minikube start
 eval $(minikube docker-env)
 docker build -t anime-recommender-app:latest .
+kubectl apply -f llmops-k8s.yaml
+```
+
+```bash
+kubectl get secrets
 ```

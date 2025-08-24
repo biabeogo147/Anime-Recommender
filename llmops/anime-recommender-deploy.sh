@@ -1,17 +1,4 @@
 #!/bin/bash
-
-# ===============================
-# 1) Build Docker image in Minikube
-# ===============================
-minikube start
-eval $(minikube docker-env)
-docker build -t anime-recommender-app:latest .
-
-# ===============================
-# 5) Deploy LLMOps App + Services + ServiceMonitor + Ingress
-# ===============================
-kubectl apply -f llmops-k8s.yaml
-
 # ===============================
 # 6) Check status
 # ===============================
@@ -29,3 +16,7 @@ kubectl get ingress -A
 # ===============================
 echo "Cluster IP:"
 minikube ip
+
+kubectl describe ingress llmops-ingress -n default
+kubectl describe ingress grafana-ingress -n monitoring
+
