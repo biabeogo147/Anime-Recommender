@@ -158,7 +158,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: grafana.local   # domain nội bộ bạn tự đặt
+    - host: grafana.local
       http:
         paths:
           - path: /
@@ -176,14 +176,14 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: llmops-ingress
+  name: streamlit-ingress
   namespace: default
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   ingressClassName: nginx
   rules:
-    - host: llmops.local
+    - host: streamlit.local
       http:
         paths:
           - path: /
