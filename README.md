@@ -7,10 +7,6 @@ bash docker-íntall.sh
 bash minikube-install.sh
 bash kubectl-install.sh
 bash helm-install.sh
-
-minikube start
-bash prometheus-install.sh
-bash ingress-install.sh
 ```
 
 Create the secret:
@@ -30,16 +26,38 @@ sudo systemctl enable docker.service
 sudo systemctl enable containerd.service
 ```
 
+After give Docker permissions, start Minikube and install Prometheus and Ingress.
+```bash
+minikube start
+bash prometheus-install.sh
+bash ingress-install.sh
+```
+
+Build the Docker image and deploy the application.
 ```bash
 eval $(minikube docker-env)
 docker build -t anime-recommender-app:latest .
 kubectl apply -f llmops-k8s.yaml
 ```
 
+If you need to delete the deployment, use:
 ```bash
 kubectl delete -f llmops-k8s.yaml
 ```
 
+Check the created secret:
 ```bash
 kubectl get secrets
+```
+
+Check the status of your pods, services, and ingress resources:
+```bash
+echo "=== Pods in default namespace ==="
+kubectl get pods
+
+echo "=== Services in default namespace ==="
+kubectl get svc
+
+echo "=== Ingress resources ==="
+kubectl get ingress -A
 ```
