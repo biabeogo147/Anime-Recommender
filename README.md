@@ -1,21 +1,9 @@
 I used source code from https://github.com/data-guru0/ANIME-RECOMMENDER-SYSTEM-LLMOPS and modified it based on my needs.
 
-Running scripts in llmops folder.
+Install Docker and give permissions to your user.
 ```bash
 cd llmops
 bash docker-íntall.sh
-bash minikube-install.sh
-bash kubectl-install.sh
-bash helm-install.sh
-```
-
-Create the secret:
-```bash
-bash create-secret.sh
-```
-
-Remember to give Docker permissions to your user.
-```bash
 sudo groupadd docker
 sudo usermod -aG docker $USER
 ```
@@ -26,16 +14,38 @@ sudo systemctl enable docker.service
 sudo systemctl enable containerd.service
 ```
 
-After give Docker permissions, start Minikube and install Prometheus and Ingress.
+If you use Minikube, run the following commands:
 ```bash
-minikube start
-bash prometheus-install.sh
+cd minikube-setup
+bash minikube-install.sh
+bash kubectl-install.sh
 bash ingress-install.sh
+minikube start
+eval $(minikube docker-env)
+```
+
+If you use k8s, run the following commands:
+```bash
+cd k8s-setup
+bash setup-k8s-env.sh
+bash on_first_master.sh
+bash on_other_master.sh
+bash ingress-install.sh
+```
+
+Install Helm and Prometheus:
+```bash
+bash helm-install.sh
+bash prometheus-install.sh
+```
+
+Create the secret:
+```bash
+bash create-secret.sh
 ```
 
 Build the Docker image and deploy the application.
 ```bash
-eval $(minikube docker-env)
 docker build -t anime-recommender-app:latest .
 kubectl apply -f llmops-k8s.yaml
 ```
