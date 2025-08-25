@@ -9,11 +9,8 @@ from metrics.prometheus_metrics import APP_INFO, UP, LATENCY, REQUESTS, EXCEPTIO
 
 @st.cache_resource
 def init_pipeline():
-    t0 = time.time()
     pl = AnimeRecommendationPipeline()
-    init_dur = time.time() - t0
-    # Ghi nhận thời gian init như 1 observation trong histogram (tuỳ chọn)
-    LATENCY.observe(init_dur * 0)  # no-op để đảm bảo metric tồn tại; có thể bỏ
+    LATENCY.observe(0.0)
     return pl
 
 
@@ -26,10 +23,10 @@ if __name__=="__main__":
     load_dotenv()
 
     try:
-        # Mở cổng /metrics trên 0.0.0.0:METRICS_PORT
+        # Open /metrics on 0.0.0.0:METRICS_PORT
         start_http_server(METRICS_PORT)
     except OSError:
-        # Đã mở rồi (do rerun hoặc nhiều worker) -> bỏ qua
+        # Port is already in use
         pass
 
     # Set static info once
@@ -38,7 +35,7 @@ if __name__=="__main__":
         "version": "1.0.0",
     })
 
-    UP.set(1)  # app đang sống
+    UP.set(1)  # App is up
 
     pipeline = init_pipeline()
     setup_ui()
