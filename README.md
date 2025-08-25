@@ -29,8 +29,23 @@ If you use k8s, run the following commands:
 cd k8s-setup
 bash setup-k8s-env.sh
 bash on_first_master.sh
-bash on_other_master.sh
 bash ingress-install.sh
+```
+
+If you forget certs, run:
+```bash
+kubeadm init phase upload-certs --upload-certs
+````
+
+Upload the certificates and run the script on other master nodes:
+```bash
+bash on_other_master.sh
+```
+
+Check if ready:
+```bash
+kubectl get nodes -o wide
+kubectl get pods -n kube-system
 ```
 
 Install Helm and Prometheus:
