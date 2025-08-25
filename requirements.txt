@@ -8,3 +8,4 @@ sentence-transformers
 langchain_huggingface
 langchain-google-genai~=2.1.9
 setuptools~=75.1.0
+prometheus_client~=0.22.1
