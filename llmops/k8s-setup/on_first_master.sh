@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo kubeadm init --control-plane-endpoint "192.168.0.100:6443" --upload-certs
+sudo kubeadm init
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
