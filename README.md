@@ -2,7 +2,7 @@ I used source code from https://github.com/data-guru0/ANIME-RECOMMENDER-SYSTEM-L
 
 Install Docker and give permissions to your user.
 ```bash
-cd llmops
+cd MLops-Common
 bash docker-íntall.sh
 sudo groupadd docker
 sudo usermod -aG docker $USER
