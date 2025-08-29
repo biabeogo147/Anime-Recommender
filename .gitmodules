@@ -1,0 +1,4 @@
+[submodule "MLops-Common"]
+	path = MLops-Common
+	url = https://github.com/biabeogo147/MLops-Common.git
+	branch = main
