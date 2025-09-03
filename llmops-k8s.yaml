@@ -5,24 +5,25 @@ apiVersion: apps/v1
 kind: Deployment
 
 metadata:
-  name: anime-recommender-app
+  namespace: anime-recommender
+  name: anime-recommender-deployment
   labels:
-    app: llmops
+    app: anime-recommender-deployment
 
 spec:
   replicas: 1
   selector:
     matchLabels:
       # The same as template.metadata.labels
-      app: llmops
+      app: anime-recommender-deployment
   template:
     metadata:
       labels:
         # The same as spec.selector.matchLabels
-        app: llmops
+        app: anime-recommender-deployment
     spec:
       containers:
-        - name: llmops-container
+        - name: anime-recommender-container
           image: anime-recommender-app:latest
           imagePullPolicy: IfNotPresent
           envFrom:
@@ -75,14 +76,15 @@ apiVersion: v1
 kind: Service
 
 metadata:
-  name: llmops-service
+  namespace: anime-recommender
+  name: anime-recommender-service
   labels:
-    app: llmops
+    app: anime-recommender-service
 
 spec:
   type: ClusterIP
   selector:
-    app: llmops
+    app: anime-recommender-deployment
   ports:
     - name: web        # Port outside the cluster
       protocol: TCP
@@ -98,14 +100,15 @@ apiVersion: v1
 kind: Service
 
 metadata:
-  name: llmops-metrics
+  namespace: anime-recommender
+  name: anime-recommender-metrics
   labels:
-    app: llmops
+    app: anime-recommender-metrics
 
 spec:
   type: ClusterIP # Only accessible within the cluster, not exposed outside Internet
   selector:
-    app: llmops
+    app: anime-recommender-deployment
   ports:
     - name: metrics-outside # Port outside the cluster
       protocol: TCP
@@ -122,8 +125,8 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 
 metadata:
-  name: llmops-servicemonitor
   namespace: monitoring
+  name: anime-recommender-servicemonitor
   labels:
     # Must be in the same namespace as kube-prometheus-stack
     release: monitoring
@@ -132,12 +135,12 @@ spec:
   # App Namespace
   namespaceSelector:
     matchNames:
-      - default
+      - anime-recommender
   selector:
     matchLabels:
-      app: llmops
+      app: anime-recommender-metrics
   endpoints:
-    - port: metrics-outside  # Port defined in llmops-metrics Service
+    - port: metrics-outside  # Port defined in anime-recommender-metrics Service
       path: /metrics
       interval: 15s
       scrapeTimeout: 10s
