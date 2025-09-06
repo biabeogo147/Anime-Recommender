@@ -7,6 +7,14 @@ docker build -t anime-recommender-app:latest .
 kubectl apply -f llmops-k8s.yaml
 ```
 
+If you don't have your own registry:
+```bash
+docker save anime-recommender-app:latest -o anime-recommender-app.tar
+scp anime-recommender-app.tar anime2:/tmp/
+scp anime-recommender-app.tar anime3:/tmp/
+docker load -i /tmp/app.tar" # on anime2 and anime3 node
+```
+
 If you need to delete the deployment, use:
 ```bash
 kubectl delete -f llmops-k8s.yaml
