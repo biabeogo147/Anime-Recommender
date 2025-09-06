@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: anime-recommender-container
-          image: anime-recommender-app:latest
+          image: docker.io/library/anime-recommender-app:latest
           imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef:

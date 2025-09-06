@@ -4,6 +4,7 @@ Create the secret, build the Docker image and deploy the application.
 ```bash
 bash create-secret.sh
 docker build -t anime-recommender-app:latest .
+kubectl create namespace anime-recommender
 kubectl apply -f llmops-k8s.yaml
 ```
 
@@ -12,7 +13,11 @@ If you don't have your own registry:
 docker save anime-recommender-app:latest -o anime-recommender-app.tar
 scp anime-recommender-app.tar anime2:/tmp/
 scp anime-recommender-app.tar anime3:/tmp/
-docker load -i /tmp/app.tar" # on anime2 and anime3 node
+# on anime2 and anime3 node
+docker load -i /tmp/anime-recommender-app.tar # (if container runtime is docker)
+docker images
+ctr -n k8s.io images import /tmp/anime-recommender-app.tar # (if container runtime is containerd)
+ctr -n k8s.io images ls
 ```
 
 If you need to delete the deployment, use:
