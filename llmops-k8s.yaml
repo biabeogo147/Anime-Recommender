@@ -180,7 +180,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: streamlit-ingress
-  namespace: default
+  namespace: anime-recommender
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
