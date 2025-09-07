@@ -194,6 +194,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: llmops-service
+                name: anime-recommender-service
                 port:
                   number: 80
