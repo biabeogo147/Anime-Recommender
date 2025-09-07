@@ -16,8 +16,8 @@ scp anime-recommender-app.tar anime3:/tmp/
 # on anime2 and anime3 node
 docker load -i /tmp/anime-recommender-app.tar # (if container runtime is docker)
 docker images
-ctr -n k8s.io images import /tmp/anime-recommender-app.tar # (if container runtime is containerd)
-ctr -n k8s.io images ls
+ctr i import /tmp/anime-recommender-app.tar # (if container runtime is containerd)
+ctr i ls
 ```
 
 If you need to delete the deployment, use:
