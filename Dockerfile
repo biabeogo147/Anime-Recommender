@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
 # Copy source code to working directory
 COPY . .
 
-# Cài đặt package ở chế độ editable
+# Run setup.py to install dependencies
 RUN pip install --no-cache-dir -e .
 
 # Expose port
