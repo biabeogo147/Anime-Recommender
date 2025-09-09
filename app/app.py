@@ -1,8 +1,5 @@
 import time
 import streamlit as st
-from dotenv import load_dotenv
-from config.config import METRICS_PORT
-from prometheus_client import start_http_server
 from pipeline.pipeline import AnimeRecommendationPipeline
 from metrics.prometheus_metrics import APP_INFO, UP, LATENCY, REQUESTS, EXCEPTIONS
 
@@ -20,15 +17,6 @@ def setup_ui():
 
 
 if __name__=="__main__":
-    load_dotenv()
-
-    try:
-        # Open /metrics on 0.0.0.0:METRICS_PORT
-        start_http_server(METRICS_PORT)
-    except OSError:
-        # Port is already in use
-        pass
-
     # Set static info once
     APP_INFO.info({
         "app": "anime-recommender",
