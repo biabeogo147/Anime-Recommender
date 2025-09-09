@@ -1,3 +1,5 @@
+I used source code from https://github.com/data-guru0/ANIME-RECOMMENDER-SYSTEM-LLMOPS and modified it based on my needs.
+
 Create the secret, build the Docker image and deploy the application.
 ```bash
 bash create-secret.sh
