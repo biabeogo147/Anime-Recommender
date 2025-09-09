@@ -119,8 +119,9 @@ spec:
 ---
 # -----------------------------
 # 4) ServiceMonitor (Prometheus Operator) - CRD (Custom Resource Definition)
-#    Allow Prometheus scrape /metrics from llmops-metrics service.
+#    Allow Prometheus scrape /metrics from anime-recommender-metrics service.
 #    Requires kube-prometheus-stack installed in the cluster.
+# App metrics
 # -----------------------------
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
@@ -197,3 +198,28 @@ spec:
                 name: anime-recommender-service
                 port:
                   number: 80
+
+---
+# -----------------------------
+# 7) Ingress rule for Prometheus
+# -----------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus-ingress
+  namespace: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: prometheus.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: monitoring-kube-prometheus-prometheus
+                port:
+                  number: 9090
