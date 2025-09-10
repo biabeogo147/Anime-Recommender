@@ -1,16 +1,21 @@
+from langchain_huggingface.embeddings import HuggingFaceEndpointEmbeddings
+from langchain_community.document_loaders.csv_loader import CSVLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import Chroma
-from langchain_community.document_loaders.csv_loader import CSVLoader
-from langchain_huggingface import HuggingFaceEmbeddings
 
+from config.config import HUGGINGFACEHUB_API_TOKEN
 from dotenv import load_dotenv
+
 load_dotenv()
 
 class VectorStoreBuilder:
-    def __init__(self,csv_path:str,persist_dir:str="chroma_db"):
+    def __init__(self, csv_path: str, persist_dir: str="chroma_db"):
         self.csv_path = csv_path
         self.persist_dir = persist_dir
-        self.embedding = HuggingFaceEmbeddings(model_name = "all-MiniLM-L6-v2")
+        self.embedding = HuggingFaceEndpointEmbeddings(
+            repo_id="sentence-transformers/all-MiniLM-L6-v2",
+            huggingfacehub_api_token=HUGGINGFACEHUB_API_TOKEN,
+        )
     
     def build_and_save_vectorstore(self):
         loader = CSVLoader(
