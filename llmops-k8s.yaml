@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
         - name: anime-recommender-container
-          image: biabeogo147/anime-recommender-app:latest
+          image: biabeogo147/anime-recommender-app:v1.0.1
           imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef:
@@ -66,7 +66,7 @@ spec:
               cpu: "100m"
               memory: "256Mi"
             limits:
-              cpu: "500m"
+              cpu: "700m"
               memory: "2Gi"
 
 ---
