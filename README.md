@@ -3,8 +3,6 @@ I used source code from https://github.com/data-guru0/ANIME-RECOMMENDER-SYSTEM-L
 Create the secret, build the Docker image and deploy the application.
 ```bash
 bash create-secret.sh
-docker build -t anime-recommender-app:latest .
-docker save anime-recommender-app:latest -o anime-recommender-app.tar 
 kubectl apply -f llmops-k8s.yaml
 ```
 

@@ -28,7 +28,7 @@ def setup_ui():
 
 load_dotenv()
 
-init_metrics_server()
+init_metrics_server(METRICS_PORT)
 APP_INFO.info({
     "app": "anime-recommender",
     "version": "1.0.0",
