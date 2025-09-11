@@ -2,9 +2,8 @@ from langchain_huggingface.embeddings import HuggingFaceEndpointEmbeddings
 from langchain_community.document_loaders.csv_loader import CSVLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import Chroma
-
-from config.config import HUGGINGFACEHUB_API_TOKEN
 from dotenv import load_dotenv
+from config.config import *
 
 load_dotenv()
 
@@ -13,7 +12,7 @@ class VectorStoreBuilder:
         self.csv_path = csv_path
         self.persist_dir = persist_dir
         self.embedding = HuggingFaceEndpointEmbeddings(
-            repo_id="sentence-transformers/all-MiniLM-L6-v2",
+            repo_id=EMBEDDING_MODEL_NAME,
             huggingfacehub_api_token=HUGGINGFACEHUB_API_TOKEN,
         )
     

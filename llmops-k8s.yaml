@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
         - name: anime-recommender-container
-          image: biabeogo147/anime-recommender-app:v1.0.1
+          image: biabeogo147/anime-recommender-app:v1.0.3
           imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef:
