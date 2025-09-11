@@ -65,11 +65,15 @@ The app reads these environment variables from a **Kubernetes Secret**:
 | `EMBEDDING_MODEL_NAME`     | Embedding model name      | `sentence-transformers/all-MiniLM-L6-v2` |
 | `METRICS_PORT`             | Metrics port              | `8000`                                   |
 
+---
+
 ## Bash scripts
 All the bash scripts setting up project in [biabeogo147/MLops-Common]
 ```bash
 git submodule update --init --recursive
 ```
+
+---
 
 ### Secret creation script (`create-secret.sh`)
 ```bash
