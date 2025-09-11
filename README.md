@@ -66,7 +66,7 @@ The app reads these environment variables from a **Kubernetes Secret**:
 | `METRICS_PORT`             | Metrics port              | `8000`                                   |
 
 ## Bash scripts
-All the bash scripts seting up project in [biabeogo147/MLops-Common]
+All the bash scripts setting up project in [biabeogo147/MLops-Common]
 ```bash
 git submodule update --init --recursive
 ```
