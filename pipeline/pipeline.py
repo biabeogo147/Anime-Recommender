@@ -16,7 +16,7 @@ class AnimeRecommendationPipeline:
 
             retriever = vector_builder.load_vector_store().as_retriever()
 
-            self.recommender = AnimeRecommender(retriever,GOOGLE_API_KEY,MODEL_NAME)
+            self.recommender = AnimeRecommender(retriever, GOOGLE_API_KEY, MODEL_NAME)
 
             logger.info("Pipeline initialized successfully...")
 

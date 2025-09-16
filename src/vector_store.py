@@ -8,7 +8,7 @@ from config.config import *
 load_dotenv()
 
 class VectorStoreBuilder:
-    def __init__(self, csv_path: str, persist_dir: str="chroma_db"):
+    def __init__(self, csv_path: str, persist_dir: str = "chroma_db"):
         self.csv_path = csv_path
         self.persist_dir = persist_dir
         self.embedding = HuggingFaceEndpointEmbeddings(

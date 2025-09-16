@@ -3,7 +3,7 @@ from src.prompt_template import get_anime_prompt
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 class AnimeRecommender:
-    def __init__(self,retriever,api_key:str,model_name:str):
+    def __init__(self, retriever, api_key: str, model_name: str):
         self.llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key)
         self.prompt = get_anime_prompt()
 

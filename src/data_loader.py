@@ -1,7 +1,7 @@
 import pandas as pd
 
 class AnimeDataLoader:
-    def __init__(self,original_csv:str,processed_csv:str):
+    def __init__(self, original_csv: str, processed_csv: str):
         self.original_csv = original_csv
         self.processed_csv = processed_csv
 
