@@ -31,9 +31,13 @@ spec:
             - secretRef:
                 name: anime-recommender-secrets
           env:
-            # config.config.METRICS_PORT
+            # config.py
             - name: METRICS_PORT
               value: "8000"
+            - name: MODEL_NAME
+              value: "gemma-3n-e2b-it"
+            - name: EMBEDDING_MODEL_NAME
+              value: "sentence-transformers/all-MiniLM-L6-v2"
           ports:
             - name: http
               containerPort: 8501
