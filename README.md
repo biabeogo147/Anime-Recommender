@@ -82,11 +82,8 @@ git submodule update --init --recursive
 kubectl create namespace anime-recommender --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl -n anime-recommender create secret generic anime-recommender-secrets \
-  --from-literal=MODEL_NAME="$MODEL_NAME" \
-  --from-literal=EMBEDDING_MODEL_NAME="$EMBEDDING_MODEL_NAME" \
   --from-literal=GOOGLE_API_KEY="$GOOGLE_API_KEY" \
   --from-literal=HUGGINGFACEHUB_API_TOKEN="$HUGGINGFACEHUB_API_TOKEN" \
-  --from-literal=METRICS_PORT="$METRICS_PORT" \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
