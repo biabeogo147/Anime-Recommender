@@ -1,7 +1,11 @@
 venv/
+.venv/
 logs/
-ANIME_RECOMMENDER.egg-info/
+*.egg-info/
 .env
 .idea
 __pycache__/
+.pytest_cache/
+.ruff_cache/
 chroma_db/
+index/

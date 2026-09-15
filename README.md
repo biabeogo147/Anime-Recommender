@@ -16,6 +16,31 @@ An end-to-end **LLMOps** demo for anime recommendation: **Gemini LLM** for reaso
 
 ---
 
+## 🐳 Run locally with Docker
+
+The app is split into a **FastAPI recommendation API** (`services/api`) and a thin **Streamlit UI** (`services/ui`).
+
+```bash
+cp .env.example .env               # fill GOOGLE_API_KEY and HF_TOKEN
+docker compose up --build -d       # API on :8000, UI on http://localhost:8501
+curl -X POST localhost:8000/recommend -H 'content-type: application/json' \
+     -d '{"query": "light hearted anime with school settings"}'
+```
+
+- **Index is built inside the image build**, with the HF token passed as a BuildKit secret, never baked into a layer. The build **fails if the index does not contain all 269 anime**.
+- **Fake provider** (no network, for load tests and failure drills): `LLM_PROVIDER=fake FAULT_RATE=0.2 docker compose up -d api`.
+- **Lint + tests:** `docker build -f services/api/Dockerfile --target test .`
+
+| API endpoint | Purpose |
+|---|---|
+| `POST /recommend` | `{query}` → 3 explained picks, retrieved titles, model, trace id |
+| `/healthz`, `/readyz` | Liveness / readiness (index loaded and complete) |
+| `/metrics` | Prometheus metrics (see cheat-sheet below) |
+
+> The Kubernetes sections below describe the previous single-pod Streamlit deployment and will be replaced by the EKS setup.
+
+---
+
 ## 🏗️ Architecture Overview
 ```
 [User Browser]
@@ -150,23 +175,29 @@ kubectl -n monitoring get secret monitoring-grafana -o jsonpath="{.data.admin-pa
 ---
 
 ## 📊 Metrics Cheat‑Sheet
-App exposes (examples):
-- `llmops_requests_total` (Counter)
-- `llmops_request_latency_seconds` (Histogram)
-- `llmops_exceptions_total` (Counter)
-- `llmops_app_info` (Info)
-- `llmops_up` (Gauge)
+The API exposes:
+- `anime_http_requests_total{route,method,status}` (Counter)
+- `anime_http_request_duration_seconds{route}` (Histogram, buckets 0.1 … 32s)
+- `anime_http_requests_in_flight` (Gauge, the autoscaling signal)
+- `anime_retrieval_duration_seconds`, `anime_llm_request_duration_seconds{model,outcome}` (Histograms)
+- `anime_llm_tokens_total{model,type=input|output|reasoning}` (Counter)
+- `anime_llm_cost_usd_total{model}` (Counter, estimated from `config/pricing.yaml`)
+- `anime_index_info` (Info: content hash, document count, embedding model)
 
 Prometheus/Grafana queries:
 ```promql
 # QPS
-rate(llmops_requests_total[1m])
+sum(rate(anime_http_requests_total{route="/recommend"}[1m]))
 
 # P95 latency
-histogram_quantile(0.95, sum(rate(llmops_request_latency_seconds_bucket[5m])) by (le))
+histogram_quantile(0.95, sum(rate(anime_http_request_duration_seconds_bucket{route="/recommend"}[5m])) by (le))
 
 # Error rate
-rate(llmops_exceptions_total[5m]) / rate(llmops_requests_total[5m])
+sum(rate(anime_http_requests_total{route="/recommend",status=~"5.."}[5m]))
+  / sum(rate(anime_http_requests_total{route="/recommend"}[5m]))
+
+# Estimated cost per 1k requests
+1000 * sum(rate(anime_llm_cost_usd_total[1h])) / sum(rate(anime_http_requests_total{route="/recommend",status="200"}[1h]))
 ```
 
 ---
