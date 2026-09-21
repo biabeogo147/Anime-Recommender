@@ -28,9 +28,10 @@ that follow describe the target, and each one says where it stands.
 
 Measured on 2026-09-15, all of it local — the cluster does not exist yet.
 
-- **Image 6.45 GB → 619 MB (−90%).** The old single image pulled PyTorch through an unused
-  `sentence-transformers`; the api and ui images now carry neither
-  ([build](docs/evidence/local.md#build-and-tests)).
+- **One 6.45 GB image became two: api 619 MB and ui 559 MB — 1.18 GB together, −82%.** The old image
+  pulled PyTorch through an unused `sentence-transformers`; neither new image carries it
+  ([build](docs/evidence/local.md#build-and-tests)). Quoting the api alone as −90% would compare one image
+  against half of its replacement.
 - **269 anime embedded in 8.5 s during the image build**, content hash `aa0c3ace7f67`. Build the image with
   `EXPECTED_DOCS=270` and it **fails** — the check is wired to fail
   ([build](docs/evidence/local.md#build-and-tests)).
@@ -43,13 +44,12 @@ Measured on 2026-09-15, all of it local — the cluster does not exist yet.
   ([drill](docs/evidence/local.md#failure-drill-fake-provider)).
 - **17 tests, ruff clean, containers run as UID 10001** with a read-only root filesystem.
 
-Not measured yet, because nothing is deployed — which is every criterion except #4, the image size above.
-Among them: the apply time and resource count (#1), the pipeline
-duration (#3), the latency
-baseline that sets the SLO threshold (#6), max RPS within the SLO (#7), time-to-rollback (#9), time-to-alert
-(#10), cost per 1,000 requests (#12), the replica count under load (#14), and the two access claims —
-HTTPS on the app (#15) and admin UIs that only answer over the VPN (#16). The numbers are defined in
-[design §6](docs/eks-sre-llmops-design.md#6-verification-and-evidence-definition-of-done).
+Not measured yet, because nothing is deployed — which is every criterion except #4, the image size above. Among
+them: the apply time and resource count (#1), the pipeline duration (#3), the latency baseline that sets the SLO
+threshold (#6), the capacity of the minimum replica count (#7), time-to-rollback (#9), time-to-alert (#10), cost
+per 1,000 requests (#12), the replica count under load (#14), and the two access claims — HTTPS on the app (#15)
+and admin UIs that only answer over the VPN (#16). The numbers are defined in [design
+§6](docs/eks-sre-llmops-design.md#6-verification-and-evidence-definition-of-done).
 
 ## Architecture
 
@@ -109,8 +109,10 @@ flowchart LR
 
     classDef tf fill:#ded7f5,stroke:#5b43a8,color:#1b1430;
     classDef gha fill:#d7e8f5,stroke:#2f5d8a,color:#1b1430;
+    classDef argo fill:#fde3cf,stroke:#c2602a,color:#1b1430;
     classDef ext fill:#eceff3,stroke:#6b7684,color:#1b1430;
-    class WS,ALB,IALB,WG,NAT,EKSCP,NODES,ECR,SM,S3,R53,ACM tf
+    class WS,WG,NAT,EKSCP,NODES,ECR,SM,S3,R53,ACM tf
+    class ALB,IALB argo
     class GHA gha
     class USER,OP,EXT,LF,DIS ext
 ```
@@ -138,13 +140,14 @@ flowchart TB
         PROM["kube-prometheus-stack<br/>Prometheus · Alertmanager · Grafana"]
         ROLLOUTS["Argo Rollouts controller"]
         KEDA["KEDA"]
+        CAS["Cluster Autoscaler"]
         OTEL["OTel Collector"]
         TEMPO["Tempo"]
         API["anime-api<br/>Rollout · 2 to 8 pods"]
         UI["anime-ui<br/>Deployment"]
     end
 
-    ARGO --> LBC & ESO & PROM & ROLLOUTS & KEDA & OTEL & TEMPO & API & UI
+    ARGO --> LBC & ESO & PROM & ROLLOUTS & KEDA & CAS & OTEL & TEMPO & API & UI
     LBC -->|"creates both ALBs<br/>and their target groups"| API
     ESO -->|"Gemini · HF · Langfuse · Discord"| API
     API -->|"scrape /metrics"| PROM
@@ -155,12 +158,13 @@ flowchart TB
     PROM -->|"in-flight requests"| KEDA
     ROLLOUTS -->|"promote or abort"| API
     KEDA -->|"replica count"| API
+    API -.->|"pods that do not fit"| CAS
     UI -->|"HTTP"| API
 
     classDef tf fill:#ded7f5,stroke:#5b43a8,color:#1b1430;
     classDef argo fill:#fde3cf,stroke:#c2602a,color:#1b1430;
     class ARGO tf
-    class LBC,ESO,PROM,ROLLOUTS,KEDA,OTEL,TEMPO,API,UI argo
+    class LBC,ESO,PROM,ROLLOUTS,KEDA,CAS,OTEL,TEMPO,API,UI argo
 ```
 
 Prometheus is read by two different controllers for two different purposes: Argo Rollouts asks it whether the
@@ -207,6 +211,7 @@ flowchart TB
     RUN1 -->|"success rate < 99% or canary p95<br/>more than 1.2x the stable p95"| BACK["abort<br/>stable back to 100%"]
     RUN1 -->|"both within bounds"| W50["setWeight 50<br/>pause 2m"]
     W50 --> RUN2{"AnalysisRun"}
+    RUN2 -->|"requests < 20"| INC
     RUN2 -->|"fail"| BACK
     RUN2 -->|"pass"| DONE["setWeight 100"]
 
@@ -240,11 +245,11 @@ the reason for the next one. Rows 1 to 3 are done and measured; the rest is desi
 | 8 *(not built)* | **External Secrets + EKS Pod Identity** | The Gemini key, HF token, Langfuse keys and Discord webhook have nowhere safe to live | Values arrive from Secrets Manager; Git holds only their names, and no pod holds an AWS access key | Images are still built by hand, unscanned and unsigned |
 | 9 *(not built)* | **GitHub Actions: test → index → build → Trivy → ECR → cosign** | Whoever can build can ship, and nobody can say what is inside an image | Commit to signed digest with no human in the path, over OIDC with no stored AWS credentials — criteria #3 and #5 | Nothing measures whether what shipped is healthy |
 | 10 *(not built)* | **kube-prometheus-stack** | No metrics leave the pods; health is a guess | Scrape, dashboards, Alertmanager, and the one datastore both controllers below will read | "Healthy" is still a human reading a graph, with no threshold to compare against |
-| 11 *(not built)* | **k6 baseline and ramp** | An SLO threshold chosen without a measurement is a number someone liked | Real p50/p95 in gemini mode sets the latency target **T**; the ramp in fake mode gives max RPS inside it — criteria #6, #7 | A threshold nobody is paged about |
+| 11 *(not built)* | **k6 baseline and ramp** | An SLO threshold chosen without a measurement is a number someone liked | Real latency in gemini mode, read from the server's own histogram, sets the target **T**; a fake-mode ramp at an open arrival rate measures what the minimum replica count can carry — criteria #6, #7 | A threshold nobody is paged about |
 | 12 *(not built)* | **Sloth SLOs + multi-window burn-rate alerts** | A target with no alert is a wish; a naive alert either pages on noise or sleeps through an outage | Fast-burn pages, slow-burn tickets, each with a runbook link — criterion #10 | Alerts fire *after* users were hurt; a bad release still reaches everyone first |
 | 13 *(not built)* | **Argo Rollouts canary + AnalysisRun** | A bad release reaches 100% of users at once, and rollback is a human noticing | 10/50/100 with Prometheus analysis at each step, automatic abort, and a pause when traffic is too thin to judge — criteria #8, #9 | Capacity is fixed: a spike queues behind whatever pods exist |
-| 14 *(not built)* | **KEDA on in-flight requests** | Capacity is whatever replica count was committed, and the obvious remedy does not work here: the pods spend their time waiting on two remote APIs, so CPU barely moves and an HPA on CPU would never fire | Scaling follows in-flight requests — the one signal that tracks demand when the work is waiting, not computing — between 2 and 8 pods — criterion #14 | You can see *that* a request was slow, never *where* it was slow |
-| 15 *(not built)* | **OpenTelemetry → Tempo + Langfuse, and cost metrics** | Latency is one number; retrieval versus generation is invisible, and so is the money | A span per stage with `gen_ai.*` attributes, traces in Tempo, prompts in Langfuse, dollars per 1,000 requests on a dashboard — criteria #11, #12 | A retrieval regression still ships: nothing tests answer quality |
+| 14 *(not built)* | **KEDA on in-flight requests, and the Cluster Autoscaler** | Capacity is whatever replica count was committed, and the obvious remedy does not work here: the pods spend their time waiting on two remote APIs, so CPU barely moves and an HPA on CPU would never fire | Scaling follows in-flight requests — the one signal that tracks demand when the work is waiting, not computing — between 2 and 8 pods; nodes added when pods no longer fit — criterion #14 | You can see *that* a request was slow, never *where* it was slow |
+| 15 *(not built)* | **OpenTelemetry → Tempo + Langfuse, and cost metrics** | Latency is one number; retrieval versus generation is invisible, and so is the money | A span per stage with `gen_ai.*` attributes, traces in Tempo, real-model traces in Langfuse (prompt text once capture is built), dollars per 1,000 requests on a dashboard — criteria #11, #12 | A retrieval regression still ships: nothing tests answer quality |
 | 16 *(not built, P1)* | **Retrieval eval gate** | Prompt and data changes are merged on opinion | `hit@4` over a golden set, compared against a stored baseline, run in CI with no LLM calls — criterion #13 | — |
 
 **The workload itself:** FastAPI on uvicorn, LangChain, a Chroma index of 269 anime, embeddings from the
@@ -256,7 +261,8 @@ Prometheus, and `config/pricing.yaml` turns tokens into dollars.
 Decisions already taken in the design, and the price each one carries. None of them is running yet.
 
 - **Spot nodes, 2 to 4.** Cheap, and interruption becomes something the design must survive rather than
-  something it hopes to avoid. The api keeps `minAvailable: 1` and spreads across nodes.
+  something it hopes to avoid. The api keeps `minAvailable: 1` and spreads across nodes. The bounds only matter
+  because the Cluster Autoscaler moves the group within them; a node group does not scale itself.
 - **One NAT gateway**, not one per zone: a cost choice, written down as a single point of failure.
 - **Langfuse Cloud, not self-hosted.** Tempo in the cluster stays the source of truth; Langfuse is a second
   export that can fail without affecting a request.
@@ -297,9 +303,21 @@ there is something to run them against.
 
 ## Docs
 
-| Area | Architecture | Step-by-step | Interview Q&A |
+Each stage has a README — the problem, the decisions in the order they must be taken, and how the stage could
+pass while broken — and a concepts page that defines every idea the README uses. They are written in build order,
+and each one points at the box in the architecture it zooms into.
+
+| Stage | Ideas | Step-by-step | Interview Q&A |
 |---|---|---|---|
-| The whole project | [design](docs/eks-sre-llmops-design.md) | *not written yet* | *not written yet* |
+| 1 · AWS and a way in, with Terraform | [README](docs/terraform/README.md) · [concepts](docs/terraform/concepts.md) | *not written yet* | *not written yet* |
+| 2 · GitOps, and two doors | [README](docs/gitops/README.md) · [concepts](docs/gitops/concepts.md) | | |
+| 3 · CI/CD, to a signed digest | [README](docs/cicd/README.md) · [concepts](docs/cicd/concepts.md) | | |
+| 4 · Load, and the numbers everything uses | [README](docs/load/README.md) · [concepts](docs/load/concepts.md) | | |
+| 5 · Delivery, a release that judges itself | [README](docs/delivery/README.md) · [concepts](docs/delivery/concepts.md) | | |
+| 6 · SLOs and alerting | [README](docs/slo/README.md) · [concepts](docs/slo/concepts.md) | | |
+| 7 · Scaling, pods and nodes | [README](docs/scaling/README.md) · [concepts](docs/scaling/concepts.md) | | |
+| 8 · Tracing and cost | [README](docs/tracing/README.md) · [concepts](docs/tracing/concepts.md) | | |
+| The whole project | [design](docs/eks-sre-llmops-design.md) | | |
 | Measured results | [`docs/evidence/`](docs/evidence/) | | |
 
 ---
