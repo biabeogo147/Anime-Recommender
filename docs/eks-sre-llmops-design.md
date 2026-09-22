@@ -110,7 +110,8 @@ stage) and the `MLops-Common` submodule (dropped once CI no longer uses the on-p
 ## 3. Architecture
 
 One picture of the whole system. Every close-up in [§4](#4-components) is one box out of this picture, and
-each says which box it is before it draws anything.
+each says which box it is before it draws anything. How it differs from Medical's self-managed cluster, and why one
+uses NLBs where the other uses ALBs: [compared with Medical](aws/compare-to-medical-rag-chatbot.md).
 
 ```mermaid
 flowchart TB
@@ -1177,7 +1178,7 @@ tests/  eval/  loadtest/k6/  config/pricing.yaml  data/
 infra/terraform/{shared/, cluster/, bootstrap/}
 deploy/{argocd/, charts/anime-api/, charts/anime-ui/, slo/, dashboards/}
 .github/workflows/{ci.yml, eval.yml}
-docs/{evidence/, runbooks/}
+docs/{1-terraform/ … 8-tracing/, aws/, common/, evidence/, runbooks/}   one folder per build stage, in build order
 Makefile
 ```
 

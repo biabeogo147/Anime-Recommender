@@ -319,7 +319,7 @@ and each one points at the box in the architecture it zooms into.
 | 7 · Scaling, pods and nodes | [README](docs/7-scaling/README.md) · [concepts](docs/7-scaling/concepts.md) | [guide](docs/7-scaling/guide.md) | [questions](docs/7-scaling/questions.md) · [answers](docs/7-scaling/answers.md) |
 | 8 · Tracing and cost | [README](docs/8-tracing/README.md) · [concepts](docs/8-tracing/concepts.md) | [guide](docs/8-tracing/guide.md) | [questions](docs/8-tracing/questions.md) · [answers](docs/8-tracing/answers.md) |
 | The whole project | [design](docs/eks-sre-llmops-design.md) | | [questions](docs/common/questions.md) · [answers](docs/common/answers.md) |
-| Managed against self-managed, beside Medical | [design §1](docs/eks-sre-llmops-design.md#1-goal) | | [questions](docs/aws/questions.md) · [answers](docs/aws/answers.md) |
+| Managed against self-managed, beside Medical | [design §1](docs/eks-sre-llmops-design.md#1-goal) · [compared with Medical](docs/aws/compare-to-medical-rag-chatbot.md) | | [questions](docs/aws/questions.md) · [answers](docs/aws/answers.md) |
 | Measured results | [`docs/evidence/`](docs/evidence/) | | |
 
 ---
