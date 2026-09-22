@@ -233,9 +233,10 @@ it is issued once and AWS renews it, and nothing in a rebuild touches it.
   balancer, and the internal one fails independently of the public one.
 - **EKS**, via `terraform-aws-modules/eks`:
   - the newest version still in **standard support** at build time, pinned exactly;
-  - **the public endpoint is off.** `cluster_endpoint_public_access = false` in the module, which is
+  - **the public endpoint is off.** `endpoint_public_access = false` in the module (v21), which is
     `endpointPublicAccess` on the EKS API itself; the private endpoint stays on. The API server has
-    no address on the internet at all, so there is no allowlist to keep correct;
+    no address on the internet at all, so there is no allowlist to keep correct. Its ENIs sit in two small subnets of
+    their own, so the VPN gateway can drop tunnel traffic to them while still forwarding 443 to the internal ALB;
   - access entries, not the `aws-auth` ConfigMap.
 - **WireGuard gateway:** one small instance in a public subnet with an Elastic IP, UDP 51820, its key material
   in Secrets Manager and readable only by this instance's role. It does **two** jobs — it is the VPN that puts
@@ -275,7 +276,7 @@ it is issued once and AWS renews it, and nothing in a rebuild touches it.
 - **Budgets:** alarms at 50 and 100 USD, with the same default tags as Medical.
 - **Argo CD:** installed **in a second apply, after the tunnel is open** — not in the same run that creates
   the cluster. `make infra` builds AWS and stops; `make tunnel` opens the SSM port-forward; `make bootstrap`
-  then runs the small Terraform configuration whose `helm` and `kubernetes` providers point at
+  then runs the small Terraform configuration whose `helm` provider points at
   `127.0.0.1:6443`. A single `apply` cannot do both: with `endpointPublicAccess = false` the API server has no
   address the workstation can reach until the tunnel exists, and the tunnel needs the gateway that the same
   apply is still creating. Medical splits the same way for the same reason. Everything after Argo CD is

@@ -9,3 +9,14 @@ __pycache__/
 .ruff_cache/
 chroma_db/
 index/
+
+# Terraform: provider plugins and local plan files are rebuilt by `terraform init`; state lives in S3.
+.terraform/
+*.tfplan
+*.tfstate
+*.tfstate.backup
+# Personal values (budget email) stay on the workstation.
+*.tfvars
+# Kubeconfig and WireGuard material written by make targets on the workstation.
+.kube/
+*.conf.local

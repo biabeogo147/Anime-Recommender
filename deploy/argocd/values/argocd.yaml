@@ -1,0 +1,76 @@
+# Values for the argo-cd chart, installed by infra/terraform/bootstrap (make bootstrap).
+
+global:
+  # The admin UI's name. It resolves publicly to the INTERNAL load balancer, so only a VPN peer can open it
+  # (GitOps A6.1). The Ingress itself is a plain manifest synced from Git in stage 2.
+  domain: argocd.anime.recruitai.io.vn
+
+# One operator, the admin account; no SSO and no notification channel yet.
+dex:
+  enabled: false
+notifications:
+  enabled: false
+
+configs:
+  cm:
+    # Tell the server its public URL: behind a load balancer that ends TLS it sees plain HTTP from an internal
+    # address, and would otherwise build links and redirects for the wrong name (GitOps A6.4).
+    url: https://argocd.anime.recruitai.io.vn
+
+    # Health of a child Application, so sync waves under the root actually wait (GitOps A2.4, A9.1).
+    #
+    # Argo CD has no built-in health for kind Application; without this every child is "healthy" the instant it is
+    # created and all waves start at once. And health alone is not enough: Argo CD leaves resources that do not exist
+    # yet out of an Application's health, so a child that has applied half its manifests still reports Healthy.
+    # Medical learned this on a real rebuild (a health-only check let every wave go at once and spent a Let's Encrypt
+    # issuance). The rule here is the corrected one:
+    #   - Healthy only when the child is Healthy AND Synced (Synced stays false until every resource exists);
+    #   - Degraded passes through, or a failed child would read Progressing and the root would wait for ever;
+    #   - a child with no resources at all is Degraded — it means a wrong `path:`, which would otherwise read
+    #     Healthy + Synced immediately and let the root walk every wave in one second.
+    resource.customizations.health.argoproj.io_Application: |
+      hs = {}
+      hs.status = "Progressing"
+      hs.message = "waiting for the child Application"
+
+      if obj.status == nil or obj.status.health == nil or obj.status.sync == nil then
+        return hs
+      end
+
+      if obj.status.health.status == "Degraded" then
+        hs.status = "Degraded"
+        hs.message = obj.status.health.message or "child Application is Degraded"
+        return hs
+      end
+
+      if obj.status.health.status == "Healthy" and obj.status.sync.status == "Synced" then
+        if obj.status.resources == nil or #obj.status.resources == 0 then
+          hs.status = "Degraded"
+          hs.message = "child Application reports no resources: check its source path"
+          return hs
+        end
+        hs.status = "Healthy"
+        hs.message = obj.status.health.message or "child Application is ready"
+      end
+
+      return hs
+
+  params:
+    # TLS ends at the ALB, which forwards plain HTTP. Without this argocd-server redirects that HTTP to HTTPS and
+    # every request loops.
+    server.insecure: true
+
+# Requests reserve room on 8 GiB nodes; limits keep one component from starving the others. Starting points, not
+# measurements.
+controller:
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { memory: 1Gi }
+server:
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 256Mi }
+repoServer:
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 512Mi }

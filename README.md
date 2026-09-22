@@ -310,7 +310,7 @@ and each one points at the box in the architecture it zooms into.
 
 | Stage | Ideas | Step-by-step | Interview Q&A |
 |---|---|---|---|
-| 1 · AWS and a way in, with Terraform | [README](docs/terraform/README.md) · [concepts](docs/terraform/concepts.md) | *not written yet* | [questions](docs/terraform/questions.md) · [answers](docs/terraform/answers.md) |
+| 1 · AWS and a way in, with Terraform | [README](docs/terraform/README.md) · [concepts](docs/terraform/concepts.md) | [guide](docs/terraform/guide.md) | [questions](docs/terraform/questions.md) · [answers](docs/terraform/answers.md) |
 | 2 · GitOps, and two doors | [README](docs/gitops/README.md) · [concepts](docs/gitops/concepts.md) | | [questions](docs/gitops/questions.md) · [answers](docs/gitops/answers.md) |
 | 3 · CI/CD, to a signed digest | [README](docs/cicd/README.md) · [concepts](docs/cicd/concepts.md) | | [questions](docs/cicd/questions.md) · [answers](docs/cicd/answers.md) |
 | 4 · Load, and the numbers everything uses | [README](docs/load/README.md) · [concepts](docs/load/concepts.md) | | [questions](docs/load/questions.md) · [answers](docs/load/answers.md) |
