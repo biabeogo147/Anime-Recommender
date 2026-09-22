@@ -139,12 +139,12 @@ giờ áp dụng."
 
 *Nếu được hỏi thêm:* ra nhanh, vào chậm — thêm capacity muộn thì người dùng chịu, bớt sớm thì một phút sau phải
 scale out lại và trả lại toàn bộ độ trễ khởi động. Mặc định của HPA cho scale out không chờ, mỗi mười lăm giây
-tăng được gấp đôi hoặc thêm bốn pod; sau cửa sổ scale in, mặc định cho phép bớt về mức tối thiểu trong một bước
-**[kiểm chứng]**. Thời điểm quay về `[điền: thời điểm quay về mức tối thiểu]`.
+tăng được gấp đôi hoặc thêm bốn pod; sau cửa sổ scale in, ScaledObject chỉ cho bớt một pod mỗi phút, để scale in không
+rút nhiều pod cùng lúc. Thời điểm quay về `[điền: thời điểm quay về mức tối thiểu]`.
 
 **A5.2** **Ý chính:** "Theo một đồng hồ riêng của Cluster Autoscaler: nó chỉ bỏ một node sau khi node đó không
-cần tới trong mười phút, và không trong mười phút sau một lần scale out — hai mốc đó là mặc định của Cluster
-Autoscaler, không phải cấu hình của tôi. Node đang giữ pod có storage cục bộ có thể bị bỏ qua, trừ khi pod nói nó
+cần tới trong mười phút, và không trong mười phút sau một lần scale out — hai mốc đó bằng mặc định của Cluster
+Autoscaler, nhưng được ghi tường minh trong cấu hình, vì #14 đo theo chúng. Node đang giữ pod có storage cục bộ có thể bị bỏ qua, trừ khi pod nói nó
 được phép bị dời. `/tmp` của api là một `emptyDir`, nên pod api mang annotation cho phép dời, với giá trị là tên
 volume."
 

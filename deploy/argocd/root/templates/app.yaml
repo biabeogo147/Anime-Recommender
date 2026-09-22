@@ -55,6 +55,14 @@ spec:
       kind: Ingress
       name: anime-public
       jsonPointers: [/metadata/annotations/alb.ingress.kubernetes.io~1actions.anime-api-stable]
+    {{- if has "scaling" $.Values.stages }}
+    # From stage 7 the HPA KEDA creates owns the Rollout's replica count. The chart keeps `replicas` (the starting
+    # value, and the value until KEDA acts), and Argo CD leaves the live number alone (Scaling A7.2).
+    - group: argoproj.io
+      kind: Rollout
+      name: anime-api
+      jsonPointers: [/spec/replicas]
+    {{- end }}
   # PruneLast: switching delivery on replaces the Deployment with a Rollout. The old Deployment is deleted only after
   # the Rollout is healthy, so the api is never without pods. It is briefly without TARGETS, though: the api rule moves
   # to the new stable target group before the controller has registered and health-checked its pods — expect 503s on

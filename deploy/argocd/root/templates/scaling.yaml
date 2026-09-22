@@ -1,0 +1,73 @@
+{{- if has "scaling" .Values.stages }}
+# Wave 0: KEDA — the ScaledObject CRD and the operator that turns one into an HPA. The api's ScaledObject is in wave 1.
+# KEDA's operator can scale any /scale subresource, the Rollout's included; it needs no AWS permission, only
+# Prometheus, which it reaches inside the cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keda
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://kedacore.github.io/charts
+    chart: keda
+    # A release with fallback.behavior (currentReplicasIfHigher) — the api's ScaledObject relies on it (design §4.5).
+    targetRevision: {{ .Values.pins.charts.keda | quote }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keda
+  # ServerSideApply: KEDA's CRDs are too large for a client-side apply's annotation.
+  {{- include "root.syncPolicy" (list "CreateNamespace=true" "ServerSideApply=true") | nindent 2 }}
+---
+# Wave 0: the Cluster Autoscaler. A managed node group does not scale itself; its 2..4 are bounds for something else
+# to move within. This adds a node when a pod cannot be scheduled and removes one that stays underused (design §4.5).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-autoscaler
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes.github.io/autoscaler
+    chart: cluster-autoscaler
+    targetRevision: {{ .Values.pins.charts.clusterAutoscaler | quote }}
+    helm:
+      valuesObject:
+        cloudProvider: aws
+        # The region, because node metadata is hidden from pods (IMDSv2, hop limit 1).
+        awsRegion: {{ .Values.region }}
+        # Finds the node group's Auto Scaling group by the two tags EKS puts on every managed node group's ASG, with
+        # the group's own min and max (2 and 4, infra/terraform/cluster/eks.tf). Nothing here repeats those numbers.
+        autoDiscovery:
+          clusterName: anime
+        # The autoscaler's minor version must match the cluster's (1.xx); the chart's default image may be newer.
+        # `make pins` prints the newest patch release for the cluster's minor.
+        image:
+          tag: {{ .Values.pins.clusterAutoscalerImageTag | quote }}
+        rbac:
+          serviceAccount:
+            create: true
+            name: cluster-autoscaler # the Pod Identity association's ServiceAccount (pod-identity.tf)
+        extraArgs:
+          # Stated rather than left to the defaults, because criterion #14 times the node return against them: a node
+          # is removed after 10 minutes unneeded, and not within 10 minutes of a scale-up (Scaling A5.2).
+          scale-down-unneeded-time: 10m
+          scale-down-delay-after-add: 10m
+          # Pods with an emptyDir are never evicted for a scale-down unless they say they may be. The api's pods do
+          # (safe-to-evict-local-volumes, in the chart). Everything else keeps the safe default on purpose: Prometheus
+          # and Tempo keep their data in an emptyDir, and moving them mid-run would erase the evidence. The cost: a
+          # scaled-out node that such a pod landed on is not removed (docs/scaling/guide.md, 3.3).
+          skip-nodes-with-local-storage: true
+          expander: least-waste
+        replicaCount: 1 # leader election is on; one replica is enough for a node group that moves in minutes
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  {{- include "root.syncPolicy" (list) | nindent 2 }}
+{{- end }}

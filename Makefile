@@ -51,7 +51,7 @@ cluster_output = $(TF_CLUSTER) output -raw $(1)
 
 .PHONY: shared-init shared-plan shared init plan infra kubeconfig tunnel ready bootstrap-init bootstrap-plan \
         bootstrap up vpn-config pins image apps loadtest-baseline loadtest-ramp loadtest-steady prom prom-range \
-        rollout-status rollout promote-full slo-generate slo-check down infra-destroy
+        rollout-status rollout promote-full slo-generate slo-check langfuse-obs down infra-destroy
 
 # --- shared: survives every teardown -----------------------------------------------------------------------------
 shared-init:
@@ -256,6 +256,26 @@ rollout: rollout-status
 # analysis that stopped it (Delivery A7.2).
 promote-full:
 	kubectl -n anime patch rollout anime-api --subresource=status --type merge -p '{"status":{"promoteFull":true}}'
+
+# --- stage 8: what Langfuse holds for one trace id ----------------------------------------------------------------
+# Through Langfuse's public API, with the project's own keys read from Secrets Manager on this workstation only. Prints
+# the HTTP status first: 200 with no observations is "not there"; 401 is keys or region, never "absent". The v2
+# observations endpoint replaces the v1 traces one, which Langfuse stops serving on 2026-11-16 (to be verified against
+# the Langfuse version in use).   make -s langfuse-obs ID=<trace id>
+langfuse-obs:
+	lf=$$(sed -n 's/^  otlpEndpoint: *"\{0,1\}\(https:\/\/[^/"]*\).*/\1/p' deploy/argocd/root/values.yaml)
+	[ -n "$$lf" ] || { echo "no Langfuse host in deploy/argocd/root/values.yaml"; exit 1; }
+	[ -n "$(ID)" ] || { echo "usage: make -s langfuse-obs ID=<trace id>"; exit 1; }
+	auth=$$(aws secretsmanager get-secret-value --region $(REGION) --secret-id anime/langfuse --query SecretString \
+	  --output text | jq -r '"\(.LANGFUSE_PUBLIC_KEY):\(.LANGFUSE_SECRET_KEY)"')
+	code=$$(curl -s -o /tmp/langfuse-obs.json -w '%{http_code}' -u "$$auth" \
+	  "$$lf/api/public/v2/observations?traceId=$(ID)&fromStartTime=$$(date -u -d '-1 day' +%FT%TZ)")
+	echo "langfuse http $$code"
+	if [ "$$code" = 200 ]; then
+	  jq -r '"observations: \(.data | length)",
+	    (.data[] | "  \(.name)  type=\(.type)  model=\(.providedModelName // .model // "-")  usage=\(.usageDetails // .usage // {} | tostring)")' \
+	    /tmp/langfuse-obs.json
+	else cat /tmp/langfuse-obs.json; echo; fi
 
 # --- stage 6: the SLO rules, generated from the Sloth spec -------------------------------------------------------
 # Sloth runs in a container (nothing installed), pinned by version: a different Sloth may write different rules, and

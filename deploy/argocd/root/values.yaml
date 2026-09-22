@@ -26,6 +26,12 @@ pins:
     externalDns: PIN_ME
     kubePrometheusStack: PIN_ME
     argoRollouts: PIN_ME
+    keda: PIN_ME
+    clusterAutoscaler: PIN_ME
+    tempo: PIN_ME
+    opentelemetryCollector: PIN_ME
+  # The Cluster Autoscaler's image, of the cluster's own minor version (`make pins` prints it).
+  clusterAutoscalerImageTag: PIN_ME
 
 # The api's mode and drill marker; set by make bootstrap from terraform.tfvars (api_llm_provider, api_fault_rate,
 # api_drill).
@@ -40,3 +46,8 @@ network:
   vpnCidr: 10.98.0.0/24
 domain: anime.recruitai.io.vn
 region: ap-southeast-1
+
+# Where the collector sends real-model traces (stage 8). Langfuse Cloud's EU region; its US region is
+# https://us.cloud.langfuse.com/api/public/otel. It must be the region the project and its keys (anime/langfuse) are in.
+langfuse:
+  otlpEndpoint: https://cloud.langfuse.com/api/public/otel

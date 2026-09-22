@@ -28,7 +28,9 @@ export const options = {
         { target: Math.round(MAX_RPS * 0.5), duration: '2m' },
         { target: Math.round(MAX_RPS * 0.75), duration: '2m' },
         { target: MAX_RPS, duration: '2m' },
-        { target: MAX_RPS, duration: '2m' }, // hold the top, so a knee near it shows as a plateau, not a spike
+        // Hold the top, so a knee near it shows as a plateau, not a spike. The scaling run (stage 7) holds longer —
+        // HOLD=10m — because a new node takes minutes, and a ramp that ends first never sees one.
+        { target: MAX_RPS, duration: __ENV.HOLD || '2m' },
       ],
       preAllocatedVUs: 50,
       maxVUs: parseInt(__ENV.MAX_VUS || '1000', 10),

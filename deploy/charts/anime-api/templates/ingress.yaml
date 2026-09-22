@@ -23,6 +23,9 @@ metadata:
     # serves them anyway (fail-open) — so a wrong path would be invisible without the readiness gate (GitOps A3.5).
     # /readyz, not /healthz: a pod whose index is not loaded should receive no traffic.
     alb.ingress.kubernetes.io/healthcheck-path: /readyz
+    # A draining target gets no NEW requests; this is how long the ALB waits for the ones in progress before dropping
+    # the target. The default is 300 s, far longer than any request here and than a pod's 45 s grace period.
+    alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=30
     {{- if has "delivery" .Values.stages }}
     # The api rule's weighted forward. Git holds only its STARTING value — all traffic to stable — because the load
     # balancer controller refuses the whole Ingress (the ui host too) while a `use-annotation` rule names an action that

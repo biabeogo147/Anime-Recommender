@@ -33,6 +33,19 @@ analysis:
   minSuccessRate: 0.99  # share of canary requests without a 5xx
   maxLatencyRatio: 1.2  # canary p95 over stable p95, same window
 
+# The autoscaler (stage 7, templates/scaledobject.yaml).
+scaling:
+  minReplicas: 2
+  maxReplicas: 8
+  # Requests in flight per pod that the HPA aims for: set below stage 4's in-flight per pod at the knee. The chart
+  # refuses to render the ScaledObject while this is the placeholder (docs/scaling/guide.md, section 0).
+  inFlightTarget: MEASURE_IN_STAGE_4
+  scaleDownWindowSeconds: 300 # the HPA's scale-down stabilisation window, stated rather than defaulted
+
+# Tracing (stage 8): whether spans carry the prompt and completion (src/anime/telemetry.py, capture_content).
+tracing:
+  captureContent: "true"
+
 # Starting points, not measurements: stage 4's capacity run replaces them with what a pod used at the knee (Scaling A4.3).
 resources:
   requests: { cpu: 250m, memory: 512Mi }
