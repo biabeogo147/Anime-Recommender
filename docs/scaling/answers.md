@@ -107,9 +107,9 @@ max của một managed node group chỉ là giới hạn cho thứ khác di chu
 Cluster Autoscaler thì pod đầu tiên không còn vừa hai node sẽ Pending mãi."
 
 *Nếu được hỏi thêm:* Cluster Autoscaler có Pod Identity riêng, chỉ được ghi vào Auto Scaling group của node group
-này. EKS tự gắn tag cho Auto Scaling group của managed node group, nên Cluster Autoscaler tự tìm ra nó. Bốn loại
-instance Spot cùng cỡ, và điều đó quan trọng, vì Cluster Autoscaler giả lập node mới từ một khuôn duy nhất
-**[kiểm chứng]**.
+này. EKS tự gắn tag cho Auto Scaling group của managed node group, nên Cluster Autoscaler tự tìm ra nó. Node group
+chỉ có một loại instance, `m7i-flex.large` — loại 2 vCPU / 8 GiB duy nhất gói Free cho chạy
+(`docs/evidence/account.md`) — nên khuôn mà Cluster Autoscaler dùng để giả lập node mới khớp đúng node thật.
 
 **A4.2** **Ý chính:** "Chủ yếu là resource *request*, không phải mức dùng thật. Scheduler đặt pod theo thứ pod
 xin, và Cluster Autoscaler thêm bớt node cũng theo đúng thước đo đó. Một pod xin ít thì vừa gần như mọi chỗ."

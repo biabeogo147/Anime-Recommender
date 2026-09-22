@@ -27,7 +27,6 @@ cho mười sáu điều kiện hoàn thành trong design; **pass sai** cho mộ
 
 | Chỗ cần điền | Lấy từ | Dùng ở |
 |---|---|---|
-| Kết quả kiểm gói của tài khoản AWS dùng chung | Trước khi dựng stage đầu | A5.1 |
 | Chi phí một phiên làm việc | Cost Explorer sau phiên đầu | A6.3 |
 | Tiêu chí đầu tiên của hạ tầng được đóng, và con số của nó | Lần dựng đầu | A6.1, A7.3 |
 
@@ -188,14 +187,18 @@ chỉ là một định nghĩa, không bao giờ là thứ tôi tuyên bố đã
 
 ### A5. Rủi ro và đánh đổi
 
-**A5.1** **Ý chính:** "Rủi ro có thể chặn ngay từ đầu: tài khoản dùng chung với Medical đang ở gói Free, và theo
-ghi chép của Medical, gói đó từ chối các loại instance ngoài free tier — `t3.large` là một ví dụ. Tôi chưa biết
-nó có cho EKS và Spot không, nên đó là thứ được kiểm đầu tiên. Sau đó: giới hạn tier miễn phí của Gemini và
-Hugging Face làm méo phép đo — nên chỉ baseline chạy model thật, còn lại chạy fake và ghi rõ chế độ. Spot hết
-capacity — có bốn loại instance và phương án node group on-demand. Và cấu hình chia traffic ở ALB có thể mất
-nhiều thời gian hơn dự kiến — phương án là canary theo tỉ lệ replica, yếu hơn, và bằng chứng sẽ nói vậy."
+**A5.1** **Ý chính:** "Rủi ro có thể chặn ngay từ đầu: tài khoản dùng chung với Medical đang ở gói Free, và gói đó chỉ
+chạy các loại instance free-tier-eligible. Nên tôi kiểm nó đầu tiên: EKS có trong gói, Spot chạy được, nhưng cả bốn
+loại tôi định dùng đều không eligible — nên node group chỉ còn `m7i-flex.large`. Sau đó: giới hạn tier miễn phí của
+Gemini và Hugging Face làm méo phép đo — nên chỉ baseline chạy model thật, còn lại chạy fake và ghi rõ chế độ. Spot
+hết capacity — chỉ còn một loại instance, nên rủi ro này lớn hơn; phương án là cùng loại đó chạy on-demand. Và cấu
+hình chia traffic ở ALB có thể mất nhiều thời gian hơn dự kiến — phương án là canary theo tỉ lệ replica, yếu hơn, và
+bằng chứng sẽ nói vậy."
 
-*Nếu được hỏi thêm:* kết quả kiểm gói `[điền: kết quả kiểm gói]`. Thêm một rủi ro nhỏ hơn: ACM có gia hạn một
+*Nếu được hỏi thêm:* kết quả kiểm gói (2026-09-22): gói FREE, còn 91.64 USD credit dùng chung với Medical; EKS
+gọi được; `t3.large`, `t3a.large`, `m5.large`, `m6i.large` không eligible; một `m7i-flex.large` Spot chạy thật được
+rồi xoá. Dry-run thì chấp nhận cả loại không eligible, nên nó không chứng minh được gì ở đây
+(`docs/evidence/account.md`). Thêm một rủi ro nhỏ hơn: ACM có gia hạn một
 chứng chỉ không gắn vào đâu phần lớn thời gian hay không — Terraform A8.4.
 
 **A5.2** **Ý chính:** "Cắt theo thứ tự: phần P1, rồi KEDA và Cluster Autoscaler — giữ số replica cố định lấy từ

@@ -26,7 +26,6 @@ cho IAM role.
 | RTO khôi phục etcd của Medical | Drill khôi phục etcd của Medical | A2.1 |
 | Thời gian dựng lại cụm EKS từ con số không | Lần dựng đầu của Anime | A2.1 |
 | Chi phí Anime mỗi giờ khi chạy | Lần dựng đầu của Anime | A2.6 |
-| Gói tài khoản có cho EKS, Spot và các loại instance đã chọn không | Kiểm trước khi dựng Anime | A6.2 |
 
 ---
 
@@ -180,8 +179,9 @@ gỡ thành viên cũ và thêm thành viên mới bằng tay. Nên Spot không 
 của mình, nên node Spot biến mất chỉ là mất capacity, và thiết kế coi đó là một đặc tính phải chịu được."
 
 *Nếu được hỏi thêm:* tài khoản dùng chung với Medical đang ở gói bị giới hạn loại instance. Anime chạy cùng tài
-khoản đó, nên danh sách instance Spot của Anime phải qua được ràng buộc này — `[điền: gói có cho EKS, Spot và các
-loại đã chọn không]`. Terraform A4.1.
+khoản đó, nên danh sách instance Spot của Anime phải qua được ràng buộc này — gói có cho EKS và Spot, nhưng
+chỉ `m7i-flex.large` trong các loại cỡ 2 vCPU / 8 GiB là eligible, nên node group chỉ dùng loại đó
+(`docs/evidence/account.md`). Terraform A4.1, và Terraform concepts §6 cho cái giá của một loại duy nhất.
 
 **A6.3** **Ý chính:** "Medical dùng Calico, pod có dải địa chỉ riêng, NetworkPolicy được thực thi — kể cả việc
 chặn địa chỉ metadata. Load balancer là NLB do Terraform tạo, đổ vào ingress-nginx qua node port. Anime dùng VPC

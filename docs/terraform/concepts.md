@@ -114,8 +114,10 @@ elevated risk.
 
 **How it runs here.** The managed node group acts on the rebalance recommendation: it launches a replacement,
 then cordons and drains the old node. If the interruption notice arrives first, draining starts then and is
-best-effort inside the two minutes. Several instance types across two zones keep one shortage from emptying
-the group.
+best-effort inside the two minutes. The group spans two zones, so one zone's shortage does not empty it. It has
+a single instance type, because the account's plan launches only one eligible type of this size, so each zone is
+one Spot pool: a shortage of that one type is more likely to leave the group short than it would be with several.
+The fallback is the same type On-Demand.
 
 **The disruption budget.** A *PodDisruptionBudget* tells Kubernetes how many of a set of pods must stay
 available during **voluntary** evictions — a drain is the usual one. Here it keeps at least one API replica

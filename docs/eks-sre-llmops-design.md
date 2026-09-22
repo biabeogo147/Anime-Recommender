@@ -251,12 +251,15 @@ it is issued once and AWS renews it, and nothing in a rebuild touches it.
   **external-dns** from the Ingress objects. Terraform cannot write them: an alias record needs its target's
   DNS name and hosted-zone id at apply time, and both load balancers are created later, by a controller
   inside the cluster, from objects Terraform never sees.
-- **Managed node group, Spot:** instance types `[t3.large, t3a.large, m5.large, m6i.large]`, desired 2, min 2,
-  max 4; gp3 encrypted volumes; IMDSv2 with hop limit 1.
-  **Account plan — to be verified before stage 1.** The account is Medical's, and Medical's design records that it
-  is on the AWS Free plan, which refuses instance types that are not free-tier eligible — `t3.large` among them.
-  Whether that plan allows EKS and Spot at all, and which of these types it accepts, decides whether this list
-  stands or the account's plan changes first.
+- **Managed node group, Spot:** instance type `m7i-flex.large` only, desired 2, min 2, max 4; gp3 encrypted
+  volumes; IMDSv2 with hop limit 1.
+  **Account plan — checked 2026-09-22** ([evidence](evidence/account.md)). The account is Medical's, on the AWS
+  **Free** plan, which lists EKS among its services but launches only free-tier-eligible instance types. None of the
+  four types first planned (`t3.large`, `t3a.large`, `m5.large`, `m6i.large`) is eligible; `m7i-flex.large` is the
+  only eligible 2 vCPU / 8 GiB type, and a real Spot launch of it was fulfilled. A dry run accepted the ineligible
+  types too, so on this plan a dry run proves nothing about what will launch. `c7i-flex.large` is eligible but has
+  4 GiB, and one node group needs one size for the Cluster Autoscaler's template, so the group has a single type:
+  one Spot pool per zone instead of four.
 - **Addons:** vpc-cni, coredns, kube-proxy, aws-ebs-csi-driver, eks-pod-identity-agent.
 - **Pod Identity associations:** AWS Load Balancer Controller; External Secrets, read on exactly three ARNs —
   `anime/llm`, `anime/langfuse`, `anime/alerting` — and **not** a wildcard, because `anime/*` would include
@@ -1237,7 +1240,8 @@ needs.
 | Risk | Mitigation |
 |---|---|
 | Gemini and Hugging Face free-tier limits distort measurements | Real-provider runs are limited to the low-rate baseline; scale and canary numbers come from fake mode, and **every claim states its mode** |
-| Spot capacity unavailable | Four instance types; fall back to an On-Demand node group (about +0.10 USD/h), which the Cluster Autoscaler must then also manage, with an expander that prefers Spot |
+| Spot capacity unavailable | Only one eligible type, so one Spot pool per zone across two zones. Fall back to `capacity_type = "ON_DEMAND"` on the same type, also eligible, at the On-Demand price for as long as the shortage lasts |
+| **The account's credit runs out** | The Free plan holds 91.64 USD of credit (2026-09-22), shared with Medical, and the account is closed when it is spent, or when the plan expires on 2027-02-13, unless it is upgraded to a paid plan. A running Anime cluster is estimated — not measured — at roughly 0.4–0.6 USD an hour. Every session ends with `make down`, and Medical's idle cluster is stopped. The shared stack's budget warns on Anime's own spend only, counted before credits (`include_credit = false`), so it fires while the credit is still paying; the credit itself is read at session start (`aws freetier get-account-plan-state`, terraform guide 0.3) |
 | ALB traffic routing takes longer to wire than planned | Fallback: a replica-ratio canary with no traffic router, using the same AnalysisTemplate. Weaker, and the evidence would say so |
 | **One NAT gateway, not one per zone** | A deliberate cost choice, and a single point of failure for everything the pods reach outside the VPC: Gemini, Hugging Face, Langfuse and the Discord webhook. A zone failure that takes the NAT takes all four at once, and the SLI records it as the service's own errors. Accepted; the alternative is a second NAT and its hourly cost |
 | **The Route 53 zone belongs to Medical** | Anime reads it with a `data` source and writes only its own records. Destroying or recreating Medical's `shared` stack invalidates ACM's validation record and Anime's names at once. Accepted because a second registered domain costs money every year; recorded because the blast radius crosses a project boundary |

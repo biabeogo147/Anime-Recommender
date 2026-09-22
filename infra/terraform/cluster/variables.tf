@@ -44,12 +44,15 @@ variable "kubernetes_version" {
 }
 
 variable "node_instance_types" {
-  # Several types across two zones, so one Spot shortage does not empty the group (Terraform A4.1). All four are
-  # 2 vCPU / 8 GiB: the Cluster Autoscaler simulates a new node from one template, so similar sizes matter.
-  # Step 0 checks the account's plan accepts them; if not, replace the list here.
+  # The account is on the AWS Free plan, which launches only free-tier-eligible types; m7i-flex.large is the only
+  # eligible 2 vCPU / 8 GiB one, and it runs as Spot (checked 2026-09-22, docs/evidence/account.md). c7i-flex.large is
+  # eligible too but left out: it has 4 GiB, and the Cluster Autoscaler simulates a new node from one template, so
+  # the types of a group must be the same size. The cost is one Spot pool per zone instead of four: a shortage is
+  # likelier to leave the group short (Terraform concepts §6); the fallback is the same type On-Demand, also eligible.
+  # Guide step 0.3 checks eligibility; replace the list only with types it reports eligible.
   description = "Spot instance types for the managed node group."
   type        = list(string)
-  default     = ["t3.large", "t3a.large", "m5.large", "m6i.large"]
+  default     = ["m7i-flex.large"]
 }
 
 variable "wireguard_instance_type" {

@@ -57,31 +57,57 @@ Expected: Terraform ≥ 1.11, a plugin version, and three paths.
 
 ```bash
 cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
-aws freetier get-account-plan-state --query '[accountPlanType,accountPlanStatus]' --output text || echo "PLAN-STATE CALL FAILED"
+aws freetier get-account-plan-state --query '[accountPlanType,accountPlanStatus,accountPlanRemainingCredits.amount]' \
+  --output text || echo "PLAN-STATE CALL FAILED"
 aws service-quotas get-service-quota --service-code ec2 --quota-code L-34B43A08 --query Quota.Value --output text
-TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
-MAC=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/mac)
-SUBNET=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/network/interfaces/macs/$MAC/subnet-id)
-AMI=$(aws ssm get-parameter --name /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id --query Parameter.Value --output text)
-PAT='DryRunOperation|[A-Za-z]*Unsupported[A-Za-z]*|InvalidParameterCombination|UnauthorizedOperation'
-for t in t3.large t3a.large m5.large m6i.large; do
-  r=$(aws ec2 run-instances --dry-run --image-id "$AMI" --subnet-id "$SUBNET" --instance-type "$t" 2>&1 | grep -oE "$PAT" | head -1 || true)
-  s=$(aws ec2 run-instances --dry-run --image-id "$AMI" --subnet-id "$SUBNET" --instance-type "$t" \
-      --instance-market-options MarketType=spot 2>&1 | grep -oE "$PAT" | head -1 || true)
-  printf '%-10s on-demand: %-28s spot: %s\n' "$t" "${r:-OTHER-ERROR}" "${s:-OTHER-ERROR}"
-done
+TYPES=$(sed -n '/variable "node_instance_types"/,/^}/s/.*default *= *\[\(.*\)\].*/\1/p' infra/terraform/cluster/variables.tf | tr ',' ' ' | tr -d '"')
+aws ec2 describe-instance-types --instance-types $TYPES --query 'InstanceTypes[].[InstanceType,FreeTierEligible]' --output text
 aws eks describe-cluster-versions --region ap-southeast-1 --version-status STANDARD_SUPPORT \
   --query 'sort_by(clusterVersions,&clusterVersion)[-1].clusterVersion' --output text
 ```
 
-Expected, in order: `PAID ACTIVE` (or similar, **not** `FREE`); a Spot vCPU quota of at least `8`; `DryRunOperation` in
-both columns for every type; `1.36`.
+Expected, in order:
+- the plan and what is left of its credit. `FREE ACTIVE <amount>` is fine: the Free plan runs EKS, and the credit is
+  the budget for every session. Write the amount down;
+- a Spot vCPU quota of at least `8`;
+- `m7i-flex.large True`: the one node type, and eligible;
+- `1.36`.
 
-- **The plan type is `FREE`, or any column is not `DryRunOperation`** — stop and report. `node_instance_types` in
-  `infra/terraform/cluster/variables.tf` (or the account plan) changes before anything is applied. A dry run proves
-  permission, not Spot capacity; capacity shows only at the real launch.
-- **The version is not `1.36`** — report it; `kubernetes_version` changes in Git first.
-- **`OTHER-ERROR`** — run that one `aws ec2 run-instances --dry-run …` line alone and report the full error.
+What stops the stage:
+- **A type shows `False`, and the plan is `FREE`.** The Free plan launches only free-tier-eligible types. A dry run
+  accepts the others anyway, so it is not a check here (docs/evidence/account.md). Report it: the type list changes
+  in Git first.
+- **The version is not `1.36`.** Report it; `kubernetes_version` changes in Git first.
+- **The credit is low.** Each session costs an estimated 0.4–0.6 USD per cluster hour, shared with Medical, and the
+  account closes when the credit is spent on the Free plan. Report it before applying.
+
+**Only after changing the type list:** prove Spot really launches that type with one real instance, deleted a minute
+later (well under a cent). Put the new type in `T=` first. This is how `m7i-flex.large` was checked on 2026-09-22.
+
+```bash
+cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
+T=m7i-flex.large
+TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+MAC=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/mac)
+SUBNET=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/network/interfaces/macs/$MAC/subnet-id)
+AMI=$(aws ssm get-parameter --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 --query Parameter.Value --output text)
+ID=$(aws ec2 run-instances --image-id "$AMI" --instance-type "$T" --subnet-id "$SUBNET" --no-associate-public-ip-address \
+  --instance-market-options MarketType=spot --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=anime-spot-test},{Key=project,Value=anime}]' \
+  --query 'Instances[0].InstanceId' --output text); echo "launched $ID"
+aws ec2 wait instance-running --instance-ids "$ID" && aws ec2 describe-instances --instance-ids "$ID" \
+  --query 'Reservations[0].Instances[0].[InstanceType,InstanceLifecycle,State.Name]' --output text
+SIR=$(aws ec2 describe-instances --instance-ids "$ID" --query 'Reservations[0].Instances[0].SpotInstanceRequestId' --output text)
+# Cancel the request first (the instance keeps running until terminated), then terminate it.
+aws ec2 cancel-spot-instance-requests --spot-instance-request-ids "$SIR" --query 'CancelledSpotInstanceRequests[0].State' --output text
+aws ec2 terminate-instances --instance-ids "$ID" >/dev/null && aws ec2 wait instance-terminated --instance-ids "$ID"
+# Whatever happened above, nothing tagged for this test may be left running.
+aws ec2 describe-instances --filters Name=tag:Name,Values=anime-spot-test Name=instance-state-name,Values=pending,running,stopping,stopped \
+  --query 'Reservations[].Instances[].InstanceId' --output text | grep . && echo "LEFT RUNNING: terminate these" || echo "nothing left"
+```
+
+Expected: `launched i-…`, `<type> spot running`, `cancelled`, `nothing left`. An error at the launch names what the
+plan refuses, and leaves nothing behind. Report it whole. If the session drops in the middle, run the last command
+alone and terminate what it lists.
 
 **0.4 — ops: Medical's pieces, and the values for the shared stack.** Replace the email on the `EMAIL=` line.
 
@@ -290,7 +316,7 @@ curl -k -sS -o /dev/null --max-time 10 "$EP/readyz"; rc=$?
 [ -n "$H" ] && [ $rc -eq 28 ] && echo "not reachable directly: correct (timeout)" || echo "UNEXPECTED rc=$rc"
 ```
 
-Expected: `ok`; two nodes `Ready` with `SPOT` and one of the four types; `getent` shows `10.30.250.x` (a private
+Expected: `ok`; two nodes `Ready` with `SPOT` and `m7i-flex.large`; `getent` shows `10.30.250.x` (a private
 address, in the control-plane subnets); last line `not reachable directly: correct (timeout)`. That last check is the
 negative half: the API has an address, but nothing outside the VPC can connect to it. Anything but a timeout (`rc=28`)
 is reported, not explained away.
@@ -401,7 +427,8 @@ again (5.1) until the versions are pinned in Git. The VPN profile needs no chang
 
 | Symptom | Likely cause | What to do |
 |---|---|---|
-| 0.3: plan `FREE`, or a type not `DryRunOperation` | The account plan refuses that type, or Spot | Report; the type list or the plan changes first |
+| 0.3: a type shows `False` on the `FREE` plan | The Free plan launches only free-tier-eligible types | Report; the type list changes first (0.3, the real Spot launch, for a new type) |
+| Node group fails: `AsgInstanceLaunchFailures`, `InsufficientInstanceCapacity` or `UnfulfillableCapacity` | No Spot capacity for the one type in these zones | `make plan && make infra` later. Last resort: `capacity_type = "ON_DEMAND"` in `eks.tf`, a change in Git that **replaces** the node group, done before apply, never mid-run. The On-Demand vCPU quota (16) is shared with Medical, which uses about 10: two Anime nodes fit, four do not |
 | 1: `VALIDATE FAILED` | A module input name differs in the downloaded module version | Report the error; the code is fixed, not the guide |
 | `make shared`: `EntityAlreadyExists` on the OIDC provider | 0.4 counted wrong | Set `create_github_oidc_provider = false` in `shared/terraform.tfvars`, `make shared-plan`, `make shared` |
 | `make shared` waits long on `aws_acm_certificate_validation` | Validation record not answering, or a CAA record excludes Amazon | `aws acm describe-certificate --certificate-arn <arn> --query 'Certificate.[Status,FailureReason]'`; `CAA_ERROR` → a CAA record needs `0 issue "amazon.com"`; also `dig +short NS recruitai.io.vn` must match the zone |
@@ -411,7 +438,6 @@ again (5.1) until the versions are pinned in Git. The VPN profile needs no chang
 | Re-plan `exit=2` right after apply | Drift, or an API that normalises what was sent | Report the `*-replan.txt` — this *is* criterion #1 |
 | `COUNT MISMATCH` | An apply partly failed, or the plan file is stale | Report both files in `/tmp/anime-*` |
 | `make infra`: `unsupported Kubernetes version` | The pin is newer than EKS offers | Fix `kubernetes_version` in Git (0.3) |
-| Node group fails: `AsgInstanceLaunchFailures`, `UnfulfillableCapacity` | No Spot capacity for the types in a zone | `make plan && make infra` later, or add a type |
 | Node group fails: `MaxSpotInstanceCountExceeded` | Spot vCPU quota (0.3) below 8 | Request a quota increase |
 | Node group fails: `NodeCreationFailure … failed to join` | CNI add-on or NAT not ready | Report `aws eks describe-nodegroup --cluster-name anime --nodegroup-name <name>` health issues |
 | `Error acquiring the state lock` | A run was interrupted | Check no terraform runs (`pgrep -a terraform`), then `terraform -chdir=infra/terraform/<s> force-unlock <ID>` with the ID from the error |

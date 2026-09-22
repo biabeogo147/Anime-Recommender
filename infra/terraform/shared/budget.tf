@@ -13,6 +13,12 @@ resource "aws_budgets_budget" "monthly" {
     values = [format("user:project$%s", var.project)] # "$" is a literal here; format() avoids HCL's "$${" escape
   }
 
+  # Spend BEFORE credits. The account's Free plan pays with credit, and the Budgets default nets credits out, so the
+  # alerts would see a cost of about zero and never fire while the credit is draining (design §10).
+  cost_types {
+    include_credit = false
+  }
+
   dynamic "notification" {
     for_each = [50, 100]
     content {
