@@ -43,10 +43,10 @@ spec:
       jsonPointers: [/data]
     - group: admissionregistration.k8s.io
       kind: MutatingWebhookConfiguration
-      jqPathExpressions: [.webhooks[].clientConfig.caBundle]
+      jqPathExpressions: [".webhooks[].clientConfig.caBundle"]
     - group: admissionregistration.k8s.io
       kind: ValidatingWebhookConfiguration
-      jqPathExpressions: [.webhooks[].clientConfig.caBundle]
+      jqPathExpressions: [".webhooks[].clientConfig.caBundle"]
   {{- include "root.syncPolicy" (list "RespectIgnoreDifferences=true") | nindent 2 }}
 ---
 # Wave -2: copies values from Secrets Manager into Kubernetes Secrets; Git holds names only. Its CRDs must exist before
