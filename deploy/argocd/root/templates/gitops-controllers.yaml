@@ -34,9 +34,15 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system
-  # Without cert-manager the chart generates its webhook certificate at render time, and Argo CD's render cannot look up
-  # the existing one — so every fresh render differs. The health check requires Synced, so a permanent diff here would
-  # stall every later wave; these fields are left to the cluster.
+  # Without cert-manager the chart generates its webhook CA and certificate at render time (genCA), and Argo CD's render
+  # cannot look up the existing one — so every fresh render differs. The health check requires Synced, so a permanent
+  # diff here would stall every later wave: ignoreDifferences keeps these fields out of the DIFF.
+  # It must not keep them out of the SYNC (no RespectIgnoreDifferences). A sync writes the Secret and both webhooks from
+  # one render, so they always match. With RespectIgnoreDifferences, the first bootstrap of 2026-09-22 broke: attempt 1
+  # created the Secret and stopped, the retry re-rendered, kept the Secret's old data and created the webhooks with the new
+  # CA, and every Ingress was then refused with "x509: certificate signed by unknown authority". The cost of the fix: any
+  # later sync of this Application rotates the CA, and the webhook fails for about a minute until the pods reload the
+  # mounted certificate; Argo CD's retries cover it.
   ignoreDifferences:
     - kind: Secret
       name: aws-load-balancer-tls
@@ -47,7 +53,7 @@ spec:
     - group: admissionregistration.k8s.io
       kind: ValidatingWebhookConfiguration
       jqPathExpressions: [".webhooks[].clientConfig.caBundle"]
-  {{- include "root.syncPolicy" (list "RespectIgnoreDifferences=true") | nindent 2 }}
+  {{- include "root.syncPolicy" (list) | nindent 2 }}
 ---
 # Wave -2: copies values from Secrets Manager into Kubernetes Secrets; Git holds names only. Its CRDs must exist before
 # wave -1 submits ClusterSecretStore and ExternalSecret objects.
