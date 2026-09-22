@@ -149,7 +149,7 @@ kubectl -n anime get deploy anime-api -o jsonpath='{.status.readyReplicas} ready
 
 Expected: `Plan: 0 to add, 1 to change`, then `template provider: fake`, `successfully rolled out`, `2 ready of 2`.
 
-**3.3 — the ramp, with the generator watched.** In a second tmux window (`Ctrl-b c`), record the workstation's CPU every
+**3.3 — the ramp, with the generator watched.** In a third tmux window (`Ctrl-b c`; window 2 holds the tunnel), record the workstation's CPU every
 5 s for the whole run. `-n` prints the header once, so the file holds only numbers after it.
 
 ```bash
@@ -163,7 +163,7 @@ cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
 make loadtest-ramp
 ```
 
-Then stop `vmstat` in the second window (`Ctrl-c`). If 3.4 shows no break-away and no dropped iterations, the knee is
+Then stop `vmstat` in that third window (`Ctrl-c`). If 3.4 shows no break-away and no dropped iterations, the knee is
 above the ramp: run again with `MAX_RPS=200 MAX_VUS=1500`. The knee must be inside the ramp to be measured.
 
 **3.4 — read the run.** Queries use `[2m]`, four scrape intervals, so one late scrape does not put a gap exactly where

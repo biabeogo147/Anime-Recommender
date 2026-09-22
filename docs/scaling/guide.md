@@ -26,7 +26,7 @@ Criterion ([design §6](../eks-sre-llmops-design.md#6-verification-and-evidence-
 
 **0.1 — fake mode first.** The values change in 0.2 is a new pod template, so it is a canary, and a canary is judged
 on traffic. In gemini mode that traffic would spend the free tier's quota. Switch with **only the first block** of
-[stage 5, section 2](../delivery/guide.md#2-fake-mode-for-the-drills--ops), then start steady traffic in window 2 and
+[stage 5, section 2](../delivery/guide.md#2-fake-mode-for-the-drills--ops), then start steady traffic in window 3 (k6; window 2 holds the tunnel) and
 leave it running until the end of 0.3:
 
 ```bash
@@ -61,7 +61,7 @@ make -s rollout-status
 ```
 
 Expected: the last commit is CI's `release:` commit, the requests are the new values, and `phase=Healthy` with
-`stable` equal to `latest`. Then stop k6 in window 2 (`Ctrl-c`).
+`stable` equal to `latest`. Then stop k6 in window 3 (`Ctrl-c`).
 
 ---
 
@@ -164,7 +164,7 @@ their requests. **Fits** means the node half will not be exercised. That is reco
 
 ## 3. Criterion #14 — the run — ops
 
-**3.1 — a recorder.** The api is in fake mode since 0.1. In window 3 (`Ctrl-b c`), start a recorder that prints one
+**3.1 — a recorder.** The api is in fake mode since 0.1. In window 4 (`Ctrl-b c`), start a recorder that prints one
 line every 15 s for the whole run. It is what you watch live; the numbers reported come from Prometheus afterwards
 (3.4).
 
@@ -190,7 +190,7 @@ make -s prom Q='sum(rate(anime_http_requests_total{route="/recommend"}[2m]))'
 
 Expected: `phase=Healthy` with `stable` equal to `latest`, and a request rate near `0`.
 
-Then, in window 2: the same ramp as stage 4, with the top held for ten minutes, because a new node takes minutes. The
+Then, in window 3: the same ramp as stage 4, with the top held for ten minutes, because a new node takes minutes. The
 top rate must be **above** what two pods sustain, or nothing needs to scale: about three times stage 4's capacity.
 `MAX_VUS` follows Little's law with room to spare: the rate times a queued latency of about 10 s. The ramp target
 overwrites stage 4's `ramp*` files, so they are copied aside first. **Replace `CAP=` with stage 4's capacity before
@@ -202,7 +202,7 @@ CAP=40   # ← stage 4's capacity, in requests per second
 MAX_RPS=$((3*CAP)) MAX_VUS=$((30*CAP)) HOLD=10m make loadtest-ramp
 ```
 
-Expected in window 3, over the next 18 minutes:
+Expected in window 4, over the next 18 minutes:
 - in-flight per pod rises past the threshold;
 - desired replicas climb above 2 within about a minute, up to at most 8;
 - if the new pods do not fit, `pending` becomes non-zero, and a few minutes later `nodes-ready` rises, up to at most 4.
@@ -220,7 +220,7 @@ echo "== Cluster Autoscaler"; kubectl -n kube-system logs $(kubectl -n kube-syst
 } | tee ~/anime-evidence/scaling-events.txt
 ```
 
-**3.3 — the return.** As soon as k6 finishes, keep a light load running in window 2 for the whole return, so that
+**3.3 — the return.** As soon as k6 finishes, keep a light load running in window 3 for the whole return, so that
 scale-in happens under traffic and can be seen to drop requests or not (M5 in
 [guide-measurements](../evidence/guide-measurements.md#m5--scaling-out-and-back)):
 
@@ -228,7 +228,7 @@ scale-in happens under traffic and can be seen to drop requests or not (M5 in
 cd ~/Anime-Recommender && RPS=5 DURATION=30m make loadtest-steady
 ```
 
-Leave window 3 running for the same **30 minutes**:
+Leave window 4 running for the same **30 minutes**:
 - replicas start falling after the 5-minute window, then one per minute: 8 to 2 in about 11 minutes;
 - nodes fall after 10 minutes unneeded, and not within 10 minutes of the last scale-up.
 

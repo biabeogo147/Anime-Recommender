@@ -10,8 +10,8 @@ Commands and checks only. The reasoning is in the comments of these files:
 The "Delivery A…" references are answers in [answers.md](answers.md).
 
 Machines: **ops** only. Work inside tmux, and start each block with
-`cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime`. Two windows are used: window 1 for commands, window 2
-for k6.
+`cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime`. Three tmux windows are used: window 1 for commands, window 2 for the tunnel
+(stage 1, 4.2; never press `Ctrl-c` there), and window 3 for k6, opened with `Ctrl-b c`.
 
 Criteria closed ([design §6](../eks-sre-llmops-design.md#6-verification-and-evidence-definition-of-done)):
 - **#8:** a good version walks 10 → 50 → 100. The evidence is the Rollout timeline and each AnalysisRun's measured
@@ -146,7 +146,7 @@ kubectl -n anime get rollout anime-api -o jsonpath='provider={.spec.template.spe
 Expected: `Plan: 0 to add, 1 to change`, `Apply complete!`, a `patched` line, `phase=Healthy` with `stable` equal to
 `latest` (a new hash), and `provider=fake`.
 
-**Start the traffic.** In window 2, run k6 at 20 requests per second for the whole of sections 3 and 4. The rate is
+**Start the traffic.** In window 3, run k6 at 20 requests per second for the whole of sections 3 and 4. The rate is
 set for the success-rate gate's resolution, not for the minimum-traffic guard (Delivery A5.3).
 
 ```bash
@@ -226,7 +226,7 @@ Check each of these:
 
 **3.4 — if it stopped.**
 - `Paused` with an `Inconclusive` AnalysisRun: too little canary traffic, or an empty series. Check that k6 is still
-  running in window 2, then look at `canary-requests`. Once traffic is back, rerun the analysis: abort, then retry
+  running in window 3, then look at `canary-requests`. Once traffic is back, rerun the analysis: abort, then retry
   (Delivery A7.2). **Never `promote-full` here** — that would promote on no evidence.
 
   ```bash
@@ -342,7 +342,7 @@ kubectl -n argocd get application anime-api -o jsonpath='{.status.sync.status}/{
 Expected: first `Synced/Degraded` (Delivery A7.1). After the revert, the template matches the stable version again,
 so no canary starts: `back on the old stable`, then `Synced/Healthy`.
 
-**4.5 — stop k6** in window 2 (`Ctrl-c`, if it has not finished). The window is still written.
+**4.5 — stop k6** in window 3 (`Ctrl-c`, if it has not finished). The window is still written.
 
 ---
 

@@ -13,8 +13,8 @@ Every block says where it runs:
 Three rules for the whole guide:
 
 - **Work inside tmux** on ops: `tmux new -A -s anime`. A Session Manager window that times out kills a running apply
-  (and leaves a state lock) or the tunnel; tmux keeps both alive. `Ctrl-b c` opens a second tmux window, `Ctrl-b n`
-  switches.
+  (and leaves a state lock) or the tunnel; tmux keeps both alive. `Ctrl-b c` opens a new tmux window, `Ctrl-b n`
+  switches. Windows keep one role each: 1 commands, 2 the tunnel, 3 k6 (from stage 4), 4 the scaling recorder.
 - **No block asks for input except where it says so.** Plans are saved to a file and applied from it, so the number you
   write down is the plan that is applied.
 - **Outputs you are asked to report** — paste them in the chat.

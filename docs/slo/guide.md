@@ -175,7 +175,7 @@ below the page threshold.
 
 **3.1 — fake mode, then an hour of clean traffic.** Put the api in fake mode with **only the mode-switch block**
 of [stage 5, section 2](../delivery/guide.md#2-fake-mode-for-the-drills--ops), if it is not already. Do not start that
-section's 45-minute k6. Then, in window 2, two and a half hours of traffic, which covers the clean hour, the fault, the
+section's 45-minute k6. Then, in window 3 (k6; window 2 holds the tunnel), two and a half hours of traffic, which covers the clean hour, the fault, the
 recovery and the half hour until the page resolves:
 
 ```bash
@@ -327,7 +327,7 @@ too, so it resolves only once the 30-minute window has also fallen — about hal
 k6 running until then. Stopped earlier, the ratios would go absent and the alert would resolve for lack of traffic,
 not for recovery.
 
-**3.6 — after the RESOLVED message**, stop k6 in window 2 (`Ctrl-c`). Then put the api back in gemini mode, as in
+**3.6 — after the RESOLVED message**, stop k6 in window 3 (`Ctrl-c`). Then put the api back in gemini mode, as in
 [stage 5, section 5](../delivery/guide.md#5-back-to-gemini--ops).
 
 ---
