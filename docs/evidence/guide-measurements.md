@@ -168,7 +168,8 @@ Without all three, a `0` is also what a broken export looks like, and the clause
 ## M8 — A timed rebuild
 
 **A session of its own, last**, when every stage has passed once. `enabled_stages` in
-`infra/terraform/bootstrap/terraform.tfvars` holds all seven stages, and the pins, T and the knee values are
+`infra/terraform/bootstrap/terraform.tfvars` holds all six in-cluster stages (gitops, load, delivery, slo,
+scaling, tracing; cicd has no in-cluster part), and the pins, T and the knee values are
 committed. Start from a torn-down cluster:
 
 ```bash
