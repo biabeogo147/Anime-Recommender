@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anime-ui
+  labels: { app: anime-ui }
+spec:
+  replicas: {{ .Values.replicas }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app: anime-ui }
+  template:
+    metadata:
+      labels: { app: anime-ui }
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app: anime-ui }
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: ui
+          image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+          ports:
+            - { name: http, containerPort: 8501 }
+          env:
+            - { name: ANIME_API_URL, value: {{ .Values.apiUrl | quote }} }
+            - { name: ANIME_API_TIMEOUT_S, value: {{ .Values.apiTimeoutSeconds | quote }} }
+          # Streamlit's own health endpoint. It says nothing about the api — a UI that cannot reach the api is still a
+          # healthy UI that shows an error, which is the right behaviour.
+          readinessProbe:
+            httpGet: { path: /_stcore/health, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /_stcore/health, port: http }
+            periodSeconds: 20
+            failureThreshold: 3
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}

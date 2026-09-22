@@ -1,0 +1,77 @@
+# The api's two objectives, as a Sloth spec (design §4.3). This file is the SOURCE: `make slo-generate` turns it into
+# deploy/slo/generated/anime-api.yaml, which is committed, and CI's `make slo-check` fails when the two disagree
+# (SLO A4.1).
+#
+# It is written in Sloth's Kubernetes form only so that `sloth generate` writes a PrometheusRule (the plain form writes
+# a bare rule file). It is NEVER applied: there is no Sloth operator and no PrometheusServiceLevel object in the
+# cluster. The slo Application syncs deploy/slo/generated/ and nothing else.
+#
+# The period is 28 days, passed on the command line (--default-slo-period=28d in the Makefile), so the generated
+# multipliers are the 28-day set — 13.44, 5.6, 2.8, 0.93 — not the 30-day 14.4, 6, 3, 1 (design §4.3). On this platform
+# the period is a DEFINITION that sizes the budget; no 28-day window ever exists, and nothing claims the objective was
+# met.
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: anime-api # the generated PrometheusRule's name
+  namespace: monitoring
+spec:
+  service: anime-api
+  labels:
+    owner: anime
+  slos:
+    # Availability: at most 0.5% of /recommend requests fail with a 5xx.
+    - name: requests-availability
+      objective: 99.5
+      description: "/recommend answers without a server error."
+      sli:
+        events:
+          # Only /recommend: the probes and /metrics are cheap, always succeed, and would dilute every failure.
+          # The error series exists only once something has failed; before that the ratio is absent, which the alerts
+          # read as "not burning". That the page is delivered at all is proven by the drill, not by this query.
+          errorQuery: sum(rate(anime_http_requests_total{route="/recommend",status=~"5.."}[{{.window}}]))
+          totalQuery: sum(rate(anime_http_requests_total{route="/recommend"}[{{.window}}]))
+      alerting:
+        name: AnimeApiAvailabilityBudgetBurn
+        labels:
+          category: availability
+        annotations:
+          summary: "anime-api is burning its availability budget"
+          runbook_url: https://github.com/biabeogo147/Anime-Recommender/blob/main/docs/runbooks/anime-api.md#availability-budget-burn
+        # `severity` is what Alertmanager routes on (deploy/argocd/root/templates/gitops-monitoring.yaml). The stack's
+        # own rules use warning and critical, so no platform alert matches either route.
+        pageAlert:
+          labels:
+            severity: page
+        ticketAlert:
+          labels:
+            severity: ticket
+
+    # Latency: at least 95% of /recommend requests finish within T.
+    - name: requests-latency
+      objective: 95
+      description: "/recommend answers within T, the gemini-mode p95 measured in stage 4."
+      sli:
+        events:
+          # "Slow" is everything outside the bucket le=T: the histogram's count minus that bucket. T is NOT chosen here.
+          # It is the boundary stage 4 printed (docs/4-load/guide.md, 2.2), written EXACTLY as the label reads — the
+          # client library writes 3 as "3.0". A label value that matches no series leaves the subtraction empty, and
+          # the objective silently measures nothing (design §4.3).
+          errorQuery: >-
+            sum(rate(anime_http_request_duration_seconds_count{route="/recommend"}[{{.window}}]))
+            -
+            sum(rate(anime_http_request_duration_seconds_bucket{route="/recommend",le="PIN_ME_T"}[{{.window}}]))
+          totalQuery: sum(rate(anime_http_request_duration_seconds_count{route="/recommend"}[{{.window}}]))
+      alerting:
+        name: AnimeApiLatencyBudgetBurn
+        labels:
+          category: latency
+        annotations:
+          summary: "anime-api is burning its latency budget"
+          runbook_url: https://github.com/biabeogo147/Anime-Recommender/blob/main/docs/runbooks/anime-api.md#latency-budget-burn
+        pageAlert:
+          labels:
+            severity: page
+        ticketAlert:
+          labels:
+            severity: ticket

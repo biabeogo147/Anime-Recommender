@@ -1,0 +1,150 @@
+{{- if has "gitops" .Values.stages }}
+# Wave -2: the load balancer controller builds both doors from Ingress objects, and from stage 5 applies the canary
+# weights — a single point of failure for reachability AND releases (GitOps A3.3).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aws-load-balancer-controller
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: default
+  source:
+    repoURL: https://aws.github.io/eks-charts
+    chart: aws-load-balancer-controller
+    targetRevision: {{ .Values.pins.charts.awsLoadBalancerController | quote }}
+    helm:
+      valuesObject:
+        clusterName: anime
+        # IMDSv2 with hop limit 1 hides node metadata from pods, so the controller cannot discover region or VPC itself.
+        # The VPC is found by its Name tag, because its id changes on every rebuild (renders --aws-vpc-tags).
+        region: {{ .Values.region }}
+        vpcTags:
+          Name: anime
+        serviceAccount:
+          create: true
+          name: aws-load-balancer-controller # the Pod Identity association's ServiceAccount (pod-identity.tf)
+        replicaCount: 2 # on Spot: one reclaimed node must not stop both doors and every release
+        podDisruptionBudget:
+          maxUnavailable: 1
+        # Its Service webhook (failurePolicy Fail) intercepts EVERY Service creation in the cluster. Nothing here uses
+        # Services of type LoadBalancer, and with both replicas gone no Service could be created anywhere — off.
+        enableServiceMutatorWebhook: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  # Without cert-manager the chart generates its webhook CA and certificate at render time (genCA), and Argo CD's render
+  # cannot look up the existing one — so every fresh render differs. The health check requires Synced, so a permanent
+  # diff here would stall every later wave: ignoreDifferences keeps these fields out of the DIFF.
+  # It must not keep them out of the SYNC (no RespectIgnoreDifferences). A sync writes the Secret and both webhooks from
+  # one render, so they always match. With RespectIgnoreDifferences, the first bootstrap of 2026-09-22 broke: attempt 1
+  # created the Secret and stopped, the retry re-rendered, kept the Secret's old data and created the webhooks with the new
+  # CA, and every Ingress was then refused with "x509: certificate signed by unknown authority". The cost of the fix: any
+  # later sync of this Application rotates the CA, and the webhook fails for about a minute until the pods reload the
+  # mounted certificate; Argo CD's retries cover it.
+  ignoreDifferences:
+    - kind: Secret
+      name: aws-load-balancer-tls
+      jsonPointers: [/data]
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions: [".webhooks[].clientConfig.caBundle"]
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions: [".webhooks[].clientConfig.caBundle"]
+  {{- include "root.syncPolicy" (list) | nindent 2 }}
+---
+# Wave -2: copies values from Secrets Manager into Kubernetes Secrets; Git holds names only. Its CRDs must exist before
+# wave -1 submits ClusterSecretStore and ExternalSecret objects.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-secrets
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.external-secrets.io
+    chart: external-secrets
+    # Needs a release that serves external-secrets.io/v1 (the manifests in deploy/platform use it).
+    targetRevision: {{ .Values.pins.charts.externalSecrets | quote }}
+    helm:
+      valuesObject:
+        installCRDs: true
+        serviceAccount:
+          create: true
+          name: external-secrets # may read exactly three ARNs (Terraform A5.4)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  {{- include "root.syncPolicy" (list "CreateNamespace=true" "ServerSideApply=true") | nindent 2 }}
+---
+# Wave -1: the plain manifests the app needs before it starts — namespaces, StorageClass, secret store, ExternalSecrets.
+# Wave 1 waits for this to be Healthy AND Synced, so no api pod starts before its Secret exists.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: deploy/platform/base
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: anime
+  {{- include "root.syncPolicy" (list) | nindent 2 }}
+---
+# Wave -1: publishes one alias record per Ingress host once its load balancer exists. Terraform cannot: it runs before
+# any load balancer exists and never sees an Ingress (GitOps A5.1).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-dns
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes-sigs.github.io/external-dns/
+    chart: external-dns
+    targetRevision: {{ .Values.pins.charts.externalDns | quote }}
+    helm:
+      valuesObject:
+        provider:
+          name: aws
+        env: # no IMDS for pods, so the region is given; credentials come from Pod Identity
+          - { name: AWS_REGION, value: {{ .Values.region }} }
+          - { name: AWS_DEFAULT_REGION, value: {{ .Values.region }} }
+        serviceAccount:
+          create: true
+          name: external-dns
+        sources: [ingress]
+        # First limit: only names under anime.* are written. The second, independent one is IAM, which refuses any name
+        # outside anime.* even if this filter is wrong (GitOps A5.2).
+        domainFilters: [{{ .Values.domain }}]
+        extraArgs:
+          # The zone is recruitai.io.vn — the PARENT of the filter. Without this, external-dns selects no zone at all and
+          # publishes nothing; with it, zone selection widens while records stay limited to anime.*.
+          - --aws-zone-match-parent
+          - --aws-zone-type=public # never a private zone of the same name
+        # `sync` also removes records whose Ingress is gone, so a teardown leaves no name pointing at a dead ALB. It only
+        # touches records with its own ownership TXT and this owner id — never Medical's.
+        policy: sync
+        registry: txt
+        txtOwnerId: anime
+        interval: 1m
+        triggerLoopOnEvent: true # react to a new Ingress at once instead of at the next interval
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-dns
+  {{- include "root.syncPolicy" (list "CreateNamespace=true") | nindent 2 }}
+{{- end }}

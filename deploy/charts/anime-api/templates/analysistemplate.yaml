@@ -1,0 +1,79 @@
+{{- if has "delivery" .Values.stages }}
+# What a canary step asks Prometheus: is the new version worse than the one it replaces? (design §4.4)
+#
+# Four probes, 30 s apart, each looking back two minutes — four scrape intervals, because rate() needs two samples in
+# its window and a 30 s window often holds one (Delivery A4.5). failureLimit 1: one bad probe is tolerated, a second
+# fails the run and the Rollout aborts.
+#
+# How each measurement can end (Delivery A6.1):
+#   - success: the condition holds on a real number;
+#   - failure: the opposite condition holds on a real number;
+#   - INCONCLUSIVE: neither — an empty result, NaN, or too little traffic. The Rollout PAUSES for a person. It never
+#     promotes on no evidence, and it does not blame the release for a capacity event (a canary whose only node was
+#     reclaimed has no series for a while — Delivery A6.3). That is why BOTH conditions start with the same guard: a
+#     guard on only one side would turn "no data" into the other outcome.
+#
+# Every query filters on the hash passed in by the Rollout. Without that filter stable and canary are measured together
+# and a broken canary is promoted on the stable version's health (design §6, row 8). The label reaches the series
+# through the PodMonitor's podTargetLabels; Prometheus spells it with underscores.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate-and-latency
+spec:
+  args:
+    - name: canary-hash
+    - name: stable-hash
+  metrics:
+    # The minimum-traffic guard: fewer than {{ .Values.analysis.minRequests }} canary requests in the window is not
+    # evidence either way (Delivery A6.2). It can only succeed or be inconclusive — its failure condition never holds — so
+    # too little traffic pauses the release instead of aborting it.
+    - name: canary-requests
+      interval: 30s
+      count: 4
+      successCondition: len(result) > 0 && result[0] >= {{ .Values.analysis.minRequests }}
+      failureCondition: "false"
+      provider:
+        prometheus:
+          address: {{ .Values.analysis.prometheus | quote }}
+          query: >-
+            sum(increase(anime_http_requests_total{route="/recommend",rollouts_pod_template_hash="{{`{{args.canary-hash}}`}}"}[2m]))
+
+    # The canary's share of requests that did not fail with a 5xx. Only the NUMERATOR falls back to zero: when every
+    # canary request failed there is no non-5xx series at all, and without the fallback the ratio would be empty —
+    # inconclusive — for the worst possible canary. The denominator has no fallback, so a canary with no series still
+    # gives an empty result and pauses. This is not the "or vector(0)" that makes a gate unable to fail (design §6,
+    # row 8): that one is on the whole expression.
+    - name: success-rate
+      interval: 30s
+      count: 4
+      failureLimit: 1
+      successCondition: len(result) > 0 && !isNaN(result[0]) && result[0] >= {{ .Values.analysis.minSuccessRate }}
+      failureCondition: len(result) > 0 && !isNaN(result[0]) && result[0] < {{ .Values.analysis.minSuccessRate }}
+      provider:
+        prometheus:
+          address: {{ .Values.analysis.prometheus | quote }}
+          query: >-
+            (sum(rate(anime_http_requests_total{route="/recommend",rollouts_pod_template_hash="{{`{{args.canary-hash}}`}}",status!~"5.."}[2m]))
+            or vector(0))
+            /
+            sum(rate(anime_http_requests_total{route="/recommend",rollouts_pod_template_hash="{{`{{args.canary-hash}}`}}"}[2m]))
+
+    # Latency RELATIVE to stable, over the same window: not "p95 <= T". T is a gemini-mode number and the drills run in
+    # fake mode, so an absolute gate could not fail; a ratio of two versions measured side by side removes the mode from
+    # the question (Delivery A3.2). Its real sensitivity depends on the bucket layout — with stage 4's buckets it trips
+    # near the ratio it names (Delivery A5.1). Infinite (a stable p95 of zero) and NaN (no requests) are inconclusive.
+    - name: latency-ratio
+      interval: 30s
+      count: 4
+      failureLimit: 1
+      successCondition: len(result) > 0 && !isNaN(result[0]) && !isInf(result[0], 0) && result[0] <= {{ .Values.analysis.maxLatencyRatio }}
+      failureCondition: len(result) > 0 && !isNaN(result[0]) && !isInf(result[0], 0) && result[0] > {{ .Values.analysis.maxLatencyRatio }}
+      provider:
+        prometheus:
+          address: {{ .Values.analysis.prometheus | quote }}
+          query: >-
+            histogram_quantile(0.95, sum by (le) (rate(anime_http_request_duration_seconds_bucket{route="/recommend",rollouts_pod_template_hash="{{`{{args.canary-hash}}`}}"}[2m])))
+            /
+            histogram_quantile(0.95, sum by (le) (rate(anime_http_request_duration_seconds_bucket{route="/recommend",rollouts_pod_template_hash="{{`{{args.stable-hash}}`}}"}[2m])))
+{{- end }}

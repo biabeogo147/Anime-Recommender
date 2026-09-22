@@ -1,7 +1,25 @@
 venv/
+.venv/
 logs/
-ANIME_RECOMMENDER.egg-info/
+*.egg-info/
 .env
 .idea
 __pycache__/
+.pytest_cache/
+.ruff_cache/
 chroma_db/
+index/
+
+# Terraform: provider plugins and local plan files are rebuilt by `terraform init`; state lives in S3.
+.terraform/
+*.tfplan
+*.tfstate
+*.tfstate.backup
+# Personal values (budget email) stay on the workstation.
+*.tfvars
+# Kubeconfig and WireGuard material written by make targets on the workstation.
+.kube/
+*.conf.local
+
+# make slo-check writes the regenerated SLO rules here (CI uploads them on a mismatch)
+slo-regenerated/

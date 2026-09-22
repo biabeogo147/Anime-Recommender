@@ -1,0 +1,21 @@
+stages: []
+
+image:
+  repository: "" # <registry>/anime-ui, from the root's pins
+  digest: sha256:61a3bcb4f777116202429837fb7121df4f162e3af5c22e62542895321d410e47 # from `make image` until CI (stage 3) writes it
+
+replicas: 2 # preferably on the two different nodes, like the api
+
+# How the UI reaches the api: through an in-cluster Service, so a UI request never leaves the VPC through the NAT. Until
+# stage 5 it is the root Service below; from stage 5 the root passes the STABLE Service instead, so UI traffic never
+# reaches a canary (design §4.4). k6 and the drills call api.<domain> directly.
+apiUrl: http://anime-api.anime.svc.cluster.local:8000
+apiTimeoutSeconds: "60"
+
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits: { memory: 512Mi }
+
+ingress:
+  certificateArn: ""
+  domain: anime.recruitai.io.vn

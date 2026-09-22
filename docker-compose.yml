@@ -1,0 +1,50 @@
+name: anime
+
+services:
+  api:
+    image: anime-api:local
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+      target: runtime
+      args:
+        EMBEDDINGS_PROVIDER: hf
+      secrets:
+        - hf_token
+    env_file: .env
+    environment:
+      # Override per run, e.g.  LLM_PROVIDER=fake FAULT_RATE=0.2 docker compose up -d
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      FAKE_LATENCY_MS: ${FAKE_LATENCY_MS:-800}
+      FAULT_RATE: ${FAULT_RATE:-0}
+    ports:
+      - "8000:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 60s
+      retries: 3
+
+  ui:
+    image: anime-ui:local
+    build:
+      context: .
+      dockerfile: services/ui/Dockerfile
+    environment:
+      ANIME_API_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+
+secrets:
+  hf_token:
+    environment: HF_TOKEN

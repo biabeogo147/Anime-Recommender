@@ -1,0 +1,35 @@
+# Grafana's admin password, generated ONCE inside the cluster by External Secrets' Password generator and never
+# rotated (refreshInterval 0). Letting the Grafana chart generate it does not work under Argo CD: the chart's `lookup`
+# of an existing Secret returns nothing in Argo CD's render, so every render would produce a new password and roll the
+# pod. Read it with: kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: grafana-admin
+  namespace: monitoring
+spec:
+  length: 32
+  digits: 6
+  symbols: 0 # letters and digits only: nothing a shell or URL would mangle
+  allowRepeat: true
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: grafana-admin
+  namespace: monitoring
+spec:
+  refreshInterval: "0" # generate once; a refresh would change the password under a running Grafana
+  target:
+    name: grafana-admin
+    creationPolicy: Owner
+    template:
+      data:
+        admin-user: admin
+        admin-password: "{{ .password }}"
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: grafana-admin

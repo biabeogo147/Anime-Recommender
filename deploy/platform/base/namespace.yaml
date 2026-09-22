@@ -1,0 +1,20 @@
+# The namespaces other Applications deploy into, created here (wave -1) so their labels and secrets exist first.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: anime
+  labels:
+    # Readiness gates: the load balancer controller holds each pod not-Ready until its ALB target is healthy. The
+    # reason is fail-open: when EVERY target fails its health check, an ALB serves them all anyway, so a wrong health
+    # path would be invisible. With the gate, the same mistake stops the rollout, loudly (GitOps A3.5).
+    # Two limits: the gate is injected only into pods created after the target group binding exists, and the injecting
+    # webhook fails OPEN (failurePolicy Ignore) — pods created while the controller is down get no gate. The guide
+    # checks `.spec.readinessGates` on the running pods rather than assuming it.
+    elbv2.k8s.aws/pod-readiness-gate-inject: enabled
+---
+# Monitoring's namespace, created here rather than by kube-prometheus-stack so the Grafana admin Secret (below) exists
+# before Grafana starts.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring

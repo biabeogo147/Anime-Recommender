@@ -1,0 +1,181 @@
+{{- if has "gitops" .Values.stages }}
+# Wave 0: Prometheus, Alertmanager, Grafana. It arrives in stage 2, before anything measures with it, because three of
+# the four admin UIs come from it and criterion #16 is about all four (GitOps A6.5). Its values are inline so that the
+# pinned certificate ARN and the shared internal-door annotations come from one place.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: {{ .Values.pins.charts.kubePrometheusStack | quote }}
+    helm:
+      valuesObject:
+        # Control-plane components run inside EKS and are not scrapeable from the cluster; kube-proxy runs on the nodes
+        # but binds its metrics to 127.0.0.1. Left on, all four are permanently-down targets and meaningless alerts.
+        kubeControllerManager: { enabled: false }
+        kubeScheduler: { enabled: false }
+        kubeEtcd: { enabled: false }
+        kubeProxy: { enabled: false }
+
+        prometheus:
+          ingress:
+            enabled: true
+            ingressClassName: alb
+            annotations:
+              {{- include "root.internalIngressAnnotations" . | nindent 14 }}
+              alb.ingress.kubernetes.io/healthcheck-path: /-/ready
+            hosts: [prometheus.{{ .Values.domain }}]
+            paths: [/]
+            pathType: Prefix
+          prometheusSpec:
+            externalUrl: https://prometheus.{{ .Values.domain }} # told its own name (GitOps A6.4)
+            # Accept monitors and rules WHATEVER their labels. By default only objects with the stack's release label are
+            # selected; anything else is accepted by the cluster and silently ignored (Load A2.4, SLO A4.2).
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+            probeSelectorNilUsesHelmValues: false
+            scrapeConfigSelectorNilUsesHelmValues: false
+            enableFeatures: [exemplar-storage] # one of the four exemplar settings (Tracing A4.2)
+            # No volume: the cluster lives hours and every teardown destroys metrics anyway (Load A7.2). A PVC would pin
+            # Prometheus to one zone, and after a Spot reclaim it could stay Pending with no node left in that zone.
+            retention: 2d
+            resources:
+              requests: { cpu: 200m, memory: 1Gi }
+              limits: { memory: 2Gi }
+
+        alertmanager:
+          ingress:
+            enabled: true
+            ingressClassName: alb
+            annotations:
+              {{- include "root.internalIngressAnnotations" . | nindent 14 }}
+              alb.ingress.kubernetes.io/healthcheck-path: /-/ready
+            hosts: [alertmanager.{{ .Values.domain }}]
+            paths: [/]
+            pathType: Prefix
+          alertmanagerSpec:
+            externalUrl: https://alertmanager.{{ .Values.domain }}
+            resources:
+              requests: { cpu: 20m, memory: 64Mi }
+              limits: { memory: 128Mi }
+            {{- if has "slo" .Values.stages }}
+            # Mounted at /etc/alertmanager/secrets/anime-alerting/; written by the alerting-secret Application (wave -1).
+            secrets: [anime-alerting]
+            {{- end }}
+          {{- if has "slo" .Values.stages }}
+          # Only the SLO alerts reach a person (design §4.3). The root route keeps the chart's `null` receiver, so the
+          # platform's cause-based alerts — and the Watchdog heartbeat — go nowhere: there is NO dead-man's switch, and a
+          # broken webhook is noticed only at the next drill (SLO README, Decision 6).
+          #
+          # These maps are merged into the chart's default config by Helm; the lists here (routes, receivers) replace
+          # the chart's lists, so the chart's Watchdog route is gone and Watchdog falls to the root route: null.
+          config:
+            route:
+              receiver: "null"
+              # One notification per alert and severity. group_wait is one of the parts of time-to-alert (SLO A5.3):
+              # a new group waits this long before its first message, to collect what fires together.
+              group_by: [alertname, severity]
+              group_wait: 30s
+              group_interval: 5m
+              repeat_interval: 4h
+              routes:
+                - receiver: discord-page
+                  matchers: ['severity="page"']
+                - receiver: discord-ticket
+                  matchers: ['severity="ticket"']
+            receivers:
+              - name: "null"
+              # One webhook, one channel: the title says which kind of alert it is. The URL is read from the mounted
+              # file, so it is in neither Git nor the rendered config.
+              - name: discord-page
+                discord_configs:
+                  - webhook_url_file: /etc/alertmanager/secrets/anime-alerting/DISCORD_WEBHOOK_URL
+                    title: '[PAGE] {{`{{ .CommonLabels.alertname }}`}} {{`{{ .Status | toUpper }}`}}'
+                    send_resolved: true
+              - name: discord-ticket
+                discord_configs:
+                  - webhook_url_file: /etc/alertmanager/secrets/anime-alerting/DISCORD_WEBHOOK_URL
+                    title: '[TICKET] {{`{{ .CommonLabels.alertname }}`}} {{`{{ .Status | toUpper }}`}}'
+                    send_resolved: true
+          {{- else }}
+          # Routes to Discord arrive in stage 6; until then every alert goes to the chart's null receiver.
+          {{- end }}
+
+        grafana:
+          ingress:
+            enabled: true
+            ingressClassName: alb
+            annotations:
+              {{- include "root.internalIngressAnnotations" . | nindent 14 }}
+              alb.ingress.kubernetes.io/healthcheck-path: /api/health
+            hosts: [grafana.{{ .Values.domain }}]
+            path: /
+            pathType: Prefix
+          grafana.ini:
+            server:
+              root_url: https://grafana.{{ .Values.domain }}
+          # The admin password comes from a Secret generated ONCE in the cluster (deploy/platform/base). Left to the chart,
+          # Argo CD's render has no cluster access, so the chart would generate a new random password — and roll Grafana —
+          # on every render.
+          admin:
+            existingSecret: grafana-admin
+            userKey: admin-user
+            passwordKey: admin-password
+          resources:
+            requests: { cpu: 50m, memory: 192Mi }
+            limits: { memory: 512Mi } # Medical's Grafana restarted at 256Mi while loading dashboards
+          {{- if has "tracing" .Values.stages }}
+          # Stage 8: Tempo as a datasource, and the fourth of the four exemplar settings — the Prometheus datasource
+          # turns an exemplar's trace_id into a link to that trace in Tempo. Without it the graphs render normally
+          # with nothing to click (design §4.2).
+          additionalDataSources:
+            - name: Tempo
+              uid: tempo
+              type: tempo
+              access: proxy
+              url: http://tempo.tracing.svc.cluster.local:3200
+          sidecar:
+            datasources:
+              exemplarTraceIdDestinations:
+                datasourceUid: tempo
+                traceIdLabelName: trace_id
+          {{- end }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  # The namespace itself is created by `platform` (wave -1), which also holds the Grafana admin Secret.
+  {{- include "root.syncPolicy" (list "ServerSideApply=true") | nindent 2 }}
+---
+# Wave 0: the Ingress for Argo CD's own UI — a plain manifest rendered by the root itself; it does not require Argo CD to
+# manage its own installation (GitOps A6.6). The fourth member of the internal group.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    {{- include "root.internalIngressAnnotations" . | nindent 4 }}
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz # the default `/` is served by none of the UIs
+spec:
+  ingressClassName: alb
+  rules:
+    - host: argocd.{{ .Values.domain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80 # plain HTTP: server.insecure is set, TLS ended at the ALB
+{{- end }}

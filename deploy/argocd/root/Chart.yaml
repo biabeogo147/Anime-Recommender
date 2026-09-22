@@ -1,0 +1,7 @@
+apiVersion: v2
+name: root
+description: >
+  The app-of-apps. Renders one Argo CD Application per component, but only for the build stages switched on in
+  `stages` — so the whole repository can be in Git while the cluster is built one stage at a time.
+type: application
+version: 0.1.0

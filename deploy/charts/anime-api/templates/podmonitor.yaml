@@ -1,0 +1,21 @@
+{{- if has "load" .Values.stages }}
+# How Prometheus finds the api. A PodMonitor, not a ServiceMonitor: from stage 5 three Services select the api pods
+# (root, stable, canary), and a ServiceMonitor matching more than one would scrape each pod once per Service and
+# multiply every count silently — both kinds can copy the pod label below; the double scrape is what decides (Load A2.4).
+# Found whatever its labels, because the monitoring stack's selectors were opened in stage 2.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: anime-api
+spec:
+  selector:
+    matchLabels: { app: anime-api }
+  # Copy the pod label that tells the two versions of a canary apart onto every series. A pod label is on no series
+  # until the scrape copies it; without this, every canary query is empty from the first probe (Delivery A4.1).
+  podTargetLabels:
+    - rollouts-pod-template-hash
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 30s # the canary window (2 min = four scrapes) and the SLO drill arithmetic assume 30 s
+{{- end }}

@@ -1,0 +1,53 @@
+# Values of the root app-of-apps.
+#
+# Two kinds of value live here:
+#   - `stages` and `targetRevision` are NOT set in Git: `make bootstrap` passes them from
+#     infra/terraform/bootstrap/terraform.tfvars, so switching a stage on is an apply, not a commit.
+#   - `pins` ARE set in Git: the values only this AWS account knows. Every PIN_ME in the repository is here, in one
+#     place; `make pins` prints them. Argo CD fails loudly on a chart version or ARN it cannot resolve, so a forgotten
+#     pin shows up as an error, never as a guess.
+
+# Which build stages are live, e.g. [gitops, cicd, load]. Empty: the root renders nothing (the end of stage 1).
+stages: []
+
+repoURL: https://github.com/biabeogo147/Anime-Recommender.git
+# The branch every in-repo source follows; set by make bootstrap (anime/build until the merge, then main).
+targetRevision: main
+
+pins:
+  # <account>.dkr.ecr.ap-southeast-1.amazonaws.com
+  registry: 242834061265.dkr.ecr.ap-southeast-1.amazonaws.com
+  # terraform -chdir=infra/terraform/shared output -raw certificate_arn
+  certificateArn: arn:aws:acm:ap-southeast-1:242834061265:certificate/5f1f2560-4096-4f7c-b998-32f49b19df62
+  # Exact chart versions — `make pins` reads the current release of each.
+  charts:
+    awsLoadBalancerController: "3.5.0"
+    externalSecrets: "2.11.0"
+    externalDns: "1.22.0"
+    kubePrometheusStack: "91.4.1"
+    argoRollouts: "2.43.2"
+    keda: "2.20.2"
+    clusterAutoscaler: "9.59.0"
+    tempo: "1.24.4"
+    opentelemetryCollector: "0.173.1"
+  # The Cluster Autoscaler's image, of the cluster's own minor version (`make pins` prints it).
+  clusterAutoscalerImageTag: v1.36.1
+
+# The api's mode and drill marker; set by make bootstrap from terraform.tfvars (api_llm_provider, api_fault_rate,
+# api_drill).
+api:
+  provider: gemini
+  faultRate: "0"
+  drill: ""
+
+# Two values that Terraform decides and the charts need; kept equal to infra/terraform/cluster/variables.tf.
+network:
+  vpcCidr: 10.30.0.0/16
+  vpnCidr: 10.98.0.0/24
+domain: anime.recruitai.io.vn
+region: ap-southeast-1
+
+# Where the collector sends real-model traces (stage 8). Langfuse Cloud's EU region; its US region is
+# https://us.cloud.langfuse.com/api/public/otel. It must be the region the project and its keys (anime/langfuse) are in.
+langfuse:
+  otlpEndpoint: https://cloud.langfuse.com/api/public/otel

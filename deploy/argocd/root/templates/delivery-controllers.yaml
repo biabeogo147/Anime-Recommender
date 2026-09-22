@@ -1,0 +1,47 @@
+{{- if has "delivery" .Values.stages }}
+# Wave 0: the Argo Rollouts controller and its CRDs (Rollout, AnalysisTemplate, AnalysisRun). The api's Rollout is in
+# wave 1, so the CRDs exist before it is submitted.
+#
+# It writes the weights into the Ingress annotation, and the load balancer controller turns them into the ALB's weighted
+# forward — so a release depends on the LBC, the single point of failure named in design §3. --aws-verify-target-group
+# makes Rollouts CHECK the result: a step waits until the ALB has the weights it asked for, and the old stable is scaled
+# down only once the stable target group holds the new pods. It reads the ALB with its own read-only role
+# (infra/terraform/cluster/pod-identity.tf, ServiceAccount argo-rollouts/argo-rollouts).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-rollouts
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: {{ .Values.pins.charts.argoRollouts | quote }}
+    helm:
+      valuesObject:
+        installCRDs: true
+        controller:
+          # Two replicas with leader election: on Spot, a reclaimed node must not freeze a canary mid-step. A paused
+          # canary is safe (stable keeps serving), but its pause timers would not run until a controller came back.
+          replicas: 2
+          extraArgs: [--aws-verify-target-group]
+          # Node metadata is hidden from pods (IMDSv2, hop limit 1), so the AWS SDK cannot discover the region itself.
+          extraEnv:
+            - { name: AWS_REGION, value: {{ .Values.region }} }
+          metrics:
+            enabled: true
+            serviceMonitor: { enabled: true } # found by Prometheus whatever its labels (stage 2 values)
+        serviceAccount:
+          name: argo-rollouts # the Pod Identity association's ServiceAccount
+        dashboard: { enabled: false } # the Rollout is read with kubectl; one fewer UI behind the VPN
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-rollouts
+  # ServerSideApply: the Rollout CRD is larger than the 256 KiB a client-side apply can store in its annotation.
+  # SkipDryRunOnMissingResource: its ServiceMonitor's CRD comes from the monitoring stack, in the same wave. On a rebuild
+  # the first sync would otherwise fail on the missing kind and wait for a retry.
+  {{- include "root.syncPolicy" (list "CreateNamespace=true" "ServerSideApply=true" "SkipDryRunOnMissingResource=true") | nindent 2 }}
+{{- end }}

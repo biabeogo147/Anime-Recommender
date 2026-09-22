@@ -1,0 +1,65 @@
+# The LLM dashboard (design §4.2), loaded by Grafana's dashboard sidecar because of the label below. A ConfigMap in a
+# plain directory, not a Helm template: dashboard JSON is full of {{ }} that Helm would try to render.
+#
+# Every panel that sums money or tokens keeps to REAL models, by an allowlist on the `model` label, and shows that
+# label: config/pricing.yaml prices `fake` exactly like the real model, so a panel over every model would add
+# fabricated dollars from every drill (design §6, row 12). The cost denominator is the model-labelled request counter,
+# not anime_http_requests_total, which has no model label and counts drill requests too.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-anime-llm
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  anime-llm.json: |
+    {
+      "title": "Anime — LLM",
+      "uid": "anime-llm",
+      "schemaVersion": 39,
+      "time": { "from": "now-1h", "to": "now" },
+      "refresh": "30s",
+      "panels": [
+        {
+          "id": 1, "type": "timeseries", "title": "Cost per 1,000 requests (USD), real models only, by model",
+          "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [{
+            "refId": "A", "legendFormat": "model={{model}}",
+            "expr": "1000 * sum by (model) (rate(anime_llm_cost_usd_total{model=~\"gemini-.*|gemma-.*\"}[5m])) / sum by (model) (rate(anime_llm_request_duration_seconds_count{outcome=\"ok\",model=~\"gemini-.*|gemma-.*\"}[5m]))"
+          }]
+        },
+        {
+          "id": 2, "type": "timeseries", "title": "Tokens per minute, real models only, by model and type",
+          "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [{
+            "refId": "A", "legendFormat": "{{model}} {{type}}",
+            "expr": "60 * sum by (model, type) (rate(anime_llm_tokens_total{model=~\"gemini-.*|gemma-.*\"}[5m]))"
+          }]
+        },
+        {
+          "id": 3, "type": "timeseries", "title": "p95 latency: retrieval and generation (every mode)",
+          "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "refId": "A", "legendFormat": "retrieval",
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(anime_retrieval_duration_seconds_bucket[5m])))" },
+            { "refId": "B", "legendFormat": "generation model={{model}}",
+              "expr": "histogram_quantile(0.95, sum by (le, model) (rate(anime_llm_request_duration_seconds_bucket{outcome=\"ok\"}[5m])))" }
+          ]
+        },
+        {
+          "id": 4, "type": "timeseries", "title": "Span duration p95 — click an exemplar to open its trace",
+          "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ms" } },
+          "targets": [{
+            "refId": "A", "legendFormat": "{{span_name}}", "exemplar": true,
+            "expr": "histogram_quantile(0.95, sum by (le, span_name) (rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"anime-api\"}[5m])))"
+          }]
+        }
+      ]
+    }

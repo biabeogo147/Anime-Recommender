@@ -1,0 +1,16 @@
+{{- if not (has "delivery" .Values.stages) }}
+# The api until stage 5: a plain Deployment. A new version replaces every pod as fast as the old ones drain, with
+# nothing but readiness in the way (Delivery A2.1). Stage 5 renders rollout.yaml instead, with the same pod template.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anime-api
+  labels: { app: anime-api }
+spec:
+  replicas: {{ .Values.replicas }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app: anime-api }
+  template:
+    {{- include "anime-api.podTemplate" . | nindent 4 }}
+{{- end }}

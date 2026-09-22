@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: anime-ui
+  labels: { app: anime-ui }
+  annotations:
+    # The public Ingress (in the api chart) sets the api's health path. A Service annotation overrides it for this
+    # Service's target group only, so the UI's targets are checked on Streamlit's path, not on the api's /readyz.
+    alb.ingress.kubernetes.io/healthcheck-path: /_stcore/health
+spec:
+  selector: { app: anime-ui }
+  ports:
+    - { name: http, port: 8501, targetPort: http }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: anime-ui
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: anime-ui }

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: anime-api
+description: The recommender API and the public Ingress for both hosts.
+type: application
+version: 0.1.0 # the chart's own version; the image is pinned by digest in values.yaml

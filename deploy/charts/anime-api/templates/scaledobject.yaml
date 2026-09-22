@@ -1,0 +1,61 @@
+{{- if has "scaling" .Values.stages }}
+{{- if not (has "delivery" .Values.stages) }}
+{{- fail "the scaling stage scales the api's Rollout: switch delivery on first" }}
+{{- end }}
+{{- if eq (toString .Values.scaling.inFlightTarget) "MEASURE_IN_STAGE_4" }}
+{{- fail "scaling.inFlightTarget is still a placeholder: set it from stage 4's in-flight per pod at the knee" }}
+{{- end }}
+# The api's autoscaler (design §4.5). KEDA creates an HPA named keda-hpa-anime-api from this and keeps it in step.
+#
+# The signal is requests IN FLIGHT, not CPU: a request spends almost all its time waiting on two remote APIs, so CPU
+# barely moves while requests queue (Scaling A2.1).
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: anime-api
+spec:
+  # The Rollout, through its /scale subresource. The HPA writes its spec.replicas; the anime-api Application ignores
+  # that one field, so self-heal does not put the chart's number back (Scaling A7.2).
+  scaleTargetRef:
+    apiVersion: argoproj.io/v1alpha1
+    kind: Rollout
+    name: anime-api
+  minReplicaCount: {{ .Values.scaling.minReplicas }}
+  maxReplicaCount: {{ .Values.scaling.maxReplicas }}
+  pollingInterval: 15 # seconds between KEDA's queries; Prometheus itself only changes every 30 s scrape
+  # When the query keeps failing, KEDA stops trusting it. A plain fallback would drive the replicas TO a fixed count —
+  # down as readily as up; currentReplicasIfHigher never scales down on an error (Scaling A6.2). Fallback does not
+  # apply to CPU or memory triggers; this Prometheus trigger, AverageValue, is supported.
+  fallback:
+    failureThreshold: 3
+    replicas: {{ .Values.scaling.minReplicas }}
+    behavior: currentReplicasIfHigher
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        # KEDA's cooldownPeriod governs only scaling to zero, which never happens with a minimum of two. How fast
+        # replicas come back down is this window, set explicitly so criterion #14 times the scale-down against a
+        # number written here rather than a default (Scaling A5.1).
+        scaleDown:
+          stabilizationWindowSeconds: {{ .Values.scaling.scaleDownWindowSeconds }}
+          policies:
+            - { type: Pods, value: 1, periodSeconds: 60 } # one pod a minute: scale-in never drains several at once
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - { type: Pods, value: 2, periodSeconds: 30 }
+  triggers:
+    - type: prometheus
+      # AverageValue: the HPA divides the query's result by the current pod count and compares it with the target. So
+      # the query is the plain sum; a query that divided by the pods again would count twice (Scaling A2.4).
+      metricType: AverageValue
+      metadata:
+        serverAddress: {{ .Values.analysis.prometheus | quote }}
+        query: sum(anime_http_requests_in_flight{job="anime/anime-api"})
+        # Set BELOW stage 4's in-flight per pod at the knee, so scaling starts before the knee, not at it (Scaling
+        # A3.2). The value and how it was chosen are in docs/evidence/load.md.
+        threshold: {{ .Values.scaling.inFlightTarget | quote }}
+        # An empty result is an ERROR, not zero load. By default KEDA reads it as 0 and scales down to the minimum in
+        # the middle of whatever load there was, if the api's series vanish (Scaling A6.1).
+        ignoreNullValues: "false"
+{{- end }}
