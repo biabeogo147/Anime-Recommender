@@ -1,0 +1,58 @@
+{{- define "anime-api.analysisStep" -}}
+templates:
+  - templateName: success-rate-and-latency
+args:
+  # The two hashes, passed in rather than looked up by the query: a filter that picked the wrong one would return a
+  # healthy number and promote a broken canary (Delivery A4.4).
+  - name: canary-hash
+    valueFrom: { podTemplateHashValue: Latest }
+  - name: stable-hash
+    valueFrom: { podTemplateHashValue: Stable }
+{{- end -}}
+
+{{- if has "delivery" .Values.stages }}
+# The api from stage 5: a Rollout. A new version gets a slice of REQUESTS on the load balancer, is measured against the
+# old one over the same minutes, and only then gets more (design §4.4, Delivery A2.2).
+#
+# The first Rollout ever created has no stable version to compare with, so it goes straight to 100%. Every template
+# change after that — a new digest from CI, a new mode, a drill — walks the steps below.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: anime-api
+  labels: { app: anime-api }
+spec:
+  replicas: {{ .Values.replicas }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app: anime-api }
+  template:
+    {{- include "anime-api.podTemplate" . | nindent 4 }}
+  strategy:
+    canary:
+      # The controller adds rollouts-pod-template-hash to these two Services' selectors, so each selects one version.
+      stableService: anime-api-stable
+      canaryService: anime-api-canary
+      # The weights are set on the ALB, not by pod counts: 10% is 10% of requests although the canary is one pod
+      # beside two (Delivery A2.3). The controller writes them into the Ingress annotation
+      # alb.ingress.kubernetes.io/actions.anime-api-stable, which the load balancer controller turns into a weighted
+      # forward between the two Services' target groups.
+      trafficRouting:
+        alb:
+          ingress: anime-public
+          servicePort: 8000
+      # The stable ReplicaSet stays at full size throughout (dynamicStableScale is off), so an abort can send every
+      # request back at once. The cost is extra pods during a release, which the node autoscaler sees (design §4.4).
+      steps:
+        - setWeight: 10
+        # The wait is not ceremony: measured right after a shift, the window would still describe the old traffic and
+        # the new pods' cold first seconds (Delivery README, Decision 1).
+        - pause: { duration: 2m }
+        - analysis:
+            {{- include "anime-api.analysisStep" . | nindent 12 }}
+        - setWeight: 50
+        - pause: { duration: 2m }
+        - analysis:
+            {{- include "anime-api.analysisStep" . | nindent 12 }}
+        # After the last step the canary becomes stable at 100%.
+{{- end }}

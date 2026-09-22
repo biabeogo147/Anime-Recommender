@@ -83,6 +83,13 @@ variable "api_fault_rate" {
   }
 }
 
+variable "api_drill" {
+  # Any new value is a new version of the api's pod template and nothing else: from stage 5, a canary with no code
+  # change — the promotion drill. Empty: no marker on the pods.
+  type    = string
+  default = ""
+}
+
 provider "helm" {
   kubernetes = {
     config_path = var.kubeconfig_path
@@ -132,6 +139,7 @@ resource "helm_release" "root" {
               api = {
                 provider  = var.api_llm_provider
                 faultRate = var.api_fault_rate
+                drill     = var.api_drill
               }
             }
           }

@@ -191,7 +191,8 @@ chối, mà không ai quyết định bản đó ổn cả. Trạng thái Degrad
 ### A8. Drill
 
 **A8.1** **Ý chính:** "Cả hai đều chạy với toàn bộ api ở chế độ fake, để hai bản được so trên cùng điều kiện, với k6 giữ 20
-request mỗi giây. Drill promote: một bản mới từ CI đi qua 10, 50, 100, mỗi mức có lần đo được ghi lại. Drill rollback: cùng
+request mỗi giây. Drill promote: một bản mới — chỉ đổi một annotation trên pod template, nên không cần image mới; đường đi từ CI đã
+được chứng minh ở stage 3 — đi qua 10, 50, 100, mỗi mức có lần đo được ghi lại. Drill rollback: cùng
 như vậy, cộng `FAULT_RATE=0.2`. Theo thiết kế, phân tích sẽ thất bại ở mức 10% và Rollout abort, trả toàn bộ traffic về
 stable."
 

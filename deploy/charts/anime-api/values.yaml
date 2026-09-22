@@ -21,6 +21,18 @@ llm:
   model: gemini-3.5-flash-lite
   faultRate: "0"
 
+# Set by the root from api_drill in terraform.tfvars; empty renders nothing. Changing it is a new version of the pod
+# template with no other change — the promotion drill (docs/delivery/guide.md).
+drill: ""
+
+# The canary analysis (stage 5, templates/analysistemplate.yaml). Written down here, beside the Rollout, so the number
+# on paper and the number in effect are one value (Delivery A5.4).
+analysis:
+  prometheus: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+  minRequests: 20       # per two-minute window, below it: inconclusive, pause (Delivery A6.2)
+  minSuccessRate: 0.99  # share of canary requests without a 5xx
+  maxLatencyRatio: 1.2  # canary p95 over stable p95, same window
+
 # Starting points, not measurements: stage 4's capacity run replaces them with what a pod used at the knee (Scaling A4.3).
 resources:
   requests: { cpu: 250m, memory: 512Mi }

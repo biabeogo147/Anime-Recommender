@@ -718,7 +718,8 @@ safe default and it is kept — but it is extra requested capacity, and the node
 together and will happily promote a broken version — which is why [§6](#6-verification-and-evidence-definition-of-done)
 requires the AnalysisRun's recorded measurement to be non-empty and attributable.
 
-**Steps:** `setWeight 10` → pause 2m → analysis; `setWeight 50` → pause 2m → analysis; `setWeight 100`.
+**Steps:** `setWeight 10` → pause 2m → analysis; `setWeight 50` → pause 2m → analysis; then 100%, implicitly,
+after the last step.
 
 **`AnalysisTemplate success-rate-and-latency`:** Prometheus provider, interval 30 s, count 4, failureLimit 1.
 Two gates. The success rate reads the canary's `rollouts-pod-template-hash` only; the latency ratio reads the
@@ -746,13 +747,16 @@ two errors; a window of 60 fails on the first one. A gate that aborts a healthy 
 error is a gate people learn to switch off, so the drill rate is chosen to give the threshold room to mean
 what it says.
 
-**Open: how the UI reaches the api, and whether real users are canaried.** Browsers reach Streamlit on
-`anime.recruitai.io.vn`; the UI then calls the api at `ANIME_API_URL`. Pointed at the public `api.anime` name,
-UI traffic follows the ALB weights but leaves the VPC through the NAT and comes back in. Pointed at an in-cluster
-Service, it stays inside — and is split by whatever that Service selects, not by the ALB weights: through the
-stable Service it never reaches a canary at all. The drills are unaffected, since k6 calls `api.anime` directly;
-what is undecided is whether a canary is judged on real users' requests too. To be settled when the ui chart is
-written, and stated in the evidence.
+**Settled in stage 5: the UI calls the stable Service, so real users are canaried only through `api.anime`.**
+Browsers reach Streamlit on `anime.recruitai.io.vn`; the UI then calls the api at `ANIME_API_URL`. Pointed at the
+public `api.anime` name, UI traffic would follow the ALB weights but leave the VPC through the NAT and come back in.
+Pointed at the root Service, it would stay inside but reach the canary at its share of *pods* — a third of them at the
+10% step. It points at `anime-api-stable`, so a canary never sees UI traffic and is judged on direct traffic: the
+drills' k6 and any other caller of `api.anime`. The evidence says so.
+
+**The promotion drill needs no new image.** Any change to the pod template is a new version to the Rollout, so the
+drill changes one annotation (`api_drill` in the bootstrap variables). A digest from CI walks the same steps; stage 3
+already proved that path.
 
 **The rollback drill.** Drills run with the whole api already in fake mode, so stable and canary are compared in
 the same mode. The change under test adds `FAULT_RATE=0.2` to a version whose values also pin
@@ -1071,7 +1075,7 @@ been anywhere else is not a private key.
   IP targets are chosen for three other reasons: no extra kube-proxy hop that, with the default traffic
   policy, can land a request on a pod of the *other* version before the split is applied; pod readiness gates,
   below; and Argo Rollouts' check that the weights it asked for are the weights the target groups actually
-  have.
+  have — `--aws-verify-target-group`, switched on in stage 5 with a read-only role of its own.
 - **`healthcheck-path`, and pod readiness gates.** The controller's default health check is `GET /` on the
   traffic port. `anime-api` serves no `/`, and Streamlit's health path is `/_stcore/health`, so every target
   would fail it. **An ALB whose targets are all unhealthy fails open** — it routes to all of them anyway —
@@ -1080,6 +1084,15 @@ been anywhere else is not a private key.
   is not Ready until its target is healthy in the load balancer, so the same mistake makes the rollout
   **stall** instead. Set `/readyz` (api: no traffic before the index is loaded) and `/_stcore/health` explicitly;
   the readiness gate is what turns getting them wrong from silent into loud.
+
+  **The gate does not cover a canary's pods.** It is injected only if a Service the controller serves already
+  selects the pod when the pod is created. A canary pod is created while the canary Service still selects the
+  stable hash — Argo Rollouts moves that selector once the canary ReplicaSet is available — so canary pods
+  become Ready on their readiness probe alone. The same holds for the pods the stable Service moves to at
+  promotion. What covers those two moments instead is target-group verification: a step does not proceed, and
+  the old stable is not scaled down, until the ALB shows the weights and the stable target group holds the new
+  pods. Argo Rollouts' ping-pong mode would keep the gates as well, and is not used: one mechanism is enough to
+  reason about in a first build.
 - **The admin UIs have to be told their own names.** Argo CD's server needs `server.insecure: true` behind a
   TLS-terminating ALB or it redirect-loops; Grafana needs `root_url`; Prometheus and Alertmanager need
   `--web.external-url`. Each is a component that works perfectly on `localhost` and breaks the moment it is

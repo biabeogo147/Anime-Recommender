@@ -1,7 +1,7 @@
 # One IAM role per controller, bound to exactly one ServiceAccount through an EKS Pod Identity association. No
 # access key anywhere, and no controller borrows the node's role (Terraform A5.1, A5.2).
 #
-# The namespace/ServiceAccount pairs below are a contract with the charts in deploy/argocd/ (stage 2 and 7): a
+# The namespace/ServiceAccount pairs below are a contract with the charts in deploy/argocd/ (stages 2, 5 and 7): a
 # chart that names its ServiceAccount differently gets no credentials, and fails with an explicit "no credentials"
 # error rather than silently using something else.
 
@@ -142,4 +142,43 @@ resource "aws_eks_pod_identity_association" "external_dns" {
   namespace       = "external-dns"
   service_account = "external-dns"
   role_arn        = aws_iam_role.external_dns.arn
+}
+
+# --- Argo Rollouts (stage 5): read-only, to VERIFY what the load balancer controller did ------------------------
+# With --aws-verify-target-group the controller checks, before each step proceeds and before the old stable is
+# scaled down, that the ALB really has the weights it asked for and that the stable target group holds the new
+# stable pods. Without it, the old pods are scaled away 30 s after promotion whether or not the target group has
+# caught up — if the load balancer controller is slow or down, the api host then forwards to deleted pods
+# (design §4.4). Describe calls cannot be scoped to resources; nothing here can change a load balancer.
+data "aws_iam_policy_document" "argo_rollouts" {
+  statement {
+    sid = "VerifyTargetGroups"
+    actions = [
+      "elasticloadbalancing:DescribeLoadBalancers",
+      "elasticloadbalancing:DescribeListeners",
+      "elasticloadbalancing:DescribeRules",
+      "elasticloadbalancing:DescribeTargetGroups",
+      "elasticloadbalancing:DescribeTargetHealth",
+      "elasticloadbalancing:DescribeTags",
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role" "argo_rollouts" {
+  name               = "${local.name}-argo-rollouts"
+  assume_role_policy = data.aws_iam_policy_document.pod_identity_trust.json
+}
+
+resource "aws_iam_role_policy" "argo_rollouts" {
+  name   = "verify-target-groups"
+  role   = aws_iam_role.argo_rollouts.id
+  policy = data.aws_iam_policy_document.argo_rollouts.json
+}
+
+resource "aws_eks_pod_identity_association" "argo_rollouts" {
+  cluster_name    = module.eks.cluster_name
+  namespace       = "argo-rollouts"
+  service_account = "argo-rollouts" # the chart's default ServiceAccount name (delivery-controllers.yaml)
+  role_arn        = aws_iam_role.argo_rollouts.arn
 }

@@ -25,11 +25,14 @@ pins:
     externalSecrets: PIN_ME
     externalDns: PIN_ME
     kubePrometheusStack: PIN_ME
+    argoRollouts: PIN_ME
 
-# The api's mode; set by make bootstrap from terraform.tfvars (api_llm_provider, api_fault_rate).
+# The api's mode and drill marker; set by make bootstrap from terraform.tfvars (api_llm_provider, api_fault_rate,
+# api_drill).
 api:
   provider: gemini
   faultRate: "0"
+  drill: ""
 
 # Two values that Terraform decides and the charts need; kept equal to infra/terraform/cluster/variables.tf.
 network:

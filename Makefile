@@ -18,7 +18,12 @@ SHELL := /bin/bash
 
 REGION     ?= ap-southeast-1
 PROJECT    ?= anime
+# The slo-* targets need no AWS at all — CI runs `make slo-check` with no credentials — so only they skip the check.
+ifeq ($(filter-out slo-%,$(or $(MAKECMDGOALS),default)),)
+ACCOUNT_ID := none
+else
 ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text 2>/dev/null)
+endif
 ifeq ($(ACCOUNT_ID),)
 $(error cannot read the AWS account id: run this on the ops workstation, with its instance role)
 endif
@@ -46,7 +51,7 @@ cluster_output = $(TF_CLUSTER) output -raw $(1)
 
 .PHONY: shared-init shared-plan shared init plan infra kubeconfig tunnel ready bootstrap-init bootstrap-plan \
         bootstrap up vpn-config pins image apps loadtest-baseline loadtest-ramp loadtest-steady prom prom-range \
-        down infra-destroy
+        rollout-status rollout promote-full slo-generate slo-check down infra-destroy
 
 # --- shared: survives every teardown -----------------------------------------------------------------------------
 shared-init:
@@ -139,18 +144,22 @@ pins: shared-init
 	helm repo add external-secrets https://charts.external-secrets.io --force-update >/dev/null
 	helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/ --force-update >/dev/null
 	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update >/dev/null
+	helm repo add argo https://argoproj.github.io/argo-helm --force-update >/dev/null
 	helm repo update >/dev/null
 	echo "account_id          $(ACCOUNT_ID)"
 	echo "registry            $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com"
 	echo "certificate_arn     $$($(TF_SHARED) output -raw certificate_arn)"
 	for c in eks/aws-load-balancer-controller external-secrets/external-secrets external-dns/external-dns \
-	         prometheus-community/kube-prometheus-stack; do
+	         prometheus-community/kube-prometheus-stack argo/argo-rollouts; do
 	  printf '%-45s %s\n' "$$c" "$$(helm search repo $$c -o json | jq -r '.[0].version')"
 	done
+	# The Sloth image for make slo-generate / slo-check (SLOTH_IMAGE in this file): its latest release tag.
+	printf '%-45s %s\n' "ghcr.io/slok/sloth" \
+	  "$$(curl -fsS https://api.github.com/repos/slok/sloth/releases/latest | jq -r .tag_name || echo LOOKUP-FAILED)"
 	# GitHub Actions used by .github/workflows, resolved from tag to COMMIT SHA once (unauthenticated API: 60 calls/h).
 	for a in actions/checkout@v4 docker/setup-buildx-action@v3 docker/build-push-action@v6 aquasecurity/trivy-action@v0.35.0 \
 	         github/codeql-action@v4 aws-actions/configure-aws-credentials@v4 aws-actions/amazon-ecr-login@v2 \
-	         sigstore/cosign-installer@v3 anchore/sbom-action@v0; do
+	         sigstore/cosign-installer@v3 anchore/sbom-action@v0 actions/upload-artifact@v4; do
 	  printf '%-45s %s\n' "$$a" "$$(curl -fsS https://api.github.com/repos/$${a%@*}/commits/$${a#*@} | jq -r .sha || echo LOOKUP-FAILED)"
 	done
 
@@ -217,6 +226,51 @@ prom-range:
 # Sync and health of every Application, by name.
 apps:
 	@kubectl -n argocd get applications -o custom-columns='NAME:.metadata.name,WAVE:.metadata.annotations.argocd\.argoproj\.io/sync-wave,SYNC:.status.sync.status,HEALTH:.status.health.status,REVISION:.status.sync.revision'
+
+# --- stage 5: the api's Rollout, read without the kubectl plugin ----------------------------------------------------
+# One line for the Rollout — phase, step, the canary's weight on the ALB, both hashes — then every measurement of the
+# newest AnalysisRun with the hashes it was given. The evidence is the measured values, not the outcome (design §6, #8).
+rollout-status:
+	@kubectl -n anime get rollout anime-api -o json | jq -r '"\(now | todate) phase=\(.status.phase) step=\(.status.currentStepIndex // "-")/\(.spec.strategy.canary.steps | length) canary-weight=\(.status.canary.weights.canary.weight // 0)% stable=\(.status.stableRS) latest=\(.status.currentPodHash) abort=\(.status.abort // false) \(.status.message // "")"'
+rollout: rollout-status
+	@run=$$(kubectl -n anime get analysisrun --sort-by=.metadata.creationTimestamp -o name | tail -1)
+	[ -n "$$run" ] || { echo "no AnalysisRun yet"; exit 0; }
+	kubectl -n anime get "$$run" -o json | jq -r '"\(.metadata.name) \(.status.phase // "Running") args: \([.spec.args[] | "\(.name)=\(.value)"] | join(" "))",
+	  (.status.metricResults[]? | "  \(.name) \(.phase): " + ([.measurements[]? | "\(.phase)=\(.value // "-")"] | join(" ")))'
+
+# Promote to 100% with NO further steps and NO analysis — what `kubectl argo rollouts promote --full` does. Used only for
+# the api's MODE switches (gemini ↔ fake), which are not releases under test and have no traffic to be judged on, and
+# for the SLO alert drill, whose fault must reach ALL traffic at once (design §4.3). Never to push a release past an
+# analysis that stopped it (Delivery A7.2).
+promote-full:
+	kubectl -n anime patch rollout anime-api --subresource=status --type merge -p '{"status":{"promoteFull":true}}'
+
+# --- stage 6: the SLO rules, generated from the Sloth spec -------------------------------------------------------
+# Sloth runs in a container (nothing installed), pinned by version: a different Sloth may write different rules, and
+# the committed file would stop matching for no reason anyone changed. `make pins` prints the current release.
+#   slo-generate  writes deploy/slo/generated/anime-api.yaml from deploy/slo/anime-api.sloth.yaml
+#   slo-check     regenerates into a temporary file and fails on any difference — what CI runs (SLO A4.1)
+# --default-slo-period=28d: without it Sloth uses 30 days and the rules carry the 30-day multipliers (design §4.3).
+SLOTH_IMAGE ?= ghcr.io/slok/sloth:PIN_ME
+SLOTH = docker run --rm -i --user "$$(id -u):$$(id -g)" -v $(CURDIR)/deploy/slo:/slo $(SLOTH_IMAGE) \
+  generate --default-slo-period=28d -i /slo/anime-api.sloth.yaml
+slo-generate:
+	mkdir -p deploy/slo/generated
+	$(SLOTH) -o /slo/generated/anime-api.yaml
+	grep -c 'record:' deploy/slo/generated/anime-api.yaml | sed 's/$$/ recording rules/'
+	grep -c 'alert:' deploy/slo/generated/anime-api.yaml | sed 's/$$/ alert rules/'
+slo-check:
+	# Until stage 4 has measured T there is nothing to generate, and CI must stay green for stages 3 to 5.
+	if grep -q 'PIN_ME_T' deploy/slo/anime-api.sloth.yaml; then echo "T not pinned yet: SLO check skipped"; exit 0; fi
+	tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT
+	cp deploy/slo/anime-api.sloth.yaml "$$tmp/"
+	docker run --rm -i --user "$$(id -u):$$(id -g)" -v "$$tmp":/slo $(SLOTH_IMAGE) \
+	  generate --default-slo-period=28d -i /slo/anime-api.sloth.yaml -o /slo/anime-api.yaml
+	# Kept outside the temporary directory: CI uploads it when this check fails, so the regenerated file can be
+	# committed without running Sloth anywhere else (docs/slo/guide.md, section 0).
+	mkdir -p slo-regenerated && cp "$$tmp/anime-api.yaml" slo-regenerated/
+	[ -f deploy/slo/generated/anime-api.yaml ] || { echo "deploy/slo/generated/anime-api.yaml is missing"; exit 1; }
+	diff -u deploy/slo/generated/anime-api.yaml "$$tmp/anime-api.yaml" && echo "SLO rules match the spec"
 
 # --- teardown: tunnel must be open -------------------------------------------------------------------------------
 # Load balancers, their target groups and security groups, and EBS volumes are created by controllers inside the

@@ -6,9 +6,9 @@ image:
 
 replicas: 2 # preferably on the two different nodes, like the api
 
-# How the UI reaches the api: through the in-cluster Service, so a UI request never leaves the VPC through the NAT. The
-# consequence, recorded in design §4.4 as open: once the api is canaried (stage 5), UI traffic follows what this Service
-# selects, not the ALB weights. k6 and the drills call api.<domain> directly and are unaffected.
+# How the UI reaches the api: through an in-cluster Service, so a UI request never leaves the VPC through the NAT. Until
+# stage 5 it is the root Service below; from stage 5 the root passes the STABLE Service instead, so UI traffic never
+# reaches a canary (design §4.4). k6 and the drills call api.<domain> directly.
 apiUrl: http://anime-api.anime.svc.cluster.local:8000
 apiTimeoutSeconds: "60"
 

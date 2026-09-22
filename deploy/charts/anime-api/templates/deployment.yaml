@@ -1,4 +1,6 @@
-# The api. A plain Deployment until stage 5 turns it into a Rollout.
+{{- if not (has "delivery" .Values.stages) }}
+# The api until stage 5: a plain Deployment. A new version replaces every pod as fast as the old ones drain, with
+# nothing but readiness in the way (Delivery A2.1). Stage 5 renders rollout.yaml instead, with the same pod template.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -10,57 +12,5 @@ spec:
   selector:
     matchLabels: { app: anime-api }
   template:
-    metadata:
-      labels: { app: anime-api }
-    spec:
-      # One replica per node where possible, so a reclaimed Spot node usually takes one replica, not both. ScheduleAnyway:
-      # when a node is missing or full the pod still starts, co-located, rather than staying Pending.
-      topologySpreadConstraints:
-        - maxSkew: 1
-          topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway
-          labelSelector:
-            matchLabels: { app: anime-api }
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 10001 # the image's own user (services/api/Dockerfile)
-        seccompProfile: { type: RuntimeDefault }
-      containers:
-        - name: api
-          image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
-          ports:
-            - { name: http, containerPort: 8000 }
-          # GOOGLE_API_KEY and HF_TOKEN, from the Secret External Secrets writes (deploy/platform/base).
-          envFrom:
-            - secretRef: { name: anime-llm }
-          env:
-            - { name: LLM_PROVIDER, value: {{ .Values.llm.provider | quote }} }
-            - { name: MODEL_NAME, value: {{ .Values.llm.model | quote }} }
-            - { name: FAULT_RATE, value: {{ .Values.llm.faultRate | quote }} }
-          # /healthz says "the process is alive" and stays 200 while the index loads; /readyz says "the index is loaded
-          # and I can answer". So readiness is what keeps traffic off a loading pod, and liveness never kills a pod whose
-          # load is merely retrying (docs/evidence/local.md, startup resilience). The startup probe only covers the
-          # process coming up. The probes' handlers are async: they do not wait behind a saturated thread pool (design §4.1).
-          startupProbe:
-            httpGet: { path: /healthz, port: http }
-            periodSeconds: 5
-            failureThreshold: 24 # two minutes to start
-          readinessProbe:
-            httpGet: { path: /readyz, port: http }
-            periodSeconds: 10
-            timeoutSeconds: 3
-          livenessProbe:
-            httpGet: { path: /healthz, port: http }
-            periodSeconds: 20
-            timeoutSeconds: 3
-            failureThreshold: 3
-          resources: {{ toYaml .Values.resources | nindent 12 }}
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities: { drop: [ALL] }
-          volumeMounts:
-            - { name: tmp, mountPath: /tmp } # HOME and HF_HOME point here; the root filesystem is read-only
-      volumes:
-        - name: tmp
-          emptyDir: {}
+    {{- include "anime-api.podTemplate" . | nindent 4 }}
+{{- end }}

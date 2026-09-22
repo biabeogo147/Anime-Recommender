@@ -35,10 +35,33 @@ spec:
         llm:
           provider: {{ $.Values.api.provider | quote }}
           faultRate: {{ $.Values.api.faultRate | quote }}
+        drill: {{ $.Values.api.drill | quote }}
+        {{- end }}
+        {{- if and (eq $svc "ui") (has "delivery" $.Values.stages) }}
+        # Settled in stage 5 (design §4.4): the UI calls the STABLE Service, so real users reach a canary
+        # only through api.<domain>, at the ALB's weight. Through the root Service they would reach it at its share of
+        # PODS — a third of them at the 10% step — which is more exposure than the step says. The canary is judged on
+        # direct traffic (the drills' k6), and that is what the evidence states.
+        apiUrl: http://anime-api-stable.anime.svc.cluster.local:8000
         {{- end }}
   destination:
     server: https://kubernetes.default.svc
     namespace: anime
+  {{- if and (eq $svc "api") (has "delivery" $.Values.stages) }}
+  # Argo Rollouts owns the api rule's weights from the first release on. Without this, self-heal would put Git's starting
+  # value (100/0) back in the middle of a canary; RespectIgnoreDifferences keeps a sync from doing the same.
+  ignoreDifferences:
+    - group: networking.k8s.io
+      kind: Ingress
+      name: anime-public
+      jsonPointers: [/metadata/annotations/alb.ingress.kubernetes.io~1actions.anime-api-stable]
+  # PruneLast: switching delivery on replaces the Deployment with a Rollout. The old Deployment is deleted only after
+  # the Rollout is healthy, so the api is never without pods. It is briefly without TARGETS, though: the api rule moves
+  # to the new stable target group before the controller has registered and health-checked its pods — expect 503s on
+  # api.<domain> for up to a minute while the stage is switched on (docs/delivery/guide.md, 1.1).
+  {{- include "root.syncPolicy" (list "RespectIgnoreDifferences=true" "PruneLast=true") | nindent 2 }}
+  {{- else }}
   {{- include "root.syncPolicy" (list) | nindent 2 }}
+  {{- end }}
 {{- end }}
 {{- end }}

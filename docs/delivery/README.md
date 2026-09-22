@@ -138,7 +138,7 @@ someone think twice about.
 
 ```mermaid
 flowchart TB
-    GOOD["Promotion drill<br/>a new version from CI"] --> G1["small share · measured"]
+    GOOD["Promotion drill<br/>a new version,<br/>one annotation changed"] --> G1["small share · measured"]
     G1 --> G2["larger share · measured"] --> G3["all traffic"]
     BAD["Rollback drill<br/>the same, plus a fault rate"] --> B1["small share · measured"] --> B2["abort"]
     B2 --> B3["stable keeps all traffic<br/>Degraded until Git changes"]
@@ -176,7 +176,7 @@ not a failing one — is what would measure it, and it is not among the criteria
 ## Known limits
 
 - **The load balancer controller is in the path of every release.** If it cannot apply weights, nothing moves.
-- **Until the buckets change, the latency gate is far looser than 1.2×.**
+- **The latency gate's real sensitivity is computed from the bucket layout, not measured.**
 - **One operator answers every pause.** Inconclusive is safe only if someone notices it.
 
 ---
