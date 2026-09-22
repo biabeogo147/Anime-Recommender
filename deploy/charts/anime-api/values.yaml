@@ -1,0 +1,31 @@
+# Values of the api chart. CI (stage 3) rewrites exactly one line here — image.digest — and commits it. The registry,
+# the certificate and the live stages are passed by the root app-of-apps (deploy/argocd/root/templates/app.yaml).
+
+# Which build stages are live; set by the root. Later stages switch chart features on from here (stage 5: Rollout).
+stages: []
+
+image:
+  repository: "" # <registry>/anime-api, from the root's pins
+  # Pulled by DIGEST, never by tag: Git records it, Argo CD deploys it, the signature is on it, so all three always name
+  # the same image (CI/CD A2.2). Until CI exists, `make image` builds it and prints this value.
+  digest: PIN_ME
+
+# Two replicas, preferably on different nodes. The spread is a preference (ScheduleAnyway), so after a Spot reclaim both
+# can land on one node until the next rollout — not a guarantee that a reclaim takes only one (Terraform A4.2).
+replicas: 2
+
+# The mode is a property of the whole deployment. `fake` answers without calling a model — for drills only, never the
+# default. FAULT_RATE is read ONLY by the fake provider (Delivery A8.2).
+llm:
+  provider: gemini
+  model: gemini-3.5-flash-lite
+  faultRate: "0"
+
+# Starting points, not measurements: stage 4's capacity run replaces them with what a pod used at the knee (Scaling A4.3).
+resources:
+  requests: { cpu: 250m, memory: 512Mi }
+  limits: { memory: 1Gi }
+
+ingress:
+  certificateArn: "" # from the root's pins
+  domain: anime.recruitai.io.vn # the ui answers on the domain itself, the api on api.<domain>

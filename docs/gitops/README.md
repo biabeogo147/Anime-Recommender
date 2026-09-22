@@ -54,7 +54,7 @@ The picture is the finished system. Components enter Git in the stage that needs
 is a plain Deployment, and until stage 7 it has no ScaledObject — so early on some waves are simply emptier.
 
 Which component sits in which wave is in the
-[design's table](../eks-sre-llmops-design.md#in-cluster-components-argo-cd-applications-deployargocdapps).
+[design's table](../eks-sre-llmops-design.md#in-cluster-components-argo-cd-applications-rendered-by-deployargocdroot).
 What matters here is the condition that makes the arrows real. **A wave only waits for the previous wave to be
 healthy — and Argo CD has no built-in way to tell whether an Application is healthy.** Without one, each child
 counts as healthy the instant it is created, and every wave starts at once. The picture above would describe an

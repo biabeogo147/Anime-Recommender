@@ -1,0 +1,23 @@
+# The api's Service: target of the public ALB's api host (pods registered by IP) and of the UI inside the cluster.
+apiVersion: v1
+kind: Service
+metadata:
+  name: anime-api
+  labels: { app: anime-api }
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1" # with the Ingress, before the pods
+spec:
+  selector: { app: anime-api }
+  ports:
+    - { name: http, port: 8000, targetPort: http }
+---
+# At most one replica down during a voluntary eviction (a drain). It does nothing against a Spot reclaim — that is
+# involuntary; the spread across nodes is what survives it (Terraform A4.3).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: anime-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: anime-api }

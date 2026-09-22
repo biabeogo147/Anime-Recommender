@@ -320,7 +320,7 @@ helm repo add argo https://argoproj.github.io/argo-helm --force-update >/dev/nul
 CD=$(helm search repo argo/argo-cd -o json | jq -r '.[0].version')
 APPS=$(helm search repo argo/argocd-apps -o json | jq -r '.[0].version')
 [ "$CD" != null ] && [ -n "$CD" ] && [ "$APPS" != null ] && [ -n "$APPS" ] || echo "CHART LOOKUP FAILED - do not continue"
-printf 'argocd_chart_version      = "%s"\nargocd_apps_chart_version = "%s"\ntarget_revision           = "anime/build"\n' "$CD" "$APPS" \
+printf 'argocd_chart_version      = "%s"\nargocd_apps_chart_version = "%s"\ntarget_revision           = "anime/build"\nenabled_stages            = []\n' "$CD" "$APPS" \
   | tee infra/terraform/bootstrap/terraform.tfvars
 ```
 
@@ -349,8 +349,9 @@ kubectl -n argocd get applications
 ```
 
 Expected: `bootstrap count OK: 2`, `exit=0`, `condition met`, every pod `Running`, `root  Synced  Healthy`, and
-`root at the pushed commit`. The root has no children yet — `deploy/argocd/apps/` holds only a README, which Argo CD
-ignores — so this proves Argo CD reads the branch, nothing more.
+`root at the pushed commit`. The root has no children yet — `enabled_stages = []`, so its chart (`deploy/argocd/root`)
+renders nothing — which proves Argo CD reads the branch and renders the chart, nothing more. Each later stage's guide
+adds its name to `enabled_stages` and re-applies the bootstrap.
 
 ---
 
@@ -427,7 +428,7 @@ again (5.1) until the versions are pinned in Git. The VPN profile needs no chang
 | WireGuard app: no handshake | Wrong key pasted in 2.4, a cached old address, or UDP 51820 blocked | Check 2.4's lengths; `ipconfig /flushdns`; try another network |
 | 5.1 prints `CHART LOOKUP FAILED` | Helm repo unreachable | Retry 5.1; never write `null` into the tfvars |
 | `make bootstrap-plan`: API not reachable | Tunnel closed | Window 2: `make tunnel`; `make ready` must say `ok` |
-| `root` is `Unknown` with `ComparisonError` | `target_revision` branch or `deploy/argocd/apps` not pushed | Push; `kubectl -n argocd get application root -o jsonpath='{.status.conditions}'` |
+| `root` is `Unknown` with `ComparisonError` | `target_revision` branch or `deploy/argocd/root` not pushed | Push; `kubectl -n argocd get application root -o jsonpath='{.status.conditions}'` |
 | `make down` stops at "load-balancer resources remain" | An Application still self-heals, or the controller is gone | `kubectl -n argocd get applications -o jsonpath='{range .items[*]}{.metadata.name} {.spec.syncPolicy.automated}{"\n"}{end}'`; report before deleting anything by hand |
 | `make down`: API not reachable | Tunnel closed, or the cluster never came up | Reopen the tunnel; for a cluster that never came up, `make infra-destroy` |
 | `terraform destroy` hangs on the VPC | Something a controller created is still inside | `aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=<vpc>`; report before deleting |

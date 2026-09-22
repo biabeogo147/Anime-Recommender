@@ -1,0 +1,34 @@
+# Values of the root app-of-apps.
+#
+# Two kinds of value live here:
+#   - `stages` and `targetRevision` are NOT set in Git: `make bootstrap` passes them from
+#     infra/terraform/bootstrap/terraform.tfvars, so switching a stage on is an apply, not a commit.
+#   - `pins` ARE set in Git: the values only this AWS account knows. Every PIN_ME in the repository is here, in one
+#     place; `make pins` prints them. Argo CD fails loudly on a chart version or ARN it cannot resolve, so a forgotten
+#     pin shows up as an error, never as a guess.
+
+# Which build stages are live, e.g. [gitops, cicd, load]. Empty: the root renders nothing (the end of stage 1).
+stages: []
+
+repoURL: https://github.com/biabeogo147/Anime-Recommender.git
+# The branch every in-repo source follows; set by make bootstrap (anime/build until the merge, then main).
+targetRevision: main
+
+pins:
+  # <account>.dkr.ecr.ap-southeast-1.amazonaws.com
+  registry: PIN_ME
+  # terraform -chdir=infra/terraform/shared output -raw certificate_arn
+  certificateArn: PIN_ME
+  # Exact chart versions — `make pins` reads the current release of each.
+  charts:
+    awsLoadBalancerController: PIN_ME
+    externalSecrets: PIN_ME
+    externalDns: PIN_ME
+    kubePrometheusStack: PIN_ME
+
+# Two values that Terraform decides and the charts need; kept equal to infra/terraform/cluster/variables.tf.
+network:
+  vpcCidr: 10.30.0.0/16
+  vpnCidr: 10.98.0.0/24
+domain: anime.recruitai.io.vn
+region: ap-southeast-1

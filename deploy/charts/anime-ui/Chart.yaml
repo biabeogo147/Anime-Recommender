@@ -1,0 +1,5 @@
+apiVersion: v2
+name: anime-ui
+description: The Streamlit UI, a thin client over the api.
+type: application
+version: 0.1.0

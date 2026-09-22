@@ -51,6 +51,14 @@ variable "target_revision" {
   default = "main"
 }
 
+variable "enabled_stages" {
+  # Which build stages the root renders, e.g. ["gitops"], then ["gitops", "cicd", ...]. Switching a stage on is a change
+  # to terraform.tfvars and `make bootstrap-plan && make bootstrap` — not a commit — so the whole repository can sit in
+  # Git while the cluster is built one stage at a time. Empty: the root renders nothing.
+  type    = list(string)
+  default = []
+}
+
 provider "helm" {
   kubernetes = {
     config_path = var.kubeconfig_path
@@ -91,7 +99,14 @@ resource "helm_release" "root" {
         source = {
           repoURL        = var.repo_url
           targetRevision = var.target_revision
-          path           = "deploy/argocd/apps" # one file per component; waves order them (stage 2)
+          path           = "deploy/argocd/root" # a small chart: one Application per component of each live stage
+          helm = {
+            valuesObject = {
+              stages         = var.enabled_stages
+              targetRevision = var.target_revision # every in-repo child follows the same branch as the root
+              repoURL        = var.repo_url        # and the same repository
+            }
+          }
         }
         destination = {
           server    = "https://kubernetes.default.svc"
@@ -99,9 +114,13 @@ resource "helm_release" "root" {
         }
         syncPolicy = {
           automated = {
-            prune    = true # a file removed from apps/ removes its Application
+            prune    = true # a stage switched off, or a template removed, removes its Applications
             selfHeal = true # a hand edit is put back to what Git says
+            # Automated sync otherwise refuses to prune EVERYTHING, so switching the last stage off would leave its
+            # Applications in place.
+            allowEmpty = true
           }
+          retry = { limit = 10, backoff = { duration = "10s", factor = 2, maxDuration = "3m" } }
         }
       }
     }

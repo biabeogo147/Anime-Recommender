@@ -1,0 +1,124 @@
+{{- if has "gitops" .Values.stages }}
+# Wave 0: Prometheus, Alertmanager, Grafana. It arrives in stage 2, before anything measures with it, because three of
+# the four admin UIs come from it and criterion #16 is about all four (GitOps A6.5). Its values are inline so that the
+# pinned certificate ARN and the shared internal-door annotations come from one place.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: {{ .Values.pins.charts.kubePrometheusStack | quote }}
+    helm:
+      valuesObject:
+        # Control-plane components run inside EKS and are not scrapeable from the cluster; kube-proxy runs on the nodes
+        # but binds its metrics to 127.0.0.1. Left on, all four are permanently-down targets and meaningless alerts.
+        kubeControllerManager: { enabled: false }
+        kubeScheduler: { enabled: false }
+        kubeEtcd: { enabled: false }
+        kubeProxy: { enabled: false }
+
+        prometheus:
+          ingress:
+            enabled: true
+            ingressClassName: alb
+            annotations:
+              {{- include "root.internalIngressAnnotations" . | nindent 14 }}
+              alb.ingress.kubernetes.io/healthcheck-path: /-/ready
+            hosts: [prometheus.{{ .Values.domain }}]
+            paths: [/]
+            pathType: Prefix
+          prometheusSpec:
+            externalUrl: https://prometheus.{{ .Values.domain }} # told its own name (GitOps A6.4)
+            # Accept monitors and rules WHATEVER their labels. By default only objects with the stack's release label are
+            # selected; anything else is accepted by the cluster and silently ignored (Load A2.4, SLO A4.2).
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+            probeSelectorNilUsesHelmValues: false
+            scrapeConfigSelectorNilUsesHelmValues: false
+            enableFeatures: [exemplar-storage] # one of the four exemplar settings (Tracing A4.2)
+            # No volume: the cluster lives hours and every teardown destroys metrics anyway (Load A7.2). A PVC would pin
+            # Prometheus to one zone, and after a Spot reclaim it could stay Pending with no node left in that zone.
+            retention: 2d
+            resources:
+              requests: { cpu: 200m, memory: 1Gi }
+              limits: { memory: 2Gi }
+
+        alertmanager:
+          ingress:
+            enabled: true
+            ingressClassName: alb
+            annotations:
+              {{- include "root.internalIngressAnnotations" . | nindent 14 }}
+              alb.ingress.kubernetes.io/healthcheck-path: /-/ready
+            hosts: [alertmanager.{{ .Values.domain }}]
+            paths: [/]
+            pathType: Prefix
+          alertmanagerSpec:
+            externalUrl: https://alertmanager.{{ .Values.domain }}
+            resources:
+              requests: { cpu: 20m, memory: 64Mi }
+              limits: { memory: 128Mi }
+          # Routes to Discord arrive in stage 6; until then every alert goes to the chart's null receiver.
+
+        grafana:
+          ingress:
+            enabled: true
+            ingressClassName: alb
+            annotations:
+              {{- include "root.internalIngressAnnotations" . | nindent 14 }}
+              alb.ingress.kubernetes.io/healthcheck-path: /api/health
+            hosts: [grafana.{{ .Values.domain }}]
+            path: /
+            pathType: Prefix
+          grafana.ini:
+            server:
+              root_url: https://grafana.{{ .Values.domain }}
+          # The admin password comes from a Secret generated ONCE in the cluster (deploy/platform/base). Left to the chart,
+          # Argo CD's render has no cluster access, so the chart would generate a new random password — and roll Grafana —
+          # on every render.
+          admin:
+            existingSecret: grafana-admin
+            userKey: admin-user
+            passwordKey: admin-password
+          resources:
+            requests: { cpu: 50m, memory: 192Mi }
+            limits: { memory: 512Mi } # Medical's Grafana restarted at 256Mi while loading dashboards
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  # The namespace itself is created by `platform` (wave -1), which also holds the Grafana admin Secret.
+  {{- include "root.syncPolicy" (list "ServerSideApply=true") | nindent 2 }}
+---
+# Wave 0: the Ingress for Argo CD's own UI — a plain manifest rendered by the root itself; it does not require Argo CD to
+# manage its own installation (GitOps A6.6). The fourth member of the internal group.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    {{- include "root.internalIngressAnnotations" . | nindent 4 }}
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz # the default `/` is served by none of the UIs
+spec:
+  ingressClassName: alb
+  rules:
+    - host: argocd.{{ .Values.domain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80 # plain HTTP: server.insecure is set, TLS ended at the ALB
+{{- end }}

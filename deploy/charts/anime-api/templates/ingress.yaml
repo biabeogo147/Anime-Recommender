@@ -1,0 +1,42 @@
+# The ONLY public Ingress: two hosts, one internet-facing ALB. It lives in the api chart because from stage 5 the api
+# rule carries the canary's weighted forward action.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: anime-public
+  annotations:
+    # Before the Deployment (wave 0 of this Application): the target group binding must exist when the api pods are
+    # created, or the readiness gate is not injected into them (deploy/platform/base/namespace.yaml).
+    argocd.argoproj.io/sync-wave: "-1"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # Pods are targets by their own IP: no hop through a node port that could hand a request to the other version, and
+    # readiness gates only mean something for IP targets (GitOps A3.4).
+    alb.ingress.kubernetes.io/target-type: ip
+    # Port 80 exists only to answer 301; the client then reconnects to 443 itself.
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    # Named by ARN: never let the controller pick a certificate by host match (GitOps A3.7).
+    alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.certificateArn | quote }}
+    # Health path for the api targets. The default `/` is served by neither app, and an ALB whose targets ALL fail
+    # serves them anyway (fail-open) — so a wrong path would be invisible without the readiness gate (GitOps A3.5).
+    # /readyz, not /healthz: a pod whose index is not loaded should receive no traffic.
+    alb.ingress.kubernetes.io/healthcheck-path: /readyz
+spec:
+  ingressClassName: alb
+  rules:
+    - host: api.{{ .Values.ingress.domain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: anime-api, port: { number: 8000 } }
+    - host: {{ .Values.ingress.domain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              # The UI's Service is in the same namespace, from the anime-ui chart. Its health path is set on that
+              # Service with a per-service annotation (anime-ui/templates/service.yaml).
+              service: { name: anime-ui, port: { number: 8501 } }

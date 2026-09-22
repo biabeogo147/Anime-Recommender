@@ -1,0 +1,35 @@
+{{- if has "gitops" .Values.stages }}
+# Wave 1: the api and its public Ingress, then the ui. They wait for wave -1 (their Secret) and wave 0.
+#
+# The charts' own values.yaml holds what CI changes (the image digest). What depends on the account (registry,
+# certificate) and on which stages are live comes from here, so a chart never needs a PIN_ME of its own and never has to
+# be edited to switch a stage on.
+{{- range $svc := list "api" "ui" }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: anime-{{ $svc }}
+  {{- include "root.metadata" $ | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: {{ $.Values.repoURL }}
+    targetRevision: {{ $.Values.targetRevision }}
+    path: deploy/charts/anime-{{ $svc }}
+    helm:
+      valuesObject:
+        stages: {{ toJson $.Values.stages }}
+        image:
+          repository: {{ printf "%s/anime-%s" $.Values.pins.registry $svc }}
+        ingress:
+          certificateArn: {{ $.Values.pins.certificateArn | quote }}
+          domain: {{ $.Values.domain }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: anime
+  {{- include "root.syncPolicy" (list) | nindent 2 }}
+{{- end }}
+{{- end }}

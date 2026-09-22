@@ -282,7 +282,12 @@ it is issued once and AWS renews it, and nothing in a rebuild touches it.
   apply is still creating. Medical splits the same way for the same reason. Everything after Argo CD is
   reconciled from Git.
 
-### In-cluster components (Argo CD Applications, `deploy/argocd/apps/`)
+### In-cluster components (Argo CD Applications, rendered by `deploy/argocd/root/`)
+
+The root app-of-apps is a small Helm chart. It renders the Applications of a build stage only when that stage is in
+`enabled_stages` (set in `infra/terraform/bootstrap/terraform.tfvars`), so the whole repository can be in Git while the
+cluster is built one stage at a time; the account-specific pins (registry, certificate ARN, chart versions) live in its
+`values.yaml`, in one place.
 
 Each has a pinned chart version. Sync waves run in the order below, because each wave needs the one before it:
 
@@ -1072,8 +1077,8 @@ been anywhere else is not a private key.
   so users would be served normally and the misconfiguration would be invisible, the quietest false pass in
   this design. The `anime` namespace therefore carries the controller's readiness-gate injection label: a pod
   is not Ready until its target is healthy in the load balancer, so the same mistake makes the rollout
-  **stall** instead. Set `/healthz` and `/_stcore/health` explicitly; the readiness gate is what turns
-  getting them wrong from silent into loud.
+  **stall** instead. Set `/readyz` (api: no traffic before the index is loaded) and `/_stcore/health` explicitly;
+  the readiness gate is what turns getting them wrong from silent into loud.
 - **The admin UIs have to be told their own names.** Argo CD's server needs `server.insecure: true` behind a
   TLS-terminating ALB or it redirect-loops; Grafana needs `root_url`; Prometheus and Alertmanager need
   `--web.external-url`. Each is a component that works perfectly on `localhost` and breaks the moment it is

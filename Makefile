@@ -45,7 +45,7 @@ TUNNEL_PORT ?= 6443
 cluster_output = $(TF_CLUSTER) output -raw $(1)
 
 .PHONY: shared-init shared-plan shared init plan infra kubeconfig tunnel ready bootstrap-init bootstrap-plan \
-        bootstrap up vpn-config down infra-destroy
+        bootstrap up vpn-config pins image apps down infra-destroy
 
 # --- shared: survives every teardown -----------------------------------------------------------------------------
 shared-init:
@@ -130,6 +130,49 @@ vpn-config: init
 	  "Address = $$address" '' '[Peer]' "PublicKey = $$server_pub" "Endpoint = $$endpoint" "AllowedIPs = $$vpc" \
 	  'PersistentKeepalive = 25' '---- to here ----'
 
+# --- stage 2: values Git needs but only this account knows -------------------------------------------------------
+# Every PIN_ME in deploy/argocd/root/values.yaml is one of these (the image digests come from `make image`). They are not
+# secrets; they are reported once and committed from the laptop, so that what runs is always what Git says.
+pins: shared-init
+	@helm repo add eks https://aws.github.io/eks-charts --force-update >/dev/null
+	helm repo add external-secrets https://charts.external-secrets.io --force-update >/dev/null
+	helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/ --force-update >/dev/null
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update >/dev/null
+	helm repo update >/dev/null
+	echo "account_id          $(ACCOUNT_ID)"
+	echo "registry            $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com"
+	echo "certificate_arn     $$($(TF_SHARED) output -raw certificate_arn)"
+	for c in eks/aws-load-balancer-controller external-secrets/external-secrets external-dns/external-dns \
+	         prometheus-community/kube-prometheus-stack; do
+	  printf '%-45s %s\n' "$$c" "$$(helm search repo $$c -o json | jq -r '.[0].version')"
+	done
+
+# Build both images on the workstation and push them by digest — the stand-in for CI until stage 3. The Hugging Face
+# token reaches the index build as a BuildKit secret, so it never becomes a layer (docs/evidence/local.md). Prints the two
+# digests to report; they go into deploy/charts/anime-{api,ui}/values.yaml.
+REGISTRY = $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com
+image:
+	tag=$$(git rev-parse --short=12 HEAD)
+	aws ecr get-login-password --region $(REGION) | docker login --username AWS --password-stdin $(REGISTRY) >/dev/null
+	export HF_TOKEN=$$(aws secretsmanager get-secret-value --region $(REGION) --secret-id $(PROJECT)/llm \
+	  --query SecretString --output text | jq -r .HF_TOKEN)
+	[ -n "$$HF_TOKEN" ] && [ "$$HF_TOKEN" != null ] || { echo "anime/llm has no HF_TOKEN (guide step 2.5)"; exit 1; }
+	for svc in api ui; do
+	  docker buildx build --progress=plain -f services/$$svc/Dockerfile --target runtime \
+	    --secret id=hf_token,env=HF_TOKEN --provenance=false --sbom=false \
+	    --tag $(REGISTRY)/$(PROJECT)-$$svc:$$tag --metadata-file /tmp/anime-$$svc-meta.json --push .
+	done
+	# The digest ECR itself reports for the pushed tag — the one a pull by digest matches — not the build tool's.
+	for svc in api ui; do
+	  d=$$(aws ecr describe-images --region $(REGION) --repository-name $(PROJECT)-$$svc --image-ids imageTag=$$tag \
+	    --query 'imageDetails[0].imageDigest' --output text)
+	  printf '%-4s digest: %s\n' $$svc "$$d"
+	done
+
+# Sync and health of every Application, by name.
+apps:
+	@kubectl -n argocd get applications -o custom-columns='NAME:.metadata.name,WAVE:.metadata.annotations.argocd\.argoproj\.io/sync-wave,SYNC:.status.sync.status,HEALTH:.status.health.status,REVISION:.status.sync.revision'
+
 # --- teardown: tunnel must be open -------------------------------------------------------------------------------
 # Load balancers, their target groups and security groups, and EBS volumes are created by controllers inside the
 # cluster; Terraform does not know them, and the VPC cannot be destroyed while they exist. In this order (design §8):
@@ -141,20 +184,50 @@ vpn-config: init
 #      cluster, its state would not. The shared stack is never touched.
 LB_LEFT = aws resourcegroupstaggingapi get-resources --region $(REGION) \
   --resource-type-filters elasticloadbalancing:loadbalancer elasticloadbalancing:targetgroup ec2:security-group \
-  --tag-filters Key=elbv2.k8s.aws/cluster,Values=$(PROJECT) --query 'length(ResourceTagMappingList)' --output text
-VOL_LEFT = aws ec2 describe-volumes --region $(REGION) --query 'length(Volumes)' --output text \
+  --tag-filters Key=elbv2.k8s.aws/cluster,Values=$(PROJECT) --query 'length(ResourceTagMappingList)' --output json
+# Alias (A) records under anime.* other than vpn.anime, which Terraform owns and destroys itself. `--output json` in all
+# three: the text formatter applies --query page by page, and a multi-page answer would print several numbers.
+DNS_LEFT = aws route53 list-resource-record-sets --output json --hosted-zone-id \
+  $$(aws route53 list-hosted-zones-by-name --dns-name recruitai.io.vn --output text \
+      --query "HostedZones[?Name=='recruitai.io.vn.' && !Config.PrivateZone].Id | [0]") \
+  --query "length(ResourceRecordSets[?Type=='A' && AliasTarget && ends_with(Name,'$(PROJECT).recruitai.io.vn.')])"
+VOL_LEFT = aws ec2 describe-volumes --region $(REGION) --query 'length(Volumes)' --output json \
   --filters Name=tag:project,Values=$(PROJECT) Name=tag-key,Values=ebs.csi.aws.com/cluster
+# Cancel an Application's running sync: turning `automated` off does not stop an operation already in progress or in
+# retry backoff, which could re-create an Ingress after it was deleted.
+STOP_OPS = for a in $$(kubectl -n argocd get applications -o name); do \
+    ph=$$(kubectl -n argocd get "$$a" -o jsonpath='{.status.operationState.phase}'); \
+    [ "$$ph" = Running ] && kubectl -n argocd patch "$$a" --type merge -p '{"status":{"operationState":{"phase":"Terminating"}}}' || true; \
+    kubectl -n argocd get "$$a" -o jsonpath='{.operation}' | grep -q . && kubectl -n argocd patch "$$a" --type json -p '[{"op":"remove","path":"/operation"}]' || true; \
+  done
 
 down: init
 	kubectl get --raw /readyz >/dev/null || { echo "API not reachable: open 'make tunnel' first (or see the guide: make infra-destroy)"; exit 1; }
 	if kubectl get crd applications.argoproj.io >/dev/null 2>&1; then
+	  # The root FIRST: while it self-heals, it would put `automated` back on every child it renders within seconds.
+	  kubectl -n argocd patch application root --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}' || true
 	  for a in $$(kubectl -n argocd get applications -o name); do
 	    kubectl -n argocd patch "$$a" --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
 	  done
+	  $(STOP_OPS)
+	  for i in $$(seq 30); do
+	    run=$$(kubectl -n argocd get applications -o json | jq '[.items[] | select(.status.operationState.phase == "Running" or .status.operationState.phase == "Terminating")] | length')
+	    [ "$$run" = 0 ] && break; echo "$$run sync operation(s) still running, waiting"; sleep 5
+	  done
+	  # A root that was mid-walk may have created later-wave children, with `automated` on, after the loop above.
+	  for a in $$(kubectl -n argocd get applications -o name); do
+	    kubectl -n argocd patch "$$a" --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
+	  done
+	  left=$$(kubectl -n argocd get applications -o json | jq '[.items[] | select(.spec.syncPolicy.automated != null)] | length')
+	  [ "$$left" = 0 ] || { echo "$$left Application(s) still self-heal; not deleting anything"; exit 1; }
 	fi
 	kubectl delete ingress --all --all-namespaces --wait=true --timeout=10m
 	for i in $$(seq 60); do n=$$($(LB_LEFT)); [ "$$n" = 0 ] && break; echo "$$n load-balancer resource(s) left, waiting"; sleep 10; done
 	[ "$$($(LB_LEFT))" = 0 ] || { echo "load-balancer resources remain; not destroying the VPC"; exit 1; }
+	# external-dns (still running) removes the records of the deleted Ingresses at its next loop. Wait for that before
+	# deleting it, or alias records in Medical's zone would keep pointing at load balancers that no longer exist.
+	for i in $$(seq 30); do n=$$($(DNS_LEFT)); [ "$$n" = 0 ] && break; echo "$$n alias record(s) left, waiting"; sleep 10; done
+	[ "$$($(DNS_LEFT))" = 0 ] || echo "WARNING: alias records under $(PROJECT).* remain; check Route 53 after the teardown"
 	if kubectl get crd applications.argoproj.io >/dev/null 2>&1; then
 	  kubectl -n argocd delete applications --all --timeout=10m
 	fi
