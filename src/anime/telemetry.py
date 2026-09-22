@@ -17,12 +17,22 @@ def setup_tracing(app, service_name: str = "anime-api") -> bool:
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+    # Resource.create also reads OTEL_RESOURCE_ATTRIBUTES. The chart sets anime.llm.provider there, from the same value
+    # as LLM_PROVIDER, so every span this pod emits says which provider served it — the collector's Langfuse pipeline
+    # keeps only real providers by that attribute (design §4.2).
     provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     trace.set_tracer_provider(provider)
     FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz,readyz,metrics")
     logger.info("OpenTelemetry tracing enabled")
     return True
+
+
+def capture_content() -> bool:
+    """Whether spans carry the prompt and the completion. Off unless OTEL_CAPTURE_CONTENT is true: a user's free text is
+    copied to whatever the traces are exported to. This deployment turns it on for a single-operator demonstration
+    (design §4.2); a regulated context would leave it off."""
+    return os.getenv("OTEL_CAPTURE_CONTENT", "false").strip().lower() in ("1", "true", "yes")
 
 
 def tracer():
