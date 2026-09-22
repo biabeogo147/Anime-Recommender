@@ -315,9 +315,9 @@ and each one points at the box in the architecture it zooms into.
 | 3 · CI/CD, to a signed digest | [README](docs/cicd/README.md) · [concepts](docs/cicd/concepts.md) | [guide](docs/cicd/guide.md) | [questions](docs/cicd/questions.md) · [answers](docs/cicd/answers.md) |
 | 4 · Load, and the numbers everything uses | [README](docs/load/README.md) · [concepts](docs/load/concepts.md) | [guide](docs/load/guide.md) | [questions](docs/load/questions.md) · [answers](docs/load/answers.md) |
 | 5 · Delivery, a release that judges itself | [README](docs/delivery/README.md) · [concepts](docs/delivery/concepts.md) | [guide](docs/delivery/guide.md) | [questions](docs/delivery/questions.md) · [answers](docs/delivery/answers.md) |
-| 6 · SLOs and alerting | [README](docs/slo/README.md) · [concepts](docs/slo/concepts.md) | | [questions](docs/slo/questions.md) · [answers](docs/slo/answers.md) |
-| 7 · Scaling, pods and nodes | [README](docs/scaling/README.md) · [concepts](docs/scaling/concepts.md) | | [questions](docs/scaling/questions.md) · [answers](docs/scaling/answers.md) |
-| 8 · Tracing and cost | [README](docs/tracing/README.md) · [concepts](docs/tracing/concepts.md) | | [questions](docs/tracing/questions.md) · [answers](docs/tracing/answers.md) |
+| 6 · SLOs and alerting | [README](docs/slo/README.md) · [concepts](docs/slo/concepts.md) | [guide](docs/slo/guide.md) | [questions](docs/slo/questions.md) · [answers](docs/slo/answers.md) |
+| 7 · Scaling, pods and nodes | [README](docs/scaling/README.md) · [concepts](docs/scaling/concepts.md) | [guide](docs/scaling/guide.md) | [questions](docs/scaling/questions.md) · [answers](docs/scaling/answers.md) |
+| 8 · Tracing and cost | [README](docs/tracing/README.md) · [concepts](docs/tracing/concepts.md) | [guide](docs/tracing/guide.md) | [questions](docs/tracing/questions.md) · [answers](docs/tracing/answers.md) |
 | The whole project | [design](docs/eks-sre-llmops-design.md) | | [questions](docs/common/questions.md) · [answers](docs/common/answers.md) |
 | Managed against self-managed, beside Medical | [design §1](docs/eks-sre-llmops-design.md#1-goal) | | [questions](docs/aws/questions.md) · [answers](docs/aws/answers.md) |
 | Measured results | [`docs/evidence/`](docs/evidence/) | | |

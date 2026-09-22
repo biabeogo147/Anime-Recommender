@@ -1,0 +1,46 @@
+{{- if has "slo" .Values.stages }}
+# Wave -1: the Discord webhook Secret, before the monitoring stack's Alertmanager mounts it (wave 0). Why it is not in
+# deploy/platform/base: see the header of deploy/platform/slo/externalsecret-alerting.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: alerting-secret
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: deploy/platform/slo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  {{- include "root.syncPolicy" (list) | nindent 2 }}
+---
+# Wave 2: the GENERATED PrometheusRule, as a plain directory — not through Helm, because Sloth's alert annotations
+# contain {{`{{ $labels }}`}}, which Helm would try to render (design §4.3). The wave is for reading order only: a rule
+# over a metric that does not exist yet is accepted and produces no series, so nothing here depends on wave 1.
+#
+# Loaded whatever its labels: the stack's ruleSelector was opened in stage 2 (ruleSelectorNilUsesHelmValues: false).
+# A rule the stack does not select is accepted by the cluster and ignored, with no error — the first false pass of
+# criterion #10 — so the guide checks that Prometheus has actually loaded the rule groups.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: slo
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: deploy/slo/generated
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  {{- include "root.syncPolicy" (list) | nindent 2 }}
+{{- end }}

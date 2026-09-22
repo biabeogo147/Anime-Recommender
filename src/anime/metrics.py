@@ -1,9 +1,9 @@
 from prometheus_client import Counter, Gauge, Histogram, Info
 
 # Dense between 0.75 s and 3 s, where both the fake provider's p95 (~1.4 s) and a plausible T fall. With the old
-# (0.1, 0.25, 0.5, 1, 2, 4, 8, 16, 32) a canary gate written as 1.2x actually tripped at ~1.43x, and T could only be 2, 4
-# or 8 s; with these the gate trips near 1.22x and T can be 2.5 or 3 (design §4.1, computed, not measured). T must be one
-# of these boundaries — the SLI asks for the counter at le=T, which exists only here.
+# (0.1, 0.25, 0.5, 1, 2, 4, 8, 16, 32) a canary gate written as 1.2x actually tripped at ~1.43x, and T could only be
+# 2, 4 or 8 s; with these the gate trips near 1.22x and T can be 2.5 or 3 (design §4.1, computed, not measured).
+# T must be one of these boundaries — the SLI asks for the counter at le=T, which exists only here.
 LATENCY_BUCKETS = (0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 6, 8, 16, 32)
 
 HTTP_REQUESTS = Counter("anime_http_requests_total", "HTTP requests", ["route", "method", "status"])

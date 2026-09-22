@@ -66,7 +66,48 @@ spec:
             resources:
               requests: { cpu: 20m, memory: 64Mi }
               limits: { memory: 128Mi }
+            {{- if has "slo" .Values.stages }}
+            # Mounted at /etc/alertmanager/secrets/anime-alerting/; written by the alerting-secret Application (wave -1).
+            secrets: [anime-alerting]
+            {{- end }}
+          {{- if has "slo" .Values.stages }}
+          # Only the SLO alerts reach a person (design §4.3). The root route keeps the chart's `null` receiver, so the
+          # platform's cause-based alerts — and the Watchdog heartbeat — go nowhere: there is NO dead-man's switch, and a
+          # broken webhook is noticed only at the next drill (SLO README, Decision 6).
+          #
+          # These maps are merged into the chart's default config by Helm; the lists here (routes, receivers) replace
+          # the chart's lists, so the chart's Watchdog route is gone and Watchdog falls to the root route: null.
+          config:
+            route:
+              receiver: "null"
+              # One notification per alert and severity. group_wait is one of the parts of time-to-alert (SLO A5.3):
+              # a new group waits this long before its first message, to collect what fires together.
+              group_by: [alertname, severity]
+              group_wait: 30s
+              group_interval: 5m
+              repeat_interval: 4h
+              routes:
+                - receiver: discord-page
+                  matchers: ['severity="page"']
+                - receiver: discord-ticket
+                  matchers: ['severity="ticket"']
+            receivers:
+              - name: "null"
+              # One webhook, one channel: the title says which kind of alert it is. The URL is read from the mounted
+              # file, so it is in neither Git nor the rendered config.
+              - name: discord-page
+                discord_configs:
+                  - webhook_url_file: /etc/alertmanager/secrets/anime-alerting/DISCORD_WEBHOOK_URL
+                    title: '[PAGE] {{`{{ .CommonLabels.alertname }}`}} {{`{{ .Status | toUpper }}`}}'
+                    send_resolved: true
+              - name: discord-ticket
+                discord_configs:
+                  - webhook_url_file: /etc/alertmanager/secrets/anime-alerting/DISCORD_WEBHOOK_URL
+                    title: '[TICKET] {{`{{ .CommonLabels.alertname }}`}} {{`{{ .Status | toUpper }}`}}'
+                    send_resolved: true
+          {{- else }}
           # Routes to Discord arrive in stage 6; until then every alert goes to the chart's null receiver.
+          {{- end }}
 
         grafana:
           ingress:
@@ -91,6 +132,22 @@ spec:
           resources:
             requests: { cpu: 50m, memory: 192Mi }
             limits: { memory: 512Mi } # Medical's Grafana restarted at 256Mi while loading dashboards
+          {{- if has "tracing" .Values.stages }}
+          # Stage 8: Tempo as a datasource, and the fourth of the four exemplar settings — the Prometheus datasource
+          # turns an exemplar's trace_id into a link to that trace in Tempo. Without it the graphs render normally
+          # with nothing to click (design §4.2).
+          additionalDataSources:
+            - name: Tempo
+              uid: tempo
+              type: tempo
+              access: proxy
+              url: http://tempo.tracing.svc.cluster.local:3200
+          sidecar:
+            datasources:
+              exemplarTraceIdDestinations:
+                datasourceUid: tempo
+                traceIdLabelName: trace_id
+          {{- end }}
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

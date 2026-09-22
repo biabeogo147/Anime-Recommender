@@ -51,7 +51,7 @@ def load_state(settings: Settings, state: AppState) -> None:
         raise RuntimeError(f"Query embedding dim {dim} != index dim {manifest['dim']}")
     model_name = "fake" if settings.fake else settings.model_name
     state.recommender = Recommender(db, get_llm(settings), load_prompt(settings.prompt_path),
-                                    settings.retriever_k, model_name)
+                                    settings.retriever_k, model_name, provider=settings.llm_provider)
     state.pricing = Pricing.load(settings.pricing_path)
     metrics.INDEX_INFO.info({k: str(manifest[k]) for k in ("content_hash", "count", "embedding_model")})
     logger.info("Recommender ready: provider=%s model=%s docs=%d", settings.llm_provider, model_name, count)
@@ -109,10 +109,10 @@ def create_app(
             metrics.HTTP_REQUESTS.labels(route_path, request.method, str(status)).inc()
             metrics.HTTP_LATENCY.labels(route_path).observe(time.perf_counter() - started)
 
-    # The three endpoints below are `async def` on purpose. A plain `def` handler runs in the same bounded thread pool as
-    # /recommend's model calls, so at saturation a probe or a scrape would queue behind forty busy threads, time out, and
-    # mark a busy pod unready — or make the in-flight series vanish just when the autoscaler needs it (design §4.1).
-    # None of them blocks, so they run on the event loop, independent of the pool.
+    # The three endpoints below are `async def` on purpose. A plain `def` handler runs in the same bounded thread pool
+    # as /recommend's model calls, so at saturation a probe or a scrape would queue behind forty busy threads, time
+    # out, and mark a busy pod unready — or make the in-flight series vanish just when the autoscaler needs it
+    # (design §4.1). None of them blocks, so they run on the event loop, independent of the pool.
     @app.get("/healthz")
     async def healthz():
         return {"status": "ok"}

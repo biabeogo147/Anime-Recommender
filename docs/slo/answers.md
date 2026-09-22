@@ -83,9 +83,9 @@ thì chậm dừng. Chỉ cửa sổ ngắn thì bắn theo mọi cú giật. Gh
 
 **A3.2** **Ý chính:** "Page làm gián đoạn một người ngay bây giờ; ticket là việc cho vài ngày tới. Hai cặp nhanh — 1h/5m và
 6h/30m — page, vì với tốc độ đó ngân sách hết trong vài ngày. Hai cặp chậm — 1d/2h và 3d/6h — mở ticket: một lỗi rỉ rả đáng
-sửa, nhưng không đáng đánh thức ai. Page tới kênh #alerts, ticket tới kênh #tickets."
+sửa, nhưng không đáng đánh thức ai. Page và ticket tới cùng một kênh Discord, phân biệt bằng `[PAGE]` và `[TICKET]` ở tiêu đề."
 
-*Nếu được hỏi thêm:* "ticket" ở đây chỉ là một tin nhắn vào kênh #tickets, không phải một hệ thống ticket thật. Route gốc
+*Nếu được hỏi thêm:* "ticket" ở đây chỉ là một tin nhắn có tiêu đề `[TICKET]`, không phải một hệ thống ticket thật. Route gốc
 giữ receiver rỗng của chart, nên alert nào không khớp hai route đó thì không đi đâu cả.
 
 **A3.3** **Ý chính:** "Mỗi hệ số là phần ngân sách mà nếu bị tiêu trong cửa sổ dài thì alert bắn, nhân chu kỳ, chia cửa sổ.
@@ -131,7 +131,7 @@ hơn tám phút của cặp 1h/5m. Nên drill chạy khoảng ba giờ traffic s
 burn của từng cửa sổ lúc page bắn. Cặp nào bắn là điều tôi đọc ra, không phải điều tôi đoán từ tên alert."
 
 *Nếu được hỏi thêm:* với ba giờ sạch, cửa sổ sáu giờ cần khoảng mười một phút — cặp một giờ thắng với khoảng cách
-vài phút, cũng là tính toán. Hai cặp ticket vượt ngưỡng trong vài phút đầu dù thế nào, vào kênh #tickets, và được
+vài phút, cũng là tính toán. Hai cặp ticket vượt ngưỡng trong vài phút đầu dù thế nào, với tiêu đề `[TICKET]`, và được
 ghi là chưa hiệu chỉnh.
 
 **Mẹo:** đây là chỗ mà chính việc rà lại thiết kế đã tìm ra lỗi. Kể được "ban đầu tôi nghĩ một giờ sạch là đủ, tính lại thì

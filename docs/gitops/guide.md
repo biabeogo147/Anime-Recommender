@@ -34,10 +34,14 @@ Expected: a buildx version and `tools ok`. `dig` missing: `sudo apt-get install 
 
 ## 1. Pins — the values only this account knows
 
-Nine `PIN_ME` values — the registry, the certificate ARN and five chart versions in
-`deploy/argocd/root/values.yaml`, and the two image digests in the charts — plus the commit SHA of each GitHub Action
-in `.github/workflows/` (stage 3). None is a secret. They are committed before `gitops` is switched on, so Argo CD
-never renders a guessed value.
+Fourteen `PIN_ME` values:
+- in `deploy/argocd/root/values.yaml`, the registry, the certificate ARN, nine chart versions and the Cluster
+  Autoscaler's image tag;
+- in the charts, the two image digests.
+
+Plus the Sloth image tag in the `Makefile`, and the commit SHA of each GitHub Action in `.github/workflows/`
+(stage 3). None is a secret. They are committed before `gitops` is switched on, so Argo CD never renders a guessed
+value. The later stages' pins are read now too, so the pins round happens once.
 
 **1.1 — ops: read them, and build the two images** (several minutes: the build embeds 269 anime).
 
@@ -47,10 +51,15 @@ make -s pins
 make image > /tmp/anime-image.log 2>&1; echo "exit=$?"; tail -2 /tmp/anime-image.log
 ```
 
-Expected: an account id, a registry, a certificate ARN, five chart versions (none `null`; Argo Rollouts' is used from
-stage 5), the Sloth release tag (used from stage 6) and ten action SHAs (none `LOOKUP-FAILED`); `exit=0`; then
-`api  digest: sha256:…` and `ui   digest: sha256:…`. `exit` not 0: read `/tmp/anime-image.log`. **Report all of
-it** — the values are committed on the laptop (by me; you push), and nothing below runs before that.
+Expected:
+- an account id, a registry and a certificate ARN;
+- nine chart versions, none `null`. Argo Rollouts' is used from stage 5, KEDA's and the Cluster Autoscaler's from
+  stage 7, Tempo's and the collector's from stage 8;
+- the Cluster Autoscaler image tag and the Sloth release tag, neither `LOOKUP-FAILED`;
+- ten action SHAs, none `LOOKUP-FAILED`;
+- `exit=0`, then `api  digest: sha256:…` and `ui   digest: sha256:…`. `exit` not 0: read `/tmp/anime-image.log`.
+
+**Report all of it.** The values are committed on the laptop (by me; you push), and nothing below runs before that.
 
 **1.2 — ops: after the push, nothing is left to pin.**
 

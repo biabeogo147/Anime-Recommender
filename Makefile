@@ -145,14 +145,25 @@ pins: shared-init
 	helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/ --force-update >/dev/null
 	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update >/dev/null
 	helm repo add argo https://argoproj.github.io/argo-helm --force-update >/dev/null
+	helm repo add kedacore https://kedacore.github.io/charts --force-update >/dev/null
+	helm repo add autoscaler https://kubernetes.github.io/autoscaler --force-update >/dev/null
+	helm repo add grafana https://grafana.github.io/helm-charts --force-update >/dev/null
+	helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts --force-update >/dev/null
 	helm repo update >/dev/null
 	echo "account_id          $(ACCOUNT_ID)"
 	echo "registry            $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com"
 	echo "certificate_arn     $$($(TF_SHARED) output -raw certificate_arn)"
 	for c in eks/aws-load-balancer-controller external-secrets/external-secrets external-dns/external-dns \
-	         prometheus-community/kube-prometheus-stack argo/argo-rollouts; do
+	         prometheus-community/kube-prometheus-stack argo/argo-rollouts kedacore/keda autoscaler/cluster-autoscaler \
+	         grafana/tempo open-telemetry/opentelemetry-collector; do
 	  printf '%-45s %s\n' "$$c" "$$(helm search repo $$c -o json | jq -r '.[0].version')"
 	done
+	# The Cluster Autoscaler's image must be the cluster's own minor version: the newest patch of it.
+	minor=$$(sed -n '/variable "kubernetes_version"/,/^}/s/.*default *= *"\([0-9.]*\)".*/\1/p' infra/terraform/cluster/variables.tf)
+	printf '%-45s %s\n' "cluster-autoscaler image (k8s $$minor)" \
+	  "$$(curl -fsS 'https://api.github.com/repos/kubernetes/autoscaler/releases?per_page=100' \
+	      | jq -r --arg p "cluster-autoscaler-$$minor." '[.[].tag_name | select(startswith($$p))][0] // "LOOKUP-FAILED" | sub("cluster-autoscaler-"; "v")' \
+	      || echo LOOKUP-FAILED)"
 	# The Sloth image for make slo-generate / slo-check (SLOTH_IMAGE in this file): its latest release tag.
 	printf '%-45s %s\n' "ghcr.io/slok/sloth" \
 	  "$$(curl -fsS https://api.github.com/repos/slok/sloth/releases/latest | jq -r .tag_name || echo LOOKUP-FAILED)"
@@ -195,7 +206,8 @@ K6_IMAGE ?= grafana/k6:latest
 # would print "failed to handle the end-of-test summary" and still exit 0, leaving no summary file.
 K6 = docker run --rm -i --network host --user "$$(id -u):$$(id -g)" \
   -v $(CURDIR)/loadtest/k6:/scripts:ro -v $(HOME)/anime-evidence:/out \
-  -e BASE_URL -e TARGET_REQUESTS -e RATE_PER_MINUTE -e MAX_RPS -e MAX_VUS -e RPS -e DURATION $(K6_IMAGE)
+  -e BASE_URL -e TARGET_REQUESTS -e RATE_PER_MINUTE -e MAX_RPS -e MAX_VUS -e HOLD -e RPS -e DURATION \
+  $(K6_IMAGE)
 
 loadtest-baseline loadtest-ramp loadtest-steady:
 	mkdir -p $(HOME)/anime-evidence

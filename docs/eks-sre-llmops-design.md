@@ -530,12 +530,13 @@ and the library is an addition to evaluate, not a dependency to plan around.
 **Prompt and response capture does not exist yet, and without it the Langfuse export is close to pointless.**
 No span carries the prompt or the completion: `recommender.py` sets `rag.*` and `gen_ai.*` numbers and nothing
 else, so Langfuse would receive timings and token counts with no text to inspect. The work is to add the two
-content attributes behind a flag — `OTEL_CAPTURE_CONTENT`, which is **to be written**, not a setting that
-exists — defaulting **on** here, and documented as default-off for any regulated context. "The content is anime
+content attributes behind a flag — `OTEL_CAPTURE_CONTENT`, written in stage 8 (`src/anime/telemetry.py`): off in
+the code, turned **on** here by the chart, and documented as default-off for any regulated context. "The content is anime
 preferences" describes what the box is *for*, not what people type into it: it is free text, and anything a user
 writes is copied to a third-party service. That is accepted for a single-operator demonstration and stated on the
-page that shows the box; it would not be for a public service. Until the flag exists, treat criterion #11 as
-covering the span structure only.
+page that shows the box; it would not be for a public service. Which attribute names Langfuse maps to a
+generation's input and output is **to be verified** against the version in use; the span carries both the
+conventions' `gen_ai.input.messages`/`gen_ai.output.messages` and Langfuse's own `langfuse.observation.*`.
 
 **Traces live as long as the cluster.** Tempo keeps its blocks in an `emptyDir`, which dies with its pod — there is
 no volume for a teardown to orphan. Langfuse Cloud keeps real-model traces across teardowns, for as long as its plan
@@ -567,8 +568,8 @@ flowchart LR
     PROM --> SLOW{"slow burn<br/>1d/2h ≥ 2.8×<br/>3d/6h ≥ 0.93×"}
     FAST -->|"page"| AMP["Alertmanager<br/>route: page"]
     SLOW -->|"ticket"| AMT["Alertmanager<br/>route: ticket"]
-    AMP --> DIS1["Discord #alerts"]
-    AMT --> DIS2["Discord #tickets"]
+    AMP --> DIS1["Discord<br/>title [PAGE]"]
+    AMT --> DIS2["Discord<br/>title [TICKET]"]
 
     classDef argo fill:#fde3cf,stroke:#c2602a,color:#1b1430;
     classDef ext fill:#eceff3,stroke:#6b7684,color:#1b1430;
@@ -841,8 +842,9 @@ replica count; Argo CD, with self-heal on, would write it back to whatever the c
 **Scale-in must not drop requests.** Removing a pod removes its IP target from the ALB, but deregistration takes
 time while the pod has already been told to stop. Without a short `preStop` delay and a termination grace period
 longer than the drain, every scale-in returns errors to requests still on their way — errors the SLO would count.
-The exact delays are set when the chart is written (**to be verified** against the controller's deregistration
-behaviour).
+The chart sets a 15-second `preStop` sleep, a 45-second grace period, and a 30-second target-group deregistration
+delay instead of the ALB's default 300. Whether 15 seconds covers the controller's deregistration is **to be
+verified** by the error ratio during the scaling run's scale-in.
 
 **The trigger's threshold comes from stage 4, not from this page.** The `4` below is a placeholder. The
 capacity run measures, at the point where p95 breaks away, how many requests each pod had in flight — which

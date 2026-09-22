@@ -20,3 +20,6 @@ index/
 # Kubeconfig and WireGuard material written by make targets on the workstation.
 .kube/
 *.conf.local
+
+# make slo-check writes the regenerated SLO rules here (CI uploads them on a mismatch)
+slo-regenerated/
