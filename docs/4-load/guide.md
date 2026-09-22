@@ -41,7 +41,19 @@ grep -E '^(enabled_stages|api_)' $F
 make bootstrap-plan
 ```
 
-Expected: `load enabled`, the three lines, `Plan: 0 to add, 1 to change, 0 to destroy.` Then `make bootstrap`.
+Expected: `load enabled`, the three lines, `Plan: 0 to add, 1 to change, 0 to destroy.` Then apply, and wait for the
+PodMonitor. The root passes `load` down to `anime-api` only when it next syncs, which can be minutes away:
+
+```bash
+cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
+make bootstrap
+kubectl -n argocd annotate application root argocd.argoproj.io/refresh=hard --overwrite
+for i in $(seq 30); do kubectl -n anime get podmonitor anime-api >/dev/null 2>&1 && break; sleep 10; done
+kubectl -n anime get podmonitor anime-api
+```
+
+Expected: `Apply complete!`, then the PodMonitor listed. `NotFound` after five minutes: compare the stages in
+`kubectl -n argocd get application anime-api -o jsonpath='{.spec.source.helm.valuesObject.stages}'` with the tfvars.
 
 **1.2 — the api is scraped, by name.** Before you trust any number, check two things. The target exists and is up. The
 TOTAL request counter has samples — not the error counter, which has none until something fails (Load A2.3). Six

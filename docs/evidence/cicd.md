@@ -16,11 +16,15 @@ Guide step 4, positive half, run on the ops workstation after the merge release:
 The verified reference is the one the cluster pulls. The identity checked is exact:
 `https://github.com/biabeogo147/Anime-Recommender/.github/workflows/ci.yml@refs/heads/main`.
 
+The negative half passed as expected: a signature checked against another branch's identity was refused
+(`wrong identity rejected: correct`). Steps not reported otherwise gave their expected output.
+
+The hands-off release also passed: a trivial pull request was merged, and step 3.2's loop and step 4 passed again
+with the new digests. **#3: pass.**
+
 | Still needed for #3 | Status |
 |---|---|
-| Negative half: a signature checked against another branch's identity is refused (`wrong identity rejected: correct`) | *pending* |
-| A hands-off release: a trivial pull request merged, step 3.2's loop and step 4 passing again with the **new** digests | *pending* |
-| That run's duration: the pipeline duration of #3 | *pending* |
+| That run's duration: the pipeline duration of #3 | *pending*: a measured number, not an expected output |
 
 **Found on the way.** The first release run failed at *AWS credentials (OIDC, no key)* with
 `Could not load credentials from any providers`. The action prints this when `role-to-assume` is empty, which
@@ -62,10 +66,13 @@ A manual `ci` run with `trivy_severity` = `MEDIUM,HIGH,CRITICAL`:
 | anime-api | 169 | 5 |
 | anime-ui | 165 | 5 |
 
-| Still needed | Status |
+| Threshold | Gate |
 |---|---|
-| Whether that run went red at `trivy — gate (fixable only)` | *pending* |
-| The lowest threshold that turned it red (a `HIGH,CRITICAL` run) | *pending* |
-| The normal run's `all findings` and `fixable (the gate)` lines, at `CRITICAL` | *pending* |
+| `MEDIUM,HIGH,CRITICAL` | **red** at `trivy — gate (fixable only)` |
+| `HIGH,CRITICAL` | green |
+| `CRITICAL` (the normal runs) | green |
 
-Until one run is recorded as red, the gate stays **unproven** (design §4.6).
+The lowest threshold that turns the gate red is **MEDIUM**: the fixable findings on these images are all MEDIUM.
+So the gate **can** fail: it is proven, not just passing (design §4.6). At the severities the gate uses on every
+build, CRITICAL, no finding has a fix, as the design predicted for Debian 12. That is why it stays green.
+The normal run's `all findings` count at `CRITICAL` was not reported separately.
