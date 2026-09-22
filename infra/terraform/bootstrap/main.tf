@@ -30,13 +30,15 @@ variable "kubeconfig_path" {
 }
 
 variable "argocd_chart_version" {
-  # Pinned. The guide looks up the current release once and writes it to terraform.tfvars; report it back so the pin
-  # moves into this file.
-  type = string
+  # Pinned: the release the terraform guide (5.1) looked up on 2026-09-22 (docs/evidence/terraform.md). terraform.tfvars
+  # may still set it; a fresh clone no longer has to.
+  type    = string
+  default = "10.9.2"
 }
 
 variable "argocd_apps_chart_version" {
-  type = string
+  type    = string
+  default = "2.0.5"
 }
 
 variable "repo_url" {
