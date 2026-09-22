@@ -11,8 +11,8 @@ giải thích được mình nhận gì, trả gì, và mất khả năng làm g
 | **A. Phỏng vấn** | Bạn so sánh được hai cách làm ở từng chỗ, bằng lý do chứ không bằng sở thích |
 | **B. Chi tiết** | *Chưa viết.* Phần này hỏi về API và giới hạn cụ thể của từng dịch vụ, khi code của Anime đã có |
 
-Bộ liên quan: [tổng quan project](../common/questions.md), [Terraform](../terraform/questions.md),
-[GitOps](../gitops/questions.md), [CI/CD](../cicd/questions.md), [Scaling](../scaling/questions.md). Bộ AWS của
+Bộ liên quan: [tổng quan project](../common/questions.md), [Terraform](../1-terraform/questions.md),
+[GitOps](../2-gitops/questions.md), [CI/CD](../3-cicd/questions.md), [Scaling](../7-scaling/questions.md). Bộ AWS của
 Medical: `Medical-RAG-Chatbot/docs/aws/questions.md`. Câu nào trùng với một bộ stage thì ở đây chỉ trả lời ở mức ranh
 giới và trỏ sang bộ đó.
 

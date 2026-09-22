@@ -310,14 +310,14 @@ and each one points at the box in the architecture it zooms into.
 
 | Stage | Ideas | Step-by-step | Interview Q&A |
 |---|---|---|---|
-| 1 · AWS and a way in, with Terraform | [README](docs/terraform/README.md) · [concepts](docs/terraform/concepts.md) | [guide](docs/terraform/guide.md) | [questions](docs/terraform/questions.md) · [answers](docs/terraform/answers.md) |
-| 2 · GitOps, and two doors | [README](docs/gitops/README.md) · [concepts](docs/gitops/concepts.md) | [guide](docs/gitops/guide.md) | [questions](docs/gitops/questions.md) · [answers](docs/gitops/answers.md) |
-| 3 · CI/CD, to a signed digest | [README](docs/cicd/README.md) · [concepts](docs/cicd/concepts.md) | [guide](docs/cicd/guide.md) | [questions](docs/cicd/questions.md) · [answers](docs/cicd/answers.md) |
-| 4 · Load, and the numbers everything uses | [README](docs/load/README.md) · [concepts](docs/load/concepts.md) | [guide](docs/load/guide.md) | [questions](docs/load/questions.md) · [answers](docs/load/answers.md) |
-| 5 · Delivery, a release that judges itself | [README](docs/delivery/README.md) · [concepts](docs/delivery/concepts.md) | [guide](docs/delivery/guide.md) | [questions](docs/delivery/questions.md) · [answers](docs/delivery/answers.md) |
-| 6 · SLOs and alerting | [README](docs/slo/README.md) · [concepts](docs/slo/concepts.md) | [guide](docs/slo/guide.md) | [questions](docs/slo/questions.md) · [answers](docs/slo/answers.md) |
-| 7 · Scaling, pods and nodes | [README](docs/scaling/README.md) · [concepts](docs/scaling/concepts.md) | [guide](docs/scaling/guide.md) | [questions](docs/scaling/questions.md) · [answers](docs/scaling/answers.md) |
-| 8 · Tracing and cost | [README](docs/tracing/README.md) · [concepts](docs/tracing/concepts.md) | [guide](docs/tracing/guide.md) | [questions](docs/tracing/questions.md) · [answers](docs/tracing/answers.md) |
+| 1 · AWS and a way in, with Terraform | [README](docs/1-terraform/README.md) · [concepts](docs/1-terraform/concepts.md) | [guide](docs/1-terraform/guide.md) | [questions](docs/1-terraform/questions.md) · [answers](docs/1-terraform/answers.md) |
+| 2 · GitOps, and two doors | [README](docs/2-gitops/README.md) · [concepts](docs/2-gitops/concepts.md) | [guide](docs/2-gitops/guide.md) | [questions](docs/2-gitops/questions.md) · [answers](docs/2-gitops/answers.md) |
+| 3 · CI/CD, to a signed digest | [README](docs/3-cicd/README.md) · [concepts](docs/3-cicd/concepts.md) | [guide](docs/3-cicd/guide.md) | [questions](docs/3-cicd/questions.md) · [answers](docs/3-cicd/answers.md) |
+| 4 · Load, and the numbers everything uses | [README](docs/4-load/README.md) · [concepts](docs/4-load/concepts.md) | [guide](docs/4-load/guide.md) | [questions](docs/4-load/questions.md) · [answers](docs/4-load/answers.md) |
+| 5 · Delivery, a release that judges itself | [README](docs/5-delivery/README.md) · [concepts](docs/5-delivery/concepts.md) | [guide](docs/5-delivery/guide.md) | [questions](docs/5-delivery/questions.md) · [answers](docs/5-delivery/answers.md) |
+| 6 · SLOs and alerting | [README](docs/6-slo/README.md) · [concepts](docs/6-slo/concepts.md) | [guide](docs/6-slo/guide.md) | [questions](docs/6-slo/questions.md) · [answers](docs/6-slo/answers.md) |
+| 7 · Scaling, pods and nodes | [README](docs/7-scaling/README.md) · [concepts](docs/7-scaling/concepts.md) | [guide](docs/7-scaling/guide.md) | [questions](docs/7-scaling/questions.md) · [answers](docs/7-scaling/answers.md) |
+| 8 · Tracing and cost | [README](docs/8-tracing/README.md) · [concepts](docs/8-tracing/concepts.md) | [guide](docs/8-tracing/guide.md) | [questions](docs/8-tracing/questions.md) · [answers](docs/8-tracing/answers.md) |
 | The whole project | [design](docs/eks-sre-llmops-design.md) | | [questions](docs/common/questions.md) · [answers](docs/common/answers.md) |
 | Managed against self-managed, beside Medical | [design §1](docs/eks-sre-llmops-design.md#1-goal) | | [questions](docs/aws/questions.md) · [answers](docs/aws/answers.md) |
 | Measured results | [`docs/evidence/`](docs/evidence/) | | |

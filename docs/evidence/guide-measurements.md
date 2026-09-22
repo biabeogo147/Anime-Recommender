@@ -9,12 +9,12 @@ is not written down as the placeholder's value.
 
 | # | CV placeholder | Taken at | Proves |
 |---|---|---|---|
-| [M1](#m1--the-latency-target) | `[T-SLO]`, `[N-BASELINE]` | [load 2.2](../load/guide.md) | The latency objective comes from real calls, read server-side |
-| [M2](#m2--the-knee) | `[KNEE-RPS]`, `[INFLIGHT-KNEE]` | [load 3.4](../load/guide.md) | Where two fixed pods saturate, and what sets the autoscaler |
-| [M3](#m3--a-canary-that-aborts-itself) | `[T-ABORT]`, `[AFFECTED-PCT]` | [delivery 4.2–4.3](../delivery/guide.md) | A bad release stops itself at 10%, and what that cost |
-| [M4](#m4--a-page-that-reaches-a-person) | `[T-PAGE]` | [slo 3.2–3.4](../slo/guide.md), short drill | A fast burn reaches Discord, and how fast |
-| [M5](#m5--scaling-out-and-back) | `[PODS-MAX]`, `[NODES-MAX]`, `[ERR-SCALEIN]` | [scaling 3.3–3.4](../scaling/guide.md) | Pods and nodes follow in-flight load, and scale-in drops nothing |
-| [M6](#m6--cost-per-1000-requests) | `[COST-PER-1K]` | [tracing 3.2](../tracing/guide.md) | What the real model costs per request |
+| [M1](#m1--the-latency-target) | `[T-SLO]`, `[N-BASELINE]` | [load 2.2](../4-load/guide.md) | The latency objective comes from real calls, read server-side |
+| [M2](#m2--the-knee) | `[KNEE-RPS]`, `[INFLIGHT-KNEE]` | [load 3.4](../4-load/guide.md) | Where two fixed pods saturate, and what sets the autoscaler |
+| [M3](#m3--a-canary-that-aborts-itself) | `[T-ABORT]`, `[AFFECTED-PCT]` | [delivery 4.2–4.3](../5-delivery/guide.md) | A bad release stops itself at 10%, and what that cost |
+| [M4](#m4--a-page-that-reaches-a-person) | `[T-PAGE]` | [slo 3.2–3.4](../6-slo/guide.md), short drill | A fast burn reaches Discord, and how fast |
+| [M5](#m5--scaling-out-and-back) | `[PODS-MAX]`, `[NODES-MAX]`, `[ERR-SCALEIN]` | [scaling 3.3–3.4](../7-scaling/guide.md) | Pods and nodes follow in-flight load, and scale-in drops nothing |
+| [M6](#m6--cost-per-1000-requests) | `[COST-PER-1K]` | [tracing 3.2](../8-tracing/guide.md) | What the real model costs per request |
 | [M7](#m7--drill-traffic-kept-out-of-langfuse) | `[LF-LEAK]`, `[N-DRILL]` | here, during tracing 2.4 | The filter keeps drill traffic out of the third-party store |
 | [M8](#m8--a-timed-rebuild) | `[T-REBUILD]`, `[N-APPS]` | here, a session of its own, last | The whole platform comes back from nothing, in a measured time |
 
@@ -34,7 +34,7 @@ memory. Every value in `cv.md` names the file it came from, and the mode it was 
 
 ## M1 — The latency target
 
-**At** [load guide 2.2](../load/guide.md), in **gemini** mode.
+**At** [load guide 2.2](../4-load/guide.md), in **gemini** mode.
 
 **Record:**
 - `[T-SLO]`: the `T = … le=<boundary>` line, as seconds (`le=3.0` becomes "3 s"). It is printed, not saved; copy
@@ -45,7 +45,7 @@ memory. Every value in `cv.md` names the file it came from, and the mode it was 
 
 ## M2 — The knee
 
-**At** [load guide 3.4](../load/guide.md): the ramp at two fixed replicas, in fake mode, before the scaling stage
+**At** [load guide 3.4](../4-load/guide.md): the ramp at two fixed replicas, in fake mode, before the scaling stage
 exists.
 
 **Record:**
@@ -57,7 +57,7 @@ reading 3). Otherwise the number describes the generator, and the bullet's first
 
 ## M3 — A canary that aborts itself
 
-**At** [delivery guide 4.2–4.3](../delivery/guide.md), in fake mode, with k6 at 20 RPS.
+**At** [delivery guide 4.2–4.3](../5-delivery/guide.md), in fake mode, with k6 at 20 RPS.
 
 **Record:**
 - `[T-ABORT]`: the `rollout start → abort` line of `rollback-time.txt`, in seconds, or minutes and seconds;
@@ -68,7 +68,7 @@ AnalysisRun is the one that stopped it (4.3). Otherwise the abort came from some
 
 ## M4 — A page that reaches a person
 
-**At** [SLO guide 3.2–3.4](../slo/guide.md), the short drill (about one clean hour).
+**At** [SLO guide 3.2–3.4](../6-slo/guide.md), the short drill (about one clean hour).
 
 **Record:** `[T-PAGE]` = the Discord `[PAGE] … FIRING` message's time minus `alert.fault`, in minutes and seconds.
 
@@ -86,7 +86,7 @@ are 0. A page from the 6h/30m pair is still a valid `[T-PAGE]`, because the CV c
 
 ## M5 — Scaling out and back
 
-**At** [scaling guide 3.4](../scaling/guide.md).
+**At** [scaling guide 3.4](../7-scaling/guide.md).
 
 **Record:**
 - `[PODS-MAX]`: the highest value in `scaling-desired.txt` that also appears in `scaling-ready.txt`. These are
@@ -117,7 +117,7 @@ did not move: `[NODES-MAX]` is not used, and the CV takes the fallback wording.
 
 ## M6 — Cost per 1,000 requests
 
-**At** [tracing guide 3.2](../tracing/guide.md), in **gemini** mode.
+**At** [tracing guide 3.2](../8-tracing/guide.md), in **gemini** mode.
 
 **Record:** `[COST-PER-1K]` = the value in `cost-per-1000.txt`, in USD, rounded to four significant figures, with
 its `model` label and the date in `cost-pricing-date.txt`.
@@ -126,7 +126,7 @@ its `model` label and the date in `cost-pricing-date.txt`.
 
 ## M7 — Drill traffic kept out of Langfuse
 
-**At** [tracing guide 2.4](../tracing/guide.md), right after its first block, while the api is in **fake** mode with
+**At** [tracing guide 2.4](../8-tracing/guide.md), right after its first block, while the api is in **fake** mode with
 tracing on, and **before** switching back to gemini. Five minutes of drill traffic, then count what reached each sink.
 
 ```bash

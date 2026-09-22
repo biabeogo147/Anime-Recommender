@@ -59,7 +59,7 @@ jobs:
         if: hashFiles('deploy/slo/*.sloth.yaml') != ''
         run: make -s slo-check
       # On a mismatch, the file Sloth just generated, ready to commit as deploy/slo/generated/anime-api.yaml — so the
-      # rules can be regenerated from a laptop that runs no Sloth (docs/slo/guide.md, section 0).
+      # rules can be regenerated from a laptop that runs no Sloth (docs/6-slo/guide.md, section 0).
       - name: upload regenerated SLO rules
         if: failure() && hashFiles('slo-regenerated/anime-api.yaml') != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

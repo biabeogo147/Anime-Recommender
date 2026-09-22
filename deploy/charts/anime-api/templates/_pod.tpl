@@ -12,7 +12,7 @@ metadata:
     cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: tmp
     {{- with .Values.drill }}
     # A drill's only change to the template. Any change to the template is a new version to the Rollout (a new
-    # rollouts-pod-template-hash), so a promotion drill needs no new image: it bumps this value (docs/delivery/guide.md).
+    # rollouts-pod-template-hash), so a promotion drill needs no new image: it bumps this value (docs/5-delivery/guide.md).
     anime.recruitai.io.vn/drill: {{ . | quote }}
     {{- end }}
 spec:

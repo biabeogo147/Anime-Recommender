@@ -66,7 +66,7 @@ spec:
   # PruneLast: switching delivery on replaces the Deployment with a Rollout. The old Deployment is deleted only after
   # the Rollout is healthy, so the api is never without pods. It is briefly without TARGETS, though: the api rule moves
   # to the new stable target group before the controller has registered and health-checked its pods — expect 503s on
-  # api.<domain> for up to a minute while the stage is switched on (docs/delivery/guide.md, 1.1).
+  # api.<domain> for up to a minute while the stage is switched on (docs/5-delivery/guide.md, 1.1).
   {{- include "root.syncPolicy" (list "RespectIgnoreDifferences=true" "PruneLast=true") | nindent 2 }}
   {{- else }}
   {{- include "root.syncPolicy" (list) | nindent 2 }}

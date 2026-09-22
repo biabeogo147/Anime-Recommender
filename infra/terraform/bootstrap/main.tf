@@ -63,7 +63,7 @@ variable "enabled_stages" {
 
 # The api's mode, an OPERATOR switch like enabled_stages: `fake` for the capacity run and every drill, `gemini` for the
 # baseline and normal traffic. Changing either changes the pod template, which is a new version: a rolling update until
-# stage 5, a canary after it — which is exactly how the drills are started (docs/delivery/guide.md).
+# stage 5, a canary after it — which is exactly how the drills are started (docs/5-delivery/guide.md).
 variable "api_llm_provider" {
   type    = string
   default = "gemini"

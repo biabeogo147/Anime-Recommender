@@ -54,7 +54,7 @@ spec:
       sli:
         events:
           # "Slow" is everything outside the bucket le=T: the histogram's count minus that bucket. T is NOT chosen here.
-          # It is the boundary stage 4 printed (docs/load/guide.md, 2.2), written EXACTLY as the label reads — the
+          # It is the boundary stage 4 printed (docs/4-load/guide.md, 2.2), written EXACTLY as the label reads — the
           # client library writes 3 as "3.0". A label value that matches no series leaves the subtraction empty, and
           # the objective silently measures nothing (design §4.3).
           errorQuery: >-

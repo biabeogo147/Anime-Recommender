@@ -62,7 +62,7 @@ spec:
           # Pods with an emptyDir are never evicted for a scale-down unless they say they may be. The api's pods do
           # (safe-to-evict-local-volumes, in the chart). Everything else keeps the safe default on purpose: Prometheus
           # and Tempo keep their data in an emptyDir, and moving them mid-run would erase the evidence. The cost: a
-          # scaled-out node that such a pod landed on is not removed (docs/scaling/guide.md, 3.3).
+          # scaled-out node that such a pod landed on is not removed (docs/7-scaling/guide.md, 3.3).
           skip-nodes-with-local-storage: true
           expander: least-waste
         replicaCount: 1 # leader election is on; one replica is enough for a node group that moves in minutes

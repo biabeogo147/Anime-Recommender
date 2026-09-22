@@ -1,7 +1,7 @@
 # Every operation on AWS and on the cluster. Runs on the ops workstation only (it has terraform, kubectl, helm,
 # aws, jq, wg, the Session Manager plugin); the Windows laptop never runs this file.
 #
-# Fresh environment (docs/terraform/guide.md):
+# Fresh environment (docs/1-terraform/guide.md):
 #   make shared-plan  → make shared      once; only again when the shared stack changes
 #   make plan         → make infra       VPC, EKS, nodes, gateway
 #   make kubeconfig                      after every `make infra`
@@ -315,7 +315,7 @@ slo-check:
 	docker run --rm -i --user "$$(id -u):$$(id -g)" -v "$$tmp":/slo $(SLOTH_IMAGE) \
 	  generate --default-slo-period=28d -i /slo/anime-api.sloth.yaml -o /slo/anime-api.yaml
 	# Kept outside the temporary directory: CI uploads it when this check fails, so the regenerated file can be
-	# committed without running Sloth anywhere else (docs/slo/guide.md, section 0).
+	# committed without running Sloth anywhere else (docs/6-slo/guide.md, section 0).
 	mkdir -p slo-regenerated && cp "$$tmp/anime-api.yaml" slo-regenerated/
 	[ -f deploy/slo/generated/anime-api.yaml ] || { echo "deploy/slo/generated/anime-api.yaml is missing"; exit 1; }
 	diff -u deploy/slo/generated/anime-api.yaml "$$tmp/anime-api.yaml" && echo "SLO rules match the spec"

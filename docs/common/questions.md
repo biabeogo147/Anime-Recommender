@@ -11,9 +11,9 @@ người nghe chọn chỗ đào sâu dựa vào những gì bạn nói ở đâ
 | **A. Phỏng vấn** | Bạn kể được cả project một cách mạch lạc, trung thực về trạng thái của nó, và dẫn người nghe tới đúng stage |
 | **B. Chi tiết** | *Chưa viết.* Phần này hỏi về code của app và cấu trúc repo, khi phần hạ tầng đã có |
 
-Bộ theo stage: [Terraform](../terraform/questions.md) · [GitOps](../gitops/questions.md) · [CI/CD](../cicd/questions.md)
-· [Load](../load/questions.md) · [Delivery](../delivery/questions.md) · [SLO](../slo/questions.md) ·
-[Scaling](../scaling/questions.md) · [Tracing](../tracing/questions.md). So sánh với Medical:
+Bộ theo stage: [Terraform](../1-terraform/questions.md) · [GitOps](../2-gitops/questions.md) · [CI/CD](../3-cicd/questions.md)
+· [Load](../4-load/questions.md) · [Delivery](../5-delivery/questions.md) · [SLO](../6-slo/questions.md) ·
+[Scaling](../7-scaling/questions.md) · [Tracing](../8-tracing/questions.md). So sánh với Medical:
 [managed so với self-managed](../aws/questions.md).
 
 **Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Phần app **đã làm và đã đo, chạy local**; mọi thứ bên dưới nó

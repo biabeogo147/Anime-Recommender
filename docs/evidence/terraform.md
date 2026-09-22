@@ -1,7 +1,7 @@
 # Stage 1 — Terraform: evidence
 
 Criterion **#1** ([design §6](../eks-sre-llmops-design.md#6-verification-and-evidence-definition-of-done)), run from the ops
-workstation on 2026-09-22 following [the terraform guide](../terraform/guide.md). Account `242834061265`, region
+workstation on 2026-09-22 following [the terraform guide](../1-terraform/guide.md). Account `242834061265`, region
 `ap-southeast-1`. Output as reported, from the guide's section 6 block and the steps before it.
 
 ## #1 — apply from empty, then a plan with no changes, against a count written down first

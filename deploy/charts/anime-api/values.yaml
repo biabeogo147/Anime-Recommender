@@ -22,7 +22,7 @@ llm:
   faultRate: "0"
 
 # Set by the root from api_drill in terraform.tfvars; empty renders nothing. Changing it is a new version of the pod
-# template with no other change — the promotion drill (docs/delivery/guide.md).
+# template with no other change — the promotion drill (docs/5-delivery/guide.md).
 drill: ""
 
 # The canary analysis (stage 5, templates/analysistemplate.yaml). Written down here, beside the Rollout, so the number
@@ -38,7 +38,7 @@ scaling:
   minReplicas: 2
   maxReplicas: 8
   # Requests in flight per pod that the HPA aims for: set below stage 4's in-flight per pod at the knee. The chart
-  # refuses to render the ScaledObject while this is the placeholder (docs/scaling/guide.md, section 0).
+  # refuses to render the ScaledObject while this is the placeholder (docs/7-scaling/guide.md, section 0).
   inFlightTarget: MEASURE_IN_STAGE_4
   scaleDownWindowSeconds: 300 # the HPA's scale-down stabilisation window, stated rather than defaulted
 

@@ -673,7 +673,7 @@ minutes, and the 1h/5m pair fires first with a margin of a few minutes (all comp
 the page fired, rather than inferring the pair from its name. Both ticket pairs cross within a couple of minutes
 of the fault either way, as `[TICKET]` messages, and are recorded as uncalibrated.
 
-**This build runs the short drill.** For time, the drill in `docs/slo/guide.md` runs on about one clean hour, not
+**This build runs the short drill.** For time, the drill in `docs/6-slo/guide.md` runs on about one clean hour, not
 three. By the arithmetic above, the 6h/30m pair then probably pages first, at about 4 minutes. The 1h/5m pair's
 own crossing, about 8 minutes, is still read from its condition: one full clean hour is all its 1-hour window needs.
 The evidence records both and which paged; the CV claims only the time to the page.
@@ -1220,15 +1220,15 @@ stack table reads out — and each ends with its own evidence.
 
 | Stage | Adds | Closes | Docs |
 |---|---|---|---|
-| 1 | `shared`: ECR, Secrets Manager, OIDC role, budgets, the ACM certificate. Then `cluster`: VPC, EKS with a **private-only** endpoint, node group, the WireGuard gateway and `vpn.anime`. Then `make tunnel`, and only then `make bootstrap` for Argo CD and the root app | #1 | [terraform](terraform/README.md) |
-| 2 | Argo CD Applications: load balancer controller, External Secrets, external-dns, the app charts, and **kube-prometheus-stack** — three of the four admin UIs come from it, so #16 cannot close without it; both entry points, the internal one as an IngressGroup; the app answering over HTTPS and the four admin names answering only through the VPN | #2, #15, #16 | [gitops](gitops/README.md) |
-| 3 | GitHub Actions: test, index assertion, build, Trivy, ECR by digest, cosign, bot commit | #3, #4, #5 | [cicd](cicd/README.md) |
-| 4 | k6 `baseline.js` and `ramp.js` against the Prometheus that has been running since stage 2; **T is measured here** | #6, #7 | [load](load/README.md) |
-| 5 | Argo Rollouts, AnalysisTemplate, ALB traffic routing; the api's `Deployment` becomes a `Rollout`; the promotion and rollback drills | #8, #9 | [delivery](delivery/README.md) |
-| 6 | Sloth SLOs, Alertmanager to Discord, runbook entries, the alert drill | #10 | [slo](slo/README.md) |
-| 7 | KEDA and the api's `ScaledObject`, its threshold taken from #7; the Cluster Autoscaler; re-run the ramp against both | #14 | [scaling](scaling/README.md) |
-| 8 | OTel Collector, Tempo, Langfuse export, cost dashboard | #11, #12 | [tracing](tracing/README.md) |
-| 9 (P1) | `eval.yml` and the golden set | #13 | [cicd](cicd/README.md) |
+| 1 | `shared`: ECR, Secrets Manager, OIDC role, budgets, the ACM certificate. Then `cluster`: VPC, EKS with a **private-only** endpoint, node group, the WireGuard gateway and `vpn.anime`. Then `make tunnel`, and only then `make bootstrap` for Argo CD and the root app | #1 | [terraform](1-terraform/README.md) |
+| 2 | Argo CD Applications: load balancer controller, External Secrets, external-dns, the app charts, and **kube-prometheus-stack** — three of the four admin UIs come from it, so #16 cannot close without it; both entry points, the internal one as an IngressGroup; the app answering over HTTPS and the four admin names answering only through the VPN | #2, #15, #16 | [gitops](2-gitops/README.md) |
+| 3 | GitHub Actions: test, index assertion, build, Trivy, ECR by digest, cosign, bot commit | #3, #4, #5 | [cicd](3-cicd/README.md) |
+| 4 | k6 `baseline.js` and `ramp.js` against the Prometheus that has been running since stage 2; **T is measured here** | #6, #7 | [load](4-load/README.md) |
+| 5 | Argo Rollouts, AnalysisTemplate, ALB traffic routing; the api's `Deployment` becomes a `Rollout`; the promotion and rollback drills | #8, #9 | [delivery](5-delivery/README.md) |
+| 6 | Sloth SLOs, Alertmanager to Discord, runbook entries, the alert drill | #10 | [slo](6-slo/README.md) |
+| 7 | KEDA and the api's `ScaledObject`, its threshold taken from #7; the Cluster Autoscaler; re-run the ramp against both | #14 | [scaling](7-scaling/README.md) |
+| 8 | OTel Collector, Tempo, Langfuse export, cost dashboard | #11, #12 | [tracing](8-tracing/README.md) |
+| 9 (P1) | `eval.yml` and the golden set | #13 | [cicd](3-cicd/README.md) |
 
 **The wave table in §3 describes the finished system.** Components enter Git in the stage that needs them: until
 stage 5 the api is a plain `Deployment`, and until stage 7 it has a fixed replica count and no `ScaledObject`.
