@@ -32,7 +32,7 @@ evaluated and never alerts, while looking, in the rules file, perfectly reasonab
 twentieth — and is therefore decided by roughly a twentieth of the samples.
 
 **How it runs here.** The baseline runs until a minimum number of requests has completed, so its p95 rests on a
-couple of dozen tail samples rather than a handful.
+ten tail samples rather than three.
 
 **What breaks without enough samples.** Over sixty requests, the p95 sits around the third- or fourth-slowest one.
 Each extra slow call shifts it by one rank, and when the neighbouring values straddle a bucket boundary, that one
@@ -53,7 +53,7 @@ the api waits.
 
 **What breaks when they are mixed.** A target taken from one and enforced on the other is off by their difference on
 every request. In this deployment that difference is small next to the bucket width, and rounding usually absorbs
-it; the principle is kept because at a finer scale it is exactly how a threshold ends up enforcing something
+it; the principle is kept because at a finer scale the same mix-up is how a threshold ends up enforcing something
 nobody measured.
 
 ---

@@ -114,8 +114,10 @@ pauses for a person and never promotes on silence. "No errors across four reques
 
 *Too few* and *none* are different, though. If Spot takes the canary's only node, its samples age out of the window
 and the query becomes empty — which, as Decision 3 showed, errors rather than pauses, and would abort the release
-for a capacity event. The analysis has to name empty as inconclusive explicitly; that is one line of the template
-that exists only because a node can disappear.
+for a capacity event. Argo Rollouts has no separate condition for *inconclusive* — a measurement is inconclusive
+when it matches neither its success nor its failure condition — so **both** conditions have to require a non-empty
+result before comparing it. That guard exists only because a node can disappear, and its exact form is to be checked
+against the Argo Rollouts version in use.
 
 ## Decision 6 — after an abort, Git and the cluster disagree on purpose
 

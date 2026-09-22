@@ -97,7 +97,7 @@ over the threshold and fires; Alertmanager waits to group related alerts; the no
 
 **How it runs here.** The generated alert rules have no extra waiting period of their own, so they fire at the first
 evaluation that satisfies them. Alertmanager's wait depends on whether the alert opens a new group or joins one that
-has already notified. The drill records each link, and whether an hour of clean traffic came first.
+has already notified. The drill records each link, and how much clean traffic came first.
 
 **What breaks without the parts.** A single number from fault to message cannot be explained or improved. Only the window
 arithmetic is about the objective; the rest is configuration, and a slow page could be any link.

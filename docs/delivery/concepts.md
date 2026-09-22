@@ -42,8 +42,9 @@ when it meets neither condition, **inconclusive**. It can also **error**, when i
 evaluated at all.
 
 **How it runs here.** The traffic guard is written so that too few requests meets neither condition, making it
-inconclusive, and an inconclusive run pauses the rollout. An empty result is declared inconclusive explicitly, so a
-vanished canary pauses instead of erroring.
+inconclusive, and an inconclusive run pauses the rollout. There is no separate inconclusive condition, so both the
+success and the failure condition require a non-empty result first; an empty one then matches neither, and a vanished
+canary pauses instead of erroring (the exact form is to be verified against the version in use).
 
 **What breaks without the third outcome.** Thin evidence must become a pass or a fail. As a pass, a canary that saw
 four requests is promoted on nothing. As a fail, every quiet hour aborts a healthy release. And without the explicit

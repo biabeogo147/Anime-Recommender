@@ -252,6 +252,10 @@ it is issued once and AWS renews it, and nothing in a rebuild touches it.
   inside the cluster, from objects Terraform never sees.
 - **Managed node group, Spot:** instance types `[t3.large, t3a.large, m5.large, m6i.large]`, desired 2, min 2,
   max 4; gp3 encrypted volumes; IMDSv2 with hop limit 1.
+  **Account plan — to be verified before stage 1.** The account is Medical's, and Medical's design records that it
+  is on the AWS Free plan, which refuses instance types that are not free-tier eligible — `t3.large` among them.
+  Whether that plan allows EKS and Spot at all, and which of these types it accepts, decides whether this list
+  stands or the account's plan changes first.
 - **Addons:** vpc-cni, coredns, kube-proxy, aws-ebs-csi-driver, eks-pod-identity-agent.
 - **Pod Identity associations:** AWS Load Balancer Controller; External Secrets, read on exactly three ARNs —
   `anime/llm`, `anime/langfuse`, `anime/alerting` — and **not** a wildcard, because `anime/*` would include
@@ -259,6 +263,8 @@ it is issued once and AWS renews it, and nothing in a rebuild touches it.
   group — its describe calls cannot be scoped and read every group; external-dns, scoped to
   `ChangeResourceRecordSets` on the one hosted zone and to record names under `anime.recruitai.io.vn` only — it
   shares a zone with Medical, and nothing in this cluster has any business editing Medical's records.
+  (**To be verified:** external-dns names the ownership TXT record of the bare `anime` name itself, and in its
+  newer format that name may fall outside the suffix the policy allows; a `--txt-prefix` keeps it inside.)
 - **Registry:** ECR `anime-api` and `anime-ui`, scan on push, a lifecycle policy keeping the last 20 images.
 - **GitHub OIDC provider and role:** trust limited to
   `repo:biabeogo147/Anime-Recommender:ref:refs/heads/main`, permissions limited to pushing to those two
@@ -291,7 +297,11 @@ Each has a pinned chart version. Sync waves run in the order below, because each
 no built-in health check for the `Application` kind, so under an app-of-apps root a child counts as healthy the
 moment it is *created*, and the next wave starts before the previous one's CRDs, controllers or secrets exist.
 The bootstrap values therefore add the `resource.customizations.health.argoproj.io_Application` check to
-`argocd-cm` — exactly as Medical's `deploy/argocd/values/argocd.yaml` does. Without it the table above is a
+`argocd-cm`, in the form Medical's `deploy/argocd/values/argocd.yaml` ended up with: a child is healthy only when it
+is `Healthy` **and** `Synced`, `Degraded` is passed through, and a child with no resources at all is `Degraded`.
+The sync condition is not optional. Argo CD leaves resources that do not exist yet out of an Application's health,
+so a child that has applied half its manifests reports `Healthy`; Medical's health-only first version let the
+waves go at once on a real rebuild. Without the check the table above is a
 description of intent, not an order anything enforces.
 
 **A single point of failure this introduces.** The load balancer controller at wave -2 is the only thing that
@@ -440,7 +450,7 @@ flowchart LR
 
     subgraph COLL["OTel Collector"]
         RCV --> P1["traces pipeline 1: every trace<br/>memory_limiter · drop headers · batch"]
-        P2["traces pipeline 2: real models only<br/>memory_limiter · resource filter<br/>drops provider = fake · batch"]
+        P2["traces pipeline 2: real models only<br/>memory_limiter · drop headers<br/>filter: real providers only · batch"]
         RCV --> P2
         P1 --> EXTEMPO["exporter otlp/tempo"]
         P1 --> CONN["connector spanmetrics<br/>exemplars on"]
@@ -470,7 +480,9 @@ before exporting to Langfuse.
 it would drop that one span and forward the rest of every drill trace — the request span, `rag.retrieve`, the
 framework's own internal spans — so Langfuse would still fill, with generation-less traces. The provider is fixed
 per pod, so the chart sets `OTEL_RESOURCE_ATTRIBUTES=anime.llm.provider=<provider>` from the same value as
-`LLM_PROVIDER`, the attribute lands on every span that pod emits, and the filter drops on the resource attribute.
+`LLM_PROVIDER`, the attribute lands on every span that pod emits, and the filter drops on the resource attribute. It
+is written as an allowlist — drop anything whose provider is not a real one — so a pod that lost the attribute is kept
+in, not sent out; the header-dropping step runs in this pipeline too, since it is the one leaving the cluster.
 Tempo is where drills are debugged; Langfuse is where real prompts and answers are read.
 
 **The span metrics are for linking, not for measuring.** The connector turns spans into request-rate, error and
@@ -486,9 +498,11 @@ exist only in the OpenMetrics format; Prometheus stores them only with the `exem
 the link itself is set on Grafana's **Prometheus** datasource, pointing exemplar trace ids at Tempo. Leave out one and
 the graphs render normally, with nothing to click.
 
-**Pipelines are not fully isolated under failure.** If Langfuse is down long enough to fill its exporter's queue,
-the back-pressure reaches the shared receiver, and the api's exporter retries batches that may already have reached
-Tempo. Requests are unaffected; Tempo may hold a few duplicate spans after a long Langfuse outage.
+**Pipelines are not fully isolated under failure.** Each exporter has its own queue, and a full one drops rather than
+blocks, so a Langfuse outage does not stall the Tempo pipeline directly. What the two share is the collector's memory:
+as the Langfuse queue grows, `memory_limiter`, which acts on the whole process, starts refusing data for both
+pipelines, the api's exporter retries, and Tempo can lose spans or receive duplicates. Requests are unaffected, since
+export runs in the background (**to be verified** against the pinned collector version's queue and retry defaults).
 
 **Instrumentation already in the code.** `src/anime/telemetry.py` turns tracing on only when
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set, and instruments FastAPI with `/healthz`, `/readyz` and `/metrics`
@@ -566,10 +580,10 @@ flowchart LR
   connection — DNS, connecting and the TLS handshake are timed separately, and with keep-alive happen once
   per connection. What it still includes and the histogram does not is one network round trip, the load
   balancer's own time, and the server's work before the timing middleware starts. A T taken from k6 and
-  enforced on the histogram would be loose by that gap. **In this deployment the gap is milliseconds against
-  buckets seconds wide**, so after rounding it will almost never change T; the rule is kept because it is the
-  right rule, and the record says how much it mattered. k6's p95 is recorded beside T as the figure a direct
-  client of the api waits.
+  enforced on the histogram would be loose by that gap. **In this deployment the gap is expected to be
+  milliseconds, against buckets a quarter to half a second wide around T**, so after rounding it will rarely
+  change T; the rule is kept because it is the right rule, and the record says how much it mattered. k6's p95
+  is recorded beside T as the figure a direct client of the api waits.
 
   **Fast failures pull T down.** The histogram is not split by status. If the provider rate-limits during the
   baseline, quick 503s enter the same distribution and make the p95 look faster than a successful request is.
@@ -599,9 +613,11 @@ otherwise the spec and the rules drift apart silently.
 
 **The multipliers are derived for 28 days, not copied from the 30-day literature.** Each factor is the share of
 budget an alert should catch, times the period, divided by its long window: 2% of 672 hours over one hour is
-13.44. The familiar 14.4, 6, 3 and 1 are the same budget shares over 720 hours. Sloth derives the 28-day set
-itself — 13.44, 5.6, 2.8 and 0.93 — so these are the numbers the generated rules will contain, and any drill
-arithmetic uses them.
+13.44. The familiar 14.4, 6, 3 and 1 are the same budget shares over 720 hours. Sloth derives the 28-day set —
+13.44, 5.6, 2.8 and 0.93 — when it is run with a 28-day period; its default is 30 days, so the period has to be set
+in the command CI re-runs as well, or the committed rules quietly carry the 30-day factors (**to be verified**
+against the Sloth version in use). These are the numbers the generated rules will contain, and any drill arithmetic
+uses them.
 
 **What the SLO is on this platform, and what it is not.** The cluster lives for a few hours a day and its metrics
 die with it, so no 28-day window ever exists here. "Availability 99.5% over 28 days" is therefore a **definition**
@@ -616,22 +632,36 @@ the drill that fires the alert. An alert that arrives with no instructions is an
 `FAULT_RATE=0.5`, **promoted straight to all traffic** — `kubectl argo rollouts promote --full`, which skips the
 remaining steps and their analyses — and measures time-to-alert.
 All traffic, because the alert reads the error ratio across the whole service: held at a 10% canary step, 50%
-errors become 5% overall — a burn rate of 10×, under the 13.44× fast-burn threshold — and the page never fires.
+errors become 5% overall — a burn rate of 10×, under the 1h/5m pair's 13.44×, so that pair never fires, and above
+the 6h/30m pair's 5.6× only after more than an hour of it (computed) — longer than a drill, so the silence in
+between would be read as broken alerting.
 `FAULT_RATE` alone does nothing: `providers.get_llm` passes it to `FakeLLM`, which is only constructed when
 `LLM_PROVIDER == "fake"`. Set the fault rate on a `gemini` rollout and the drill injects **zero** faults, no
 alert ever fires, and the absence looks like a healthy service.
 
 At 10% errors the burn rate against a 99.5% target is 20×, and the 1-hour window needs roughly 40 minutes
 before its average crosses 13.44× — a drill nobody will sit through, and one that overlaps a teardown. At 50%
-the burn rate is 100× and the page should fire in about 8 minutes. The drill value is chosen for the drill's
-own arithmetic, and the calculation is written down so the number is not mistaken for a production condition.
+the burn rate is 100× and the 1h/5m pair crosses in about 8 minutes — window arithmetic only, before scrape,
+evaluation, grouping and delivery. The drill value is chosen for the drill's own arithmetic, and the calculation
+is written down so the number is not mistaken for a production condition.
 
-**Those minutes assume an hour of clean traffic first.** The 1-hour window's error ratio climbs from zero only if
-the hour before the fault was full of successful requests at the same rate. Start the traffic and the fault
-together and the window holds nothing but the faulty period: its ratio is 50% from the first scrape, and the page
-fires within a couple of evaluations. Both runs are legitimate; they measure different things — the first how
-long the rule takes to *notice* a burn, the second how long the pipeline takes to *deliver* a page — and the
-record states which one it is. `steady.js` therefore runs for an hour before the faulty version is promoted.
+**Those minutes assume clean traffic first — and how much decides which pair fires.** The 1-hour window's error
+ratio climbs from zero only if the hour before the fault was full of successful requests at the same rate. Start
+the traffic and the fault together and every window holds nothing but the faulty period: the ratio is 50% from the
+first scrape, and the page fires within a couple of evaluations. Both runs are legitimate; they measure different
+things — the first how long the rule takes to *notice* a burn, the second how long the pipeline takes to *deliver*
+a page — and the record states which one it is.
+
+One hour of clean traffic is not enough to make the *calibrated* pair the one that fires. Sloth writes both fast
+pairs into a single page alert, joined by `or` (**to be verified** against the generated file), so the drill cannot
+choose a pair; whichever crosses first fires the page. In a ratio of rates, hours with no traffic count for nothing,
+so what matters is how much clean traffic the store holds, not how old it is. With one clean hour, the 6-hour
+window holds that hour plus the fault and crosses 5.6× after about 4 minutes, before the 1h/5m pair's 8 — the page
+would come from the uncalibrated branch. With about three hours of clean traffic the 6-hour window needs about 11
+minutes, and the 1h/5m pair fires first with a margin of a few minutes (all computed). So `steady.js` runs for
+**three hours** before the faulty version is promoted, and the record reads each window's burn rate at the moment
+the page fired, rather than inferring the pair from its name. Both ticket pairs cross within a couple of minutes
+of the fault either way, into the ticket channel, and are recorded as uncalibrated.
 
 **Time-to-alert is a sum, recorded in parts:** the scrape that first carries failing requests; the recording
 rules that turn counters into burn-rate ratios, evaluated on their own interval; the alert rule's evaluation that
@@ -710,6 +740,14 @@ two errors; a window of 60 fails on the first one. A gate that aborts a healthy 
 error is a gate people learn to switch off, so the drill rate is chosen to give the threshold room to mean
 what it says.
 
+**Open: how the UI reaches the api, and whether real users are canaried.** Browsers reach Streamlit on
+`anime.recruitai.io.vn`; the UI then calls the api at `ANIME_API_URL`. Pointed at the public `api.anime` name,
+UI traffic follows the ALB weights but leaves the VPC through the NAT and comes back in. Pointed at an in-cluster
+Service, it stays inside — and is split by whatever that Service selects, not by the ALB weights: through the
+stable Service it never reaches a canary at all. The drills are unaffected, since k6 calls `api.anime` directly;
+what is undecided is whether a canary is judged on real users' requests too. To be settled when the ui chart is
+written, and stated in the evidence.
+
 **The rollback drill.** Drills run with the whole api already in fake mode, so stable and canary are compared in
 the same mode. The change under test adds `FAULT_RATE=0.2` to a version whose values also pin
 `LLM_PROVIDER=fake` — the fault rate is read only by the fake provider, so on a `gemini` version it injects
@@ -751,7 +789,8 @@ can go Pending there; its plateau is the service's or the load generator's.
 
 **Something has to add nodes, or "max 4" is decoration.** A managed node group does not scale itself: its
 minimum and maximum are bounds for something else to move within. Without that something, the group stays at
-its desired size of two, and the fifth pod KEDA asks for sits `Pending` for ever. So stage 7 also installs the
+its desired size of two, and the first pod KEDA asks for that no longer fits on two nodes sits `Pending` for
+ever. So stage 7 also installs the
 **Cluster Autoscaler**, with its own Pod Identity association scoped to this node group, which adds a node when
 a pod cannot be scheduled and removes one that has been underused. Adding a node takes minutes, not seconds —
 the scaling run reports pod scale-out and node scale-out as separate delays.
@@ -775,7 +814,7 @@ under `advanced.horizontalPodAutoscalerConfig.behavior`, and criterion #14 times
 window, not against a cooldown that never applies.
 
 **An empty result must not read as zero load.** KEDA's Prometheus scaler treats an empty query result as `0` by
-default. If the api's series disappear — the monitor broken, Prometheus restarting — the autoscaler sees no
+default. If the api's series disappear — the monitor broken, the scrape timing out — the autoscaler sees no
 requests in flight and scales down to the minimum, in the middle of whatever load there was. The trigger sets
 `ignoreNullValues: false`, so an empty result is an error, and the HPA holds its current replica count while the
 error lasts. After `fallback.failureThreshold` consecutive errors KEDA takes over with a synthesised metric, and a
@@ -783,6 +822,17 @@ plain fallback would drive the replicas *to* a fixed count — down, as readily 
 `behavior: currentReplicasIfHigher`, which never scales down on an error, on a KEDA version that supports it,
 pinned at build time. Fallback only works for `AverageValue` triggers, which is also why the query is the plain
 `sum(...)`: the HPA divides by the pod count itself, and a query that divided again would be counting twice.
+
+**Two owners of the replica count, and one of them must step back.** The HPA that KEDA creates writes the Rollout's
+replica count; Argo CD, with self-heal on, would write it back to whatever the chart says. So the api chart leaves
+`spec.replicas` out of the Rollout (or the Application ignores differences on that field), and the ScaledObject's
+`scaleTargetRef` names the Rollout, which KEDA can scale through its `/scale` subresource.
+
+**Scale-in must not drop requests.** Removing a pod removes its IP target from the ALB, but deregistration takes
+time while the pod has already been told to stop. Without a short `preStop` delay and a termination grace period
+longer than the drain, every scale-in returns errors to requests still on their way — errors the SLO would count.
+The exact delays are set when the chart is written (**to be verified** against the controller's deregistration
+behaviour).
 
 **The trigger's threshold comes from stage 4, not from this page.** The `4` below is a placeholder. The
 capacity run measures, at the point where p95 breaks away, how many requests each pod had in flight — which
@@ -982,9 +1032,11 @@ the SSM Agent *on the gateway*, not by the caller, so: the VPC needs `enableDnsS
 `enableDnsHostnames` for the EKS-managed private hosted zone to answer; the gateway needs egress on 443 to
 the cluster security group **and** that group needs 443 inbound from the gateway; the gateway needs an
 instance profile with `AmazonSSMManagedInstanceCore` and an SSM Agent new enough for
-`AWS-StartPortForwardingSessionToRemoteHost`. And afterwards: **`aws eks update-kubeconfig` rewrites the
-cluster stanza and drops `tls-server-name`**, so the edit has to be re-applied every time it is run — a step
-that silently reintroduces the certificate-name failure described above.
+`AWS-StartPortForwardingSessionToRemoteHost`. And afterwards: **`aws eks update-kubeconfig` rewrites the whole
+cluster entry** — `server` goes back to the private endpoint's hostname and `tls-server-name` disappears — so both
+lines have to be re-applied every time it is run. Until they are, `kubectl` dials an address the workstation
+cannot reach and times out, which is the dead-cluster symptom again. (Whether the command replaces the entry or
+merges into it is **to be verified** against the CLI version in use.)
 
 **What each door allows.** Named here because criterion #16 asks for these rules as evidence and a rule that
 exists nowhere cannot be compared with anything:
@@ -1028,8 +1080,9 @@ been anywhere else is not a private key.
 
 **The gateway earns its instance twice.** It is the VPN endpoint for a browser on the laptop, and the SSM
 jump host for `kubectl` on the workstation. It sits in the cluster stack, so `make down` takes it, and a
-rebuild brings back a new Elastic IP — the client profile's endpoint address changes with it, which is a
-teardown consequence the runbook has to state rather than let a reader rediscover.
+rebuild brings back a new Elastic IP. The client profile names the gateway as `vpn.anime`, not by address, so a
+rebuild changes one DNS record rather than every laptop's profile; what remains is a resolver that cached the old
+address, which clears within the record's TTL.
 
 ## 5. Error handling and failure modes
 
@@ -1039,17 +1092,17 @@ teardown consequence the runbook has to state rather than let a reader rediscove
 | Hugging Face embedding failure at query time | **Today: 500, with no `Retry-After` and no LLM error metric** — the `rag.retrieve` leg has no handler and `BatchedEmbeddings` re-raises the original exception ([§4.1](#41-the-application)). It reaches the 5xx SLI only through the middleware's status fallback. The fix is to map it to `UpstreamError` like the model path. Readiness reflects only local state either way, so the probe does not flap on an upstream outage |
 | Index missing or wrong in the image | `/readyz` returns 503, the new pods never become Ready, and the Rollout does not progress. The CI assertion should prevent it reaching here |
 | Spot interruption | Managed node group rebalance handles the termination notice. `minAvailable: 1` PDB on the api; minimum 2 replicas spread across nodes |
-| **Spot interruption during a canary analysis** | The canary ReplicaSet loses a pod mid-window. If a replica survives, the minimum-traffic guard should return `Inconclusive`. If the **last** canary pod goes, its samples age out of the two-minute window and the query then returns an **empty vector** — which the `< 20` comparison cannot evaluate. The measurement errors; enough consecutive errors fail the run, and a failed run **aborts** the release on a capacity event. The guard protects against thin traffic, not absent series; the analysis must treat an empty result as `Inconclusive` explicitly. Either way the record must say which happened, because an abort blamed on the release when capacity caused it is a wrong conclusion carried forward |
+| **Spot interruption during a canary analysis** | The canary ReplicaSet loses a pod mid-window. If a replica survives, the minimum-traffic guard should return `Inconclusive`. If the **last** canary pod goes, its samples age out of the two-minute window and the query then returns an **empty vector** — which the `< 20` comparison cannot evaluate. The measurement errors; enough consecutive errors fail the run, and a failed run **aborts** the release on a capacity event. The guard protects against thin traffic, not absent series; the analysis must treat an empty result as `Inconclusive` — and since Argo Rollouts has no inconclusive condition of its own, that means both `successCondition` and `failureCondition` require a non-empty result before comparing it, so an empty one matches neither (**to be verified** against the version in use). Either way the record must say which happened, because an abort blamed on the release when capacity caused it is a wrong conclusion carried forward |
 | Canary regression | The AnalysisRun fails, the Rollout aborts automatically, stable keeps 100%. The Argo CD Application shows `Degraded` until Git is fixed or reverted |
 | Too little canary traffic | `Inconclusive` → the rollout pauses for a human. It never auto-promotes on no evidence |
-| WireGuard gateway lost, or replaced by a rebuild | **The service keeps serving.** Argo CD runs inside the cluster and goes on reconciling, users reach the public ALB as before. What is lost is control and sight: no internal UI, and no `make tunnel`, so no `kubectl` either. A rebuild also gives the gateway a **new Elastic IP**, so a client profile that still names the old one fails to handshake — which looks exactly like a firewall problem and is not |
+| WireGuard gateway lost, or replaced by a rebuild | **The service keeps serving.** Argo CD runs inside the cluster and goes on reconciling, users reach the public ALB as before. What is lost is control and sight: no internal UI, and no `make tunnel`, so no `kubectl` either. A rebuild gives the gateway a **new Elastic IP**; profiles name it as `vpn.anime`, so they follow the record once cached answers expire, and a laptop still holding the old address fails its handshake until then — which looks like a firewall problem and is not |
 | ACM validation record missing from the zone | The certificate stays `PENDING_VALIDATION`, the ALB gets no HTTPS listener, and the Ingress looks healthy while port 443 answers nothing. The zone belongs to Medical's `shared` stack; Anime only writes records into it, so a zone that was deleted or recreated breaks this silently |
 | The autoscaler's query returns nothing | Treated as an error: replicas hold, then fall back to the current count if higher. Never read as zero load |
 | No Spot capacity when a node is needed | New pods stay `Pending` and the Cluster Autoscaler keeps trying; the service runs on what it has. The scaling run records how long it waited |
 | Hugging Face unavailable while scaling out, in gemini mode | A new pod's index load embeds a probe query, so it cannot become ready; scale-out stalls until the provider returns. Existing pods keep serving |
 | AWS Load Balancer Controller unhealthy | No ALB can be created and no weight can be changed: the service is unreachable *and* releases stall. First thing to check when a rollout hangs with no AnalysisRun |
 | OTel Collector or Langfuse unavailable | The SDK's batch exporter drops spans from a bounded queue; requests are unaffected. The collector's `memory_limiter` prevents it from being the thing that runs the node out of memory |
-| Prometheus restarted or its volume lost | Every window starts empty and returns nothing — *no data*, not *no errors* — until samples arrive. After that the longer windows are worse than empty: a 1-day or 3-day `rate()` over a store a few hours old is computed from the hours that exist, so every rule whose long window exceeds the store's age — the 6h/30m page pair as well as both ticket pairs — quietly behaves like a shorter window, keeping its threshold, and can fire on a burst it was designed to ignore. On a stack torn down nightly only the 1h/5m pair is calibrated for most of a session, and it is the one the drill exercises. (28 days is the budget period, not any rule's range.) See [§6](#6-verification-and-evidence-definition-of-done) |
+| Prometheus restarted or its volume lost | Every window starts empty and returns nothing — *no data*, not *no errors* — until samples arrive. After that the longer windows are worse than empty: a 1-day or 3-day `rate()` over a store a few hours old is computed from the hours that exist, so every rule whose long window exceeds the store's age — the 6h/30m page pair as well as both ticket pairs — quietly behaves like a shorter window, keeping its threshold, and can fire on a burst it was designed to ignore. On a stack torn down nightly only the 1h/5m pair is calibrated for most of a session, and the drill is arranged — three hours of clean traffic first — so that it is the branch that fires first, which the record confirms from each window's burn rate. (28 days is the budget period, not any rule's range.) See [§6](#6-verification-and-evidence-definition-of-done) |
 
 ## 6. Verification and evidence (definition of done)
 
@@ -1067,7 +1120,7 @@ check passes wrongly.
 
 | # | Item | Verification | Evidence | What a false pass looks like |
 |---|---|---|---|---|
-| 1 | Terraform | Apply from empty, then `plan` reports no changes **against a stated expected resource count** | the count, and apply duration | `plan -refresh=false` prints "no changes" without ever asking AWS, so real drift stays invisible; so does re-reading a saved plan file. And a verdict with no expected count records a number instead of asserting one — write the count down first, then compare |
+| 1 | Terraform | Apply from empty, then `plan` reports no changes **against a stated expected resource count** | the count, and apply duration | `plan -refresh=false` prints "no changes" without comparing the managed resources with reality — data sources are still read — so real drift stays invisible; so does re-reading a saved plan file. And a verdict with no expected count records a number instead of asserting one — write the count down first, then compare |
 | 2 | GitOps | Every Argo CD Application `Synced` and `Healthy` after bootstrap | the Application list, by name | `Healthy` is the **unconditional default** for any resource Argo CD has no health check for — `AnalysisTemplate`, the api's `PodMonitor` and the generated `PrometheusRule` all report it while doing nothing. Not `PrometheusServiceLevel` — [§4.3](#43-slos-and-alerting-deployslo) rejects the Sloth operator, so no such object exists here. Assert the literal set of names and its size, plus one named readiness field per custom resource |
 | 3 | CI end to end | Push to main → signed image in ECR → Argo CD synced | `cosign verify` output, pipeline duration | `Synced` means synced to the revision Argo CD *has*, which a repo-server that cannot reach GitHub keeps indefinitely. Compare `status.sync.revision` against `git rev-parse origin/main`. Second: verifying by tag instead of by the digest pinned in `deploy/charts/anime-*/values.yaml` verifies a different image than the one running. Third: an identity pattern that accepts any workflow or any ref of the repository passes for a signature made from a feature branch |
 | 4 | Image size | `docker image ls` before and after the multi-stage build | MB before and after | A "before" taken from a different base image or a warm cache, or one image compared against two. State both images and the method |
@@ -1076,8 +1129,8 @@ check passes wrongly.
 | 7 | Scale | k6 `ramp.js` in fake mode, ramping arrival rate, at the **minimum** replica count | highest sustained offered rate before p95 breaks away from the same run's low-load p95, with no dropped iterations; pods and nodes over time; error rate | Three. **A closed-model ramp** — virtual users waiting on responses — shows a throughput ceiling but understates latency, because the requests it never sent are never timed; the arrival-rate model and its dropped-iterations count expose the queue. **A plateau that is the load generator's**, read as the service's limit — record the workstation's CPU beside the dropped iterations, since the service's own slowness also exhausts the generator's pool. And comparing this run's p95 against **T**: a fake-mode p95 is a fraction of a gemini-mode T, so the comparison fails only long after saturation began |
 | 8 | Canary promotion | A good version walks 10 → 50 → 100 | the Rollout timeline and each AnalysisRun's measured values | A query that matches **no series** — a metric typo, or a missing `rollouts-pod-template-hash` filter — returns an empty vector. By default that makes each measurement **error**, and repeated errors abort every release — loud, but blamed on the release. The silent version comes from "fixing" the errors: a query ending in `or vector(0)`, or a condition that tolerates an empty result, and from then on an empty query passes. Worse, a filter that selects the **stable** hash returns a healthy non-empty number and promotes a broken canary. Require the recorded measurement to be non-empty **and** to carry the canary ReplicaSet's own `rollouts-pod-template-hash`. Two more, both about plumbing rather than logic: **the hash never reaches the series** — no `podTargetLabels` — so every filtered query is empty from the first probe; and **each pod scraped once per Service**, which doubles the request count and lets the minimum-traffic guard pass on half the traffic it asks for |
 | 9 | Canary rollback | A version with `LLM_PROVIDER=fake` **and** `FAULT_RATE=0.2` aborts itself | time to abort, the failing measurement, requests affected | **`FAULT_RATE` is read only by the fake provider.** Set it on a `gemini` rollout and it injects nothing: the canary stays healthy, the analysis passes, the release is promoted — and the drill gets filed as proof that rollback works. Assert a non-zero canary error rate *before* trusting the abort. Second: a rollout that failed for an unrelated reason — an image that never pulls stalls until the progress deadline and turns Degraded, and aborts only if configured to — credited to the analysis; the record must carry the AnalysisRun's own failure |
-| 10 | Alerting | The fast-burn page reaches Discord during the fault drill | time-to-alert in its parts, the `alertname` and objective, and which pair fired | Four. **The rule never loaded** — a PrometheusRule the monitoring stack does not select is accepted and ignored, and the drill ends with no page and no error. **The fault diluted by a canary's share**, so the burn stays under the threshold and silence is read as broken alerting. **The rule fired and the webhook refused**, so nothing arrives — there is no dead-man's switch to catch it. And **the wrong pair**: a store younger than a rule's long window makes that rule evaluate less data than it names, so a page from the 6h/30m pair on a young store is not the calibrated 1h/5m pair working. Record the `alertname`, the objective and the pair |
-| 11 | Tracing | A `/recommend` trace shows retrieve and generate spans with **non-zero** tokens, in `gemini` mode | the span attributes as text, from both sinks | `recommender.py` writes `usage.get("input_tokens", 0)`, so when usage metadata is missing the attribute is **present and zero** — "the trace carries `gen_ai.*`" passes while token capture is entirely broken. Fake mode is worse: `FakeLLM` fabricates plausible counts, so a screenshot proves nothing. Assert non-zero values, name the mode, and check Tempo **and** Langfuse |
+| 10 | Alerting | The fast-burn page reaches Discord during the fault drill | time-to-alert in its parts, the `alertname` and objective, and which pair fired | Four. **The rule never loaded** — a PrometheusRule the monitoring stack does not select is accepted and ignored, and the drill ends with no page and no error. **The fault diluted by a canary's share**, so the burn stays under the threshold and silence is read as broken alerting. **The rule fired and the webhook refused**, so nothing arrives — there is no dead-man's switch to catch it. And **the wrong pair**: a store younger than a rule's long window makes that rule evaluate less data than it names, so a page from the 6h/30m pair on a young store is not the calibrated 1h/5m pair working. Record the `alertname`, the severity label, the objective, and each window's burn rate at the moment it fired — the name alone does not say which pair |
+| 11 | Tracing | A `/recommend` trace shows retrieve and generate spans with **non-zero** tokens, in `gemini` mode | the span attributes as text, from both sinks | `recommender.py` writes `usage.get("input_tokens", 0)`, so when usage metadata is missing the attribute is **present and zero** — "the trace carries `gen_ai.*`" passes while token capture is entirely broken. Fake mode is worse: `FakeLLM` fabricates plausible counts, so a screenshot proves nothing. Assert non-zero values, name the mode, and check Tempo **and** Langfuse. And the split itself: a fake-mode request from the same session, looked up by the trace id in its response, is in Tempo and absent from Langfuse — absence alone is also what a broken Langfuse export looks like, which is why the real-mode trace must be present in the same session |
 | 12 | Cost metric | The dashboard shows cost per 1,000 requests **in `gemini` mode** | the value, the mode, and the `pricing.yaml` date | **`config/pricing.yaml` carries a `fake:` entry priced identically to `gemini-3.5-flash-lite`**, and fake-mode metrics are labelled `model="fake"`. A fake-mode run therefore produces a realistic dollar figure out of fabricated tokens, numerically indistinguishable from a real one — it defeats the rule that the two modes are different claims, silently. Always read the `model` label. The other path is a `MODEL_NAME` absent from the file, where every price resolves to zero: a confident `$0.00` |
 | 13 (P1) | Eval gate | A pull request that degrades retrieval is blocked | the CI run, `hit@4` before and after | A baseline regenerated inside the same pull request it is meant to judge. The baseline's commit must predate the pull request's base |
 | 14 | Autoscaling | k6 `ramp.js` against a live `ScaledObject` and the Cluster Autoscaler: replicas move from 2 toward 8, nodes from 2 toward 4, and both come back | replicas and nodes over time, the trigger's value, the pod and node scale-out delays, and the scale-down against the HPA's window | §1 calls autoscaling a P0, so it needs a row of its own — #7 is measured at a fixed replica count, stages before KEDA exists. Four false passes. Replicas that grew because a deploy rolled pods, not because the trigger fired — record the trigger's value. A run seen scaling out but never back, hiding a stuck `ScaledObject`. **Pods that scaled while nodes did not**, the extra ones `Pending` — replica count alone looks like success. And **a scale-down caused by an empty query** rather than by falling load, which is what a default Prometheus trigger does when the series vanish |
@@ -1121,14 +1174,14 @@ Two files from the original repository are still present and are removed by the 
 | `make loadtest-baseline`, `make loadtest-ramp` | The k6 runs of [§4.5](#45-autoscaling-and-load-testing) |
 | `make drill-canary`, `make drill-alert` | The two drills |
 | `make tunnel` | SSM port-forward to the private EKS endpoint, through the WireGuard gateway. Held open in a second window, exactly as on Medical |
-| `make vpn-config` | Print the WireGuard client profile for the laptop, reading the gateway's current Elastic IP |
+| `make vpn-config` | Print a WireGuard client profile for a new operator, with the gateway named `vpn.anime` |
 
 **Teardown order matters, and there are now two of them.** Both load balancers and all their target groups
 are created by a controller inside the cluster, not by Terraform, so Terraform does not know they exist.
 Destroying the VPC before they are gone leaves orphaned resources and a destroy that hangs on dependencies it
 cannot see. `make down` therefore deletes **every** Ingress first — all five — and waits for the controller to finish.
-The ACM certificate and the Route 53 records outlive the cluster; the gateway's Elastic IP does not, which is
-why a rebuild hands out a new VPN endpoint address.
+The ACM certificate outlives the cluster; the gateway's Elastic IP does not, so a rebuild moves `vpn.anime` to a
+new address.
 
 ## 9. Build order
 
@@ -1153,8 +1206,9 @@ The waves say what order things start in once they exist; this table says when t
 
 Two orderings are load-bearing. **Stage 4 comes before stage 6** because the SLO's latency target is **T**,
 and T is a measurement, not a choice. **Rollouts come before the alert drill**, because that drill is defined
-as a rollout pinned with a fault rate and analysis disabled — with no Rollout there is nothing to pin, and an
-earlier draft of this plan had the drill a whole stage before the object it needs.
+as a rollout pinned with a fault rate and promoted straight to all traffic, skipping its analyses — with no
+Rollout there is nothing to pin, and an earlier draft of this plan had the drill a whole stage before the object it
+needs.
 
 ## 10. Risks
 

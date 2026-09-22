@@ -45,8 +45,9 @@ waits for everything in a wave to be healthy before starting the next.
 
 **How it runs here.** The waves are on the child Applications, inside the root's sync. So "healthy" means
 *the child Application is healthy* — and since Argo CD 1.8 there is no built-in check for that kind. The
-bootstrap values add one to Argo CD's configuration, as Medical's do, so that a child is healthy only when
-what it deployed is.
+bootstrap values add one to Argo CD's configuration, in the form Medical's ended up with: a child is healthy only
+when it is both *Healthy* and *Synced*. Health alone is not enough, because Argo CD leaves resources that do not
+exist yet out of an Application's health — a child that has applied half its manifests still reads Healthy.
 
 **What breaks without the health check.** Every child counts as healthy the moment it is created. The root
 starts every wave at once, the numbers become decoration, and the cluster converges only through retries.

@@ -60,10 +60,10 @@ flowchart LR
 
 The SLO will be computed from the server's own histogram. So T is read from that histogram — not from k6 — over
 exactly the baseline's window. That is a rule, not an optimisation, and it is worth being honest about its size
-here: the two differ by a network round trip and the load balancer's time, milliseconds against buckets two
-seconds wide, and once T is rounded up to a bucket the difference will almost never show. The rule is kept because
-the same mistake at a finer scale — a threshold measured in one place and enforced in another — is exactly what
-broke checks in the other project, and because the record should say how much it mattered, not assume it.
+here: the two are expected to differ by a network round trip and the load balancer's time — milliseconds, against
+buckets a quarter to half a second wide around where T will land — so once T is rounded up to a bucket the
+difference will rarely show. The rule is kept because it is the right one, and because the record should say how
+much it mattered, not assume it.
 
 **What the rounding really means.** The SLO counts requests that fell at or below a bucket boundary. T therefore
 has to *be* a boundary, and the target is only as fine as the buckets: whatever the p95 turns out to be, T is the

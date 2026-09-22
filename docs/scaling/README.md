@@ -59,9 +59,9 @@ between the trigger and the knee is what pays for all of that; set the trigger a
 late.
 
 Two things make the loop fragile under exactly the conditions it exists for. The api's health and metrics endpoints
-used to share a worker pool with the requests they report on, so at saturation the scrape and the probe would queue
+still share a worker pool with the requests they report on, so at saturation the scrape and the probe would queue
 behind the work — the signal going stale and a busy pod marked unready at the knee. The design moves them off that
-pool. And in real-model mode a new pod's startup calls the embedding API, so if that provider is down, new pods cannot
+pool before the capacity run. And in real-model mode a new pod's startup calls the embedding API, so if that provider is down, new pods cannot
 become ready and scale-out stalls while existing pods carry on.
 
 ## Decision 3 — two autoscalers, and what decides whether the second ever acts

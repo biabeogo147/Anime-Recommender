@@ -58,9 +58,11 @@ Which component sits in which wave is in the
 What matters here is the condition that makes the arrows real. **A wave only waits for the previous wave to be
 healthy — and Argo CD has no built-in way to tell whether an Application is healthy.** Without one, each child
 counts as healthy the instant it is created, and every wave starts at once. The picture above would describe an
-intention, and the cluster would converge only because retries eventually paper over the ordering. Medical
-learned this and added the health check to Argo CD's configuration; this design does the same, in the
-bootstrap values, before any wave exists.
+intention, and the cluster would converge only because retries eventually paper over the ordering. And the check
+has to read **sync as well as health**: Argo CD leaves resources that do not exist yet out of an Application's
+health, so a child that has applied half its manifests still reads healthy. Medical learned that on a real
+rebuild, with a health-only check that let every wave go at once; this design carries the corrected check into
+the bootstrap values, before any wave exists.
 
 ## Decision 2 — one controller, two doors, five Ingresses
 

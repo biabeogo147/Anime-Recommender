@@ -155,7 +155,7 @@ asking, for each, *what is the worst it could do*:
 |---|---|---|
 | GitHub Actions | A role assumed through OIDC, trusted for one repository **and one branch** | Push an image — nothing else |
 | Each in-cluster controller | Its own Pod Identity association | Its own slice: one controller cannot use another's rights |
-| The kubelet on each node | The node's instance role | Pull images. Pods cannot borrow it: IMDSv2's hop limit of 1 keeps it on the node |
+| The node, and what runs on its network | The node's instance role | Pull images, and the network rights the VPC CNI needs to attach addresses. Ordinary pods cannot borrow it — IMDSv2's hop limit of 1 keeps the metadata service to the node — but pods on the host network, such as the CNI itself, can |
 | The EKS service | The cluster role | What AWS needs to run a control plane on our behalf |
 | The WireGuard gateway | Its instance role | Read its own keys, and be an SSM target |
 | The operator | The ops workstation's role, reached over SSM | Everything — which is why the workstation has no inbound port at all |
@@ -202,8 +202,9 @@ order that works.
 
 Criterion #1 is apply, then plan, and see no changes. That can be true while the thing it guards is not:
 
-- **The plan never asked AWS.** `plan -refresh=false`, or re-reading a saved plan file, reports "no changes"
-  without looking at what exists. Drift is invisible to it.
+- **The plan never compared with reality.** `plan -refresh=false`, or re-reading a saved plan file, reports "no
+  changes" without checking the managed resources against what exists — data sources are still read, which makes
+  it look as if AWS was consulted. Drift is invisible to it.
 - **Nothing was predicted.** "No changes" with no number beside it records a result instead of asserting
   one. The resource count has to be written down *before* the apply.
 - **The wrong configuration.** Plan a different, already-applied configuration and it will truthfully report

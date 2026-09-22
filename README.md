@@ -4,7 +4,7 @@
 alerts, a canary that rolls itself back, autoscaling on the right signal, and an LLM you can see the cost of.**
 
 ![EKS](https://img.shields.io/badge/EKS-managed_node_group_·_Spot-FF9900?logo=amazonaws&logoColor=white)
-![Terraform](https://img.shields.io/badge/Terraform-one_stack-7B42BC?logo=terraform&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-three_stacks_by_lifetime-7B42BC?logo=terraform&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-OIDC,_no_access_keys-2088FF?logo=githubactions&logoColor=white)
 ![Argo Rollouts](https://img.shields.io/badge/Argo_Rollouts-canary_10%2F50%2F100-EF7B4D?logo=argo&logoColor=white)
 ![SLO](https://img.shields.io/badge/SLO-Sloth_multi--window_burn--rate-E6522C?logo=prometheus&logoColor=white)
@@ -42,7 +42,8 @@ Measured on 2026-09-15, all of it local — the cluster does not exist yet.
   ([runtime](docs/evidence/local.md#runtime-gemini-gemini-35-flash-lite)).
 - **A 20% fault injection produced exactly 80 × 200 and 20 × 503**, and all three counters agreed
   ([drill](docs/evidence/local.md#failure-drill-fake-provider)).
-- **17 tests, ruff clean, containers run as UID 10001** with a read-only root filesystem.
+- **17 tests, ruff clean, containers run as UID 10001** ([build](docs/evidence/local.md#build-and-tests)); the
+  compose file also sets a read-only root filesystem, which is configured rather than measured.
 
 Not measured yet, because nothing is deployed — which is every criterion except #4, the image size above. Among
 them: the apply time and resource count (#1), the pipeline duration (#3), the latency baseline that sets the SLO
@@ -309,15 +310,16 @@ and each one points at the box in the architecture it zooms into.
 
 | Stage | Ideas | Step-by-step | Interview Q&A |
 |---|---|---|---|
-| 1 · AWS and a way in, with Terraform | [README](docs/terraform/README.md) · [concepts](docs/terraform/concepts.md) | *not written yet* | *not written yet* |
-| 2 · GitOps, and two doors | [README](docs/gitops/README.md) · [concepts](docs/gitops/concepts.md) | | |
-| 3 · CI/CD, to a signed digest | [README](docs/cicd/README.md) · [concepts](docs/cicd/concepts.md) | | |
-| 4 · Load, and the numbers everything uses | [README](docs/load/README.md) · [concepts](docs/load/concepts.md) | | |
-| 5 · Delivery, a release that judges itself | [README](docs/delivery/README.md) · [concepts](docs/delivery/concepts.md) | | |
-| 6 · SLOs and alerting | [README](docs/slo/README.md) · [concepts](docs/slo/concepts.md) | | |
-| 7 · Scaling, pods and nodes | [README](docs/scaling/README.md) · [concepts](docs/scaling/concepts.md) | | |
-| 8 · Tracing and cost | [README](docs/tracing/README.md) · [concepts](docs/tracing/concepts.md) | | |
-| The whole project | [design](docs/eks-sre-llmops-design.md) | | |
+| 1 · AWS and a way in, with Terraform | [README](docs/terraform/README.md) · [concepts](docs/terraform/concepts.md) | *not written yet* | [questions](docs/terraform/questions.md) · [answers](docs/terraform/answers.md) |
+| 2 · GitOps, and two doors | [README](docs/gitops/README.md) · [concepts](docs/gitops/concepts.md) | | [questions](docs/gitops/questions.md) · [answers](docs/gitops/answers.md) |
+| 3 · CI/CD, to a signed digest | [README](docs/cicd/README.md) · [concepts](docs/cicd/concepts.md) | | [questions](docs/cicd/questions.md) · [answers](docs/cicd/answers.md) |
+| 4 · Load, and the numbers everything uses | [README](docs/load/README.md) · [concepts](docs/load/concepts.md) | | [questions](docs/load/questions.md) · [answers](docs/load/answers.md) |
+| 5 · Delivery, a release that judges itself | [README](docs/delivery/README.md) · [concepts](docs/delivery/concepts.md) | | [questions](docs/delivery/questions.md) · [answers](docs/delivery/answers.md) |
+| 6 · SLOs and alerting | [README](docs/slo/README.md) · [concepts](docs/slo/concepts.md) | | [questions](docs/slo/questions.md) · [answers](docs/slo/answers.md) |
+| 7 · Scaling, pods and nodes | [README](docs/scaling/README.md) · [concepts](docs/scaling/concepts.md) | | [questions](docs/scaling/questions.md) · [answers](docs/scaling/answers.md) |
+| 8 · Tracing and cost | [README](docs/tracing/README.md) · [concepts](docs/tracing/concepts.md) | | [questions](docs/tracing/questions.md) · [answers](docs/tracing/answers.md) |
+| The whole project | [design](docs/eks-sre-llmops-design.md) | | [questions](docs/common/questions.md) · [answers](docs/common/answers.md) |
+| Managed against self-managed, beside Medical | [design §1](docs/eks-sre-llmops-design.md#1-goal) | | [questions](docs/aws/questions.md) · [answers](docs/aws/answers.md) |
 | Measured results | [`docs/evidence/`](docs/evidence/) | | |
 
 ---

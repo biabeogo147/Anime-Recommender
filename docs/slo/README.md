@@ -96,8 +96,11 @@ flowchart TB
     class STORE,OK,OFF argo
 ```
 
-Only the one-hour page pair is calibrated for most of a session. That is the part the drill exercises, and the drill
-records **which pair fired** — a page from any other pair on a young store is a different claim.
+Only the one-hour page pair is calibrated for most of a session. But the two page pairs are one alert, and whichever
+crosses first fires it — on a store holding only an hour of clean traffic, by the arithmetic, that is the six-hour
+pair, computed from far less than six hours. So the drill runs about three hours of clean traffic first, which lets
+the one-hour pair win, and records **each window's burn rate at the moment the page fired** — the only way to say
+which pair it was. A page from any other pair on a young store is a different claim.
 
 ## Decision 5 — a drill whose number is explicable
 
@@ -109,7 +112,7 @@ whether that time means anything.
 - **The fault must reach all traffic.** Held at a canary's small share, half the canary's requests failing is a
   small fraction of the service's — below the page threshold. The drill version is promoted straight through, and
   silence at a canary share would be read, wrongly, as broken alerting.
-- **What came before decides what is measured.** After an hour of clean traffic the long window climbs gradually, and
+- **What came before decides what is measured.** After clean traffic the long window climbs gradually, and
   the drill measures how long the rule takes to *notice*. Without it, the window sees only failures from the start and
   the drill measures how long the pipeline takes to *deliver*. Different questions; the record names which.
 - **The total is a sum, and most of it is plumbing.** Scrape, recording rules, the alert's evaluation, Alertmanager's
@@ -127,7 +130,7 @@ flowchart LR
     class CLEAN,MSG ext
 ```
 
-Only the window arithmetic is about the objective. Recording each link is what turns "it took eleven minutes" into
+Only the window arithmetic is about the objective. Recording each link is what turns "it took so many minutes" into
 something that could be made faster.
 
 ## Decision 6 — alert on what users feel, and know what is not watched
@@ -155,7 +158,7 @@ and why, not only that something did.
 
 ## What this stage proves, and what it only assumes
 
-**Proves:** the one-hour page fires on the right rule and reaches Discord, with the time split into its parts and the
+**Proves:** the page fires from the one-hour pair and reaches Discord, with the time split into its parts and the
 kind of run — noticing or delivering — named.
 
 **Does not prove, and says so:** that the objective was met over any period; that the longer pairs behave as designed

@@ -58,10 +58,11 @@ looks like now. *Drift* is any difference between that and the state — somethi
 only if the second plan refreshed, against the right configuration, and was compared against a resource count
 written down in advance.
 
-**What breaks without it.** `plan -refresh=false` skips the asking, so it reports "no changes" regardless of
-drift. Re-reading a saved plan reports what was true when it was saved. Neither is lying about what it did;
-both answer a different question from the one being asked. That is the most common way a check passes while
-the thing it guards is broken — and why the criterion names the refresh and the count, not just the verdict.
+**What breaks without it.** `plan -refresh=false` skips comparing managed resources with reality — it still reads
+data sources, so it does talk to AWS — and reports "no changes" regardless of drift. Re-reading a saved plan
+reports what was true when it was saved. Neither is lying about what it did; both answer a different question
+from the one being asked. That is the most common way a check passes while the thing it guards is broken — and
+why the criterion names the refresh and the count, not just the verdict.
 
 ---
 
@@ -138,8 +139,9 @@ to be able to say "a node went away" — or it will blame the release.
 - **EKS Pod Identity** — an agent on the node hands a pod its role's credentials; the association between a
   ServiceAccount and a role is an EKS API object.
 
-**How it runs here.** Pod Identity, one association per controller. Pods cannot fall back to the node's role:
-IMDSv2 with a hop limit of 1 means the instance metadata service answers the node, not a container behind it.
+**How it runs here.** Pod Identity, one association per controller. Ordinary pods cannot fall back to the node's
+role: IMDSv2 with a hop limit of 1 means the metadata service answers the node, not a container behind it. Pods on
+the host network are the exception — the VPC CNI is one, and it uses the node's role for its own network rights.
 
 **How it compares.** Medical builds IRSA by hand — a self-hosted issuer and one role per workload — because a
 kubeadm cluster has no managed issuer. It works, and it is a lot of machinery. Pod Identity does the same job
@@ -212,8 +214,9 @@ generates their own keypair, keeps the private half on their own machine, and ha
 A private key that has travelled is no longer private.
 
 **What breaks without the gateway.** The service keeps serving — the gateway is not in the request path — but
-every admin UI and every `kubectl` go at once. A rebuild also gives the gateway a **new Elastic IP**, so a
-client profile naming the old one fails its handshake silently, which reads like a firewall problem.
+every admin UI and every `kubectl` go at once. A rebuild also gives the gateway a **new Elastic IP**. Profiles
+name the gateway rather than its address, so they follow the new record — but a laptop whose resolver cached the
+old address fails its handshake silently until the cache expires, which reads like a firewall problem.
 
 ---
 

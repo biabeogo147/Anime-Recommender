@@ -16,9 +16,10 @@ cost query and each criterion's false passes are in
 
 ## The problem
 
-Every stage so far treats a request's latency as one number. When it rises, the question is *where* — the embedding
-call, the vector search, or the model — and nothing can say. Nor can anything say what a request cost: the model is
-paid per token, and the tokens are counted but go nowhere a person would look. And the text of a bad answer, the thing
+Every stage so far treats a request's latency as a set of averages. The metrics already split retrieval time from model
+time in aggregate, but when one request is slow nothing can say where *its* time went, and nothing leads from a slow
+point on a graph to a request that was in it. Nor can anything say what a request cost: the model is paid per token,
+and the tokens are counted but sit on no dashboard. And the text of a bad answer, the thing
 most worth reading when an LLM service misbehaves, is not recorded at all.
 
 ## Decision 1 — one trace per request, one span per stage
@@ -131,7 +132,8 @@ value is *about* before asking what it *is*.
 ## What this stage proves, and what it only assumes
 
 **Proves:** a real-model request produces a trace with a retrieval span and a generation span, the latter carrying
-non-zero token counts, in both Tempo and Langfuse, while drill traffic reaches only Tempo; the dashboard shows an
+non-zero token counts, in both Tempo and Langfuse, while a fake-mode request from the same session, looked up by its
+trace id, is in Tempo and absent from Langfuse; the dashboard shows an
 estimated cost per thousand real-model requests.
 
 **Assumes:** that the list prices are still current — they are read by hand and dated, not fetched; and that the token
