@@ -43,8 +43,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@PIN_ME # v4
-      - uses: docker/setup-buildx-action@PIN_ME # v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       # The Dockerfile's `test` target runs ruff and pytest in the locked environment — the same one the image uses.
       - name: ruff + pytest
         run: docker buildx build -f services/api/Dockerfile --target test .
@@ -62,7 +62,7 @@ jobs:
       # rules can be regenerated from a laptop that runs no Sloth (docs/slo/guide.md, section 0).
       - name: upload regenerated SLO rules
         if: failure() && hashFiles('slo-regenerated/anime-api.yaml') != ''
-        uses: actions/upload-artifact@PIN_ME # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: slo-regenerated
           path: slo-regenerated/anime-api.yaml
@@ -90,13 +90,13 @@ jobs:
       matrix:
         svc: [api, ui]
     steps:
-      - uses: actions/checkout@PIN_ME # v4
-      - uses: docker/setup-buildx-action@PIN_ME # v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       # Build into the runner's image store first: the scan and the size measurement run against the image BEFORE
       # anything is pushed, so nothing unscanned ever reaches ECR.
       - name: build (the index assertion runs inside the api build)
-        uses: docker/build-push-action@PIN_ME # v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           file: services/${{ matrix.svc }}/Dockerfile
@@ -123,7 +123,7 @@ jobs:
       # teaches people to switch the gate off. The gate is the scan command itself; `trivy convert` of a saved report has
       # no --ignore-unfixed.
       - name: trivy — all findings (recorded)
-        uses: aquasecurity/trivy-action@PIN_ME # v0.35.0 — the release after the March 2026 tag incident
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 — the release after the March 2026 tag incident
         with:
           image-ref: anime-${{ matrix.svc }}:ci
           severity: ${{ env.SEVERITY }}
@@ -131,7 +131,7 @@ jobs:
           output: trivy-total.json
           exit-code: "0"
       - name: trivy — gate (fixable only)
-        uses: aquasecurity/trivy-action@PIN_ME # v0.35.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: anime-${{ matrix.svc }}:ci
           severity: ${{ env.SEVERITY }}
@@ -151,7 +151,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: upload SARIF
         if: always() && hashFiles('trivy.sarif') != ''
-        uses: github/codeql-action/upload-sarif@PIN_ME # v4
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
         with:
           sarif_file: trivy.sarif
           category: trivy-${{ matrix.svc }}
@@ -159,7 +159,7 @@ jobs:
       # ---- push to main only: push, sign, attest --------------------------------------------------------------
       - name: AWS credentials (OIDC, no key)
         if: env.IS_RELEASE == 'true'
-        uses: aws-actions/configure-aws-credentials@PIN_ME # v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           # Trusts exactly repo:<this>:ref:refs/heads/main; may only push to the two repositories.
           role-to-assume: ${{ vars.AWS_CI_ROLE_ARN }}
@@ -167,7 +167,7 @@ jobs:
       - name: ECR login
         if: env.IS_RELEASE == 'true'
         id: ecr
-        uses: aws-actions/amazon-ecr-login@PIN_ME # v2
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
       - name: push
         if: env.IS_RELEASE == 'true'
         id: push
@@ -180,7 +180,7 @@ jobs:
             --image-ids imageTag=${GITHUB_SHA::12} --query 'imageDetails[0].imageDigest' --output text)
           echo "ref=$repo@$digest" >> "$GITHUB_OUTPUT"
           echo "pushed $repo@$digest" >> "$GITHUB_STEP_SUMMARY"
-      - uses: sigstore/cosign-installer@PIN_ME # v3
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
         if: env.IS_RELEASE == 'true'
       # Keyless: a throwaway key, a short-lived certificate bound to THIS workflow on THIS branch, and a Rekor entry.
       # Rekor is public — digest, repository and workflow become public permanently; accepted for a public repository
@@ -190,7 +190,7 @@ jobs:
         run: cosign sign --yes "${{ steps.push.outputs.ref }}"
       - name: SBOM (SPDX)
         if: env.IS_RELEASE == 'true'
-        uses: anchore/sbom-action@PIN_ME # v0 — pinned to the SHA of the current release
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0 — pinned to the SHA of the current release
         with:
           image: ${{ steps.push.outputs.ref }}
           format: spdx-json
@@ -231,11 +231,11 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@PIN_ME # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
           fetch-depth: 0
-      - uses: aws-actions/configure-aws-credentials@PIN_ME # v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: ${{ vars.AWS_CI_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}

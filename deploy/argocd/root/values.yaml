@@ -16,22 +16,22 @@ targetRevision: main
 
 pins:
   # <account>.dkr.ecr.ap-southeast-1.amazonaws.com
-  registry: PIN_ME
+  registry: 242834061265.dkr.ecr.ap-southeast-1.amazonaws.com
   # terraform -chdir=infra/terraform/shared output -raw certificate_arn
-  certificateArn: PIN_ME
+  certificateArn: arn:aws:acm:ap-southeast-1:242834061265:certificate/5f1f2560-4096-4f7c-b998-32f49b19df62
   # Exact chart versions — `make pins` reads the current release of each.
   charts:
-    awsLoadBalancerController: PIN_ME
-    externalSecrets: PIN_ME
-    externalDns: PIN_ME
-    kubePrometheusStack: PIN_ME
-    argoRollouts: PIN_ME
-    keda: PIN_ME
-    clusterAutoscaler: PIN_ME
-    tempo: PIN_ME
-    opentelemetryCollector: PIN_ME
+    awsLoadBalancerController: "3.5.0"
+    externalSecrets: "2.11.0"
+    externalDns: "1.22.0"
+    kubePrometheusStack: "91.4.1"
+    argoRollouts: "2.43.2"
+    keda: "2.20.2"
+    clusterAutoscaler: "9.59.0"
+    tempo: "1.24.4"
+    opentelemetryCollector: "0.173.1"
   # The Cluster Autoscaler's image, of the cluster's own minor version (`make pins` prints it).
-  clusterAutoscalerImageTag: PIN_ME
+  clusterAutoscalerImageTag: v1.36.1
 
 # The api's mode and drill marker; set by make bootstrap from terraform.tfvars (api_llm_provider, api_fault_rate,
 # api_drill).

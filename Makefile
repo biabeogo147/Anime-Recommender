@@ -299,7 +299,7 @@ langfuse-count:
 #   slo-generate  writes deploy/slo/generated/anime-api.yaml from deploy/slo/anime-api.sloth.yaml
 #   slo-check     regenerates into a temporary file and fails on any difference — what CI runs (SLO A4.1)
 # --default-slo-period=28d: without it Sloth uses 30 days and the rules carry the 30-day multipliers (design §4.3).
-SLOTH_IMAGE ?= ghcr.io/slok/sloth:PIN_ME
+SLOTH_IMAGE ?= ghcr.io/slok/sloth:v0.16.0
 SLOTH = docker run --rm -i --user "$$(id -u):$$(id -g)" -v $(CURDIR)/deploy/slo:/slo $(SLOTH_IMAGE) \
   generate --default-slo-period=28d -i /slo/anime-api.sloth.yaml
 slo-generate:

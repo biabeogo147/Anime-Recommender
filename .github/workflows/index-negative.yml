@@ -21,8 +21,8 @@ jobs:
   truncated-catalogue-fails:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@PIN_ME # v4
-      - uses: docker/setup-buildx-action@PIN_ME # v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       # Drop whole ROWS with a CSV parser, keeping the header: cutting bytes could leave 269 rows with a broken synopsis
       # (the check would then pass on damaged data), and an empty file fails with a different error (missing columns).
       - name: truncate the catalogue
