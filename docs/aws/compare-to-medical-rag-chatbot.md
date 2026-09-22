@@ -3,7 +3,9 @@
 **The two projects run the same kind of workload on the same AWS account, and split one question between them:
 what changes when AWS runs the cluster instead of you.** This page is the map from one to the other. It
 explains the differences of design, not their interview answers; those are in the [AWS Q&A](questions.md)
-([answers](answers.md)).
+([answers](answers.md)). The same comparison one stage at a time (Terraform, the app, GitOps and CI), with the
+reason for each difference, and why each project's extra stages have no counterpart, is in
+[stage by stage](compare-by-stage.md).
 
 **Sources.**
 - Medical:

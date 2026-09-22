@@ -8,6 +8,8 @@ threshold in effect.**
 **Where this sits.** The `ROLLOUTS` and `API` boxes in [design §3](../eks-sre-llmops-design.md#3-architecture).
 Criteria **#8** and **#9**.
 
+**Compared with Medical:** Medical has no such stage; why is in [stage by stage](../aws/compare-by-stage.md#only-in-anime).
+
 Ideas are in [`concepts.md`](concepts.md); this stage also leans on two from stage 4 —
 [histograms and buckets](../4-load/concepts.md#1-a-histogram-and-what-a-bucket-boundary-means) and
 [how Prometheus finds a target](../4-load/concepts.md#4-how-prometheus-finds-a-target). Steps, thresholds, the window,

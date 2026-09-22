@@ -6,6 +6,8 @@ are how traffic gets in, where secrets come from, and what the names are.**
 **Where this sits.** The `ARGO`, `LBC`, `ESO`, `EDNS`, `ALB` and `IALB` boxes in
 [design §3](../eks-sre-llmops-design.md#3-architecture). Criteria **#2**, **#15** and **#16**.
 
+**Compared with Medical:** Medical's `gitops` stage, decision by decision, in [stage by stage](../aws/compare-by-stage.md#gitops).
+
 Ideas are in [`concepts.md`](concepts.md). Parameters — chart versions, annotations, security-group rules —
 are in [design §3](../eks-sre-llmops-design.md#3-architecture) and
 [§4.7](../eks-sre-llmops-design.md#47-names-tls-and-the-two-ways-in). This page is the reasoning.

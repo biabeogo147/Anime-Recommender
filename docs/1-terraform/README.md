@@ -8,6 +8,8 @@ reached through a door that has no address on the internet.**
 them. This stage also writes one record, `vpn.anime`, into the `R53` zone — a zone it does not own. Criterion
 **#1**.
 
+**Compared with Medical:** Medical's `terraform` stage, decision by decision, in [stage by stage](../aws/compare-by-stage.md#terraform); what its `ansible` stage did, and what does that here, in [only in Medical](../aws/compare-by-stage.md#only-in-medical).
+
 Ideas are defined in [`concepts.md`](concepts.md); read the section a paragraph points to before the
 paragraph. Parameters — instance types, counts, versions, the resource list — live in
 [design §3](../eks-sre-llmops-design.md#3-architecture) and are not repeated here. This page is the reasoning.

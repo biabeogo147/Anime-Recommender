@@ -7,6 +7,8 @@ worked while the other did not.**
 **Where this sits.** The `KEDA` and `CAS` boxes in [design §3](../eks-sre-llmops-design.md#3-architecture).
 Criterion **#14**.
 
+**Compared with Medical:** Medical has no such stage; why is in [stage by stage](../aws/compare-by-stage.md#only-in-anime).
+
 Ideas are in [`concepts.md`](concepts.md); this stage also leans on stage 2's
 [readiness gates](../2-gitops/concepts.md#6-target-type-health-checks-and-readiness-gates) and stage 5's
 [Rollout](../5-delivery/concepts.md#1-a-rollout-instead-of-a-deployment). The trigger, bounds, fallback and windows

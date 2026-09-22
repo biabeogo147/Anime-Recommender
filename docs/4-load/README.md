@@ -7,6 +7,8 @@ making each one a measurement of the thing it will later be used to judge.**
 **Where this sits.** The `PROM` box in [design §3](../eks-sre-llmops-design.md#3-architecture), queried after k6
 runs from the ops workstation drive traffic through the public door. Criteria **#6** and **#7**.
 
+**Compared with Medical:** Medical has no such stage; why is in [stage by stage](../aws/compare-by-stage.md#only-in-anime).
+
 Ideas are in [`concepts.md`](concepts.md). The scripts, rates, buckets and the exact definition of T are in
 [design §4.5](../eks-sre-llmops-design.md#45-autoscaling-and-load-testing) and
 [§4.3](../eks-sre-llmops-design.md#43-slos-and-alerting-deployslo). This page is the reasoning.

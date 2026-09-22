@@ -8,6 +8,8 @@ design.**
 [design §3](../eks-sre-llmops-design.md#3-architecture). Build stages 3 and 9 (the P1 eval gate). Criteria
 **#3**, **#4**, **#5** and **#13**.
 
+**Compared with Medical:** Medical's `jenkins` stage, decision by decision, in [stage by stage](../aws/compare-by-stage.md#ci).
+
 Ideas are in [`concepts.md`](concepts.md). The workflow's steps, its flags, the exact verification command and
 the per-criterion false passes are in [design §4.6](../eks-sre-llmops-design.md#46-cicd-github-actions-githubworkflows)
 and [§6](../eks-sre-llmops-design.md#6-verification-and-evidence-definition-of-done). This page is the reasoning
