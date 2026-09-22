@@ -1,0 +1,192 @@
+{{- if has "tracing" .Values.stages }}
+# Wave -1: the Langfuse credential, before the collector that mounts it (wave 0).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tracing-secret
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: deploy/platform/tracing
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tracing
+  {{- include "root.syncPolicy" (list "CreateNamespace=true") | nindent 2 }}
+---
+# Wave 0: Tempo, single binary. Its blocks live in an emptyDir that dies with the pod: traces last as long as the
+# cluster, and evidence is captured during the session (design §4.2).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tempo
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: tempo
+    targetRevision: {{ .Values.pins.charts.tempo | quote }}
+    helm:
+      valuesObject:
+        persistence: { enabled: false }
+        tempo:
+          # OTLP over gRPC is what the collector sends. The chart's other default receivers (Jaeger, OTLP/HTTP) stay
+          # open inside the cluster; nothing sends to them.
+          receivers:
+            otlp:
+              protocols:
+                grpc: { endpoint: 0.0.0.0:4317 }
+          retention: 24h
+          resources:
+            requests: { cpu: 50m, memory: 256Mi }
+            limits: { memory: 1Gi }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tracing
+  {{- include "root.syncPolicy" (list "CreateNamespace=true") | nindent 2 }}
+---
+# Wave 0: the OpenTelemetry Collector. One receiver, two trace pipelines, one metrics pipeline (design §4.2):
+#   traces           every trace → Tempo, and → spanmetrics
+#   traces/langfuse  real providers only → Langfuse Cloud
+#   metrics          spanmetrics → a Prometheus endpoint, scraped (no remote-write receiver on Prometheus)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opentelemetry-collector
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+    chart: opentelemetry-collector
+    targetRevision: {{ .Values.pins.charts.opentelemetryCollector | quote }}
+    helm:
+      valuesObject:
+        mode: deployment
+        replicaCount: 1
+        # The contrib distribution: the filter processor and the spanmetrics connector are not in the core one.
+        image:
+          repository: otel/opentelemetry-collector-contrib
+        fullnameOverride: otel-collector # the api's OTEL_EXPORTER_OTLP_ENDPOINT names this Service
+        resources:
+          requests: { cpu: 50m, memory: 128Mi }
+          limits: { memory: 512Mi }
+        extraEnvsFrom:
+          - secretRef: { name: anime-langfuse } # LANGFUSE_AUTH, built by External Secrets
+        ports:
+          # The chart's defaults also open Jaeger and Zipkin receivers; nothing here speaks them.
+          jaeger-compact: { enabled: false }
+          jaeger-thrift: { enabled: false }
+          jaeger-grpc: { enabled: false }
+          zipkin: { enabled: false }
+          # The span metrics, in OpenMetrics — the only format that carries exemplars.
+          spanmetrics:
+            enabled: true
+            containerPort: 8889
+            servicePort: 8889
+            protocol: TCP
+        podMonitor:
+          enabled: true
+          metricsEndpoints:
+            - port: spanmetrics
+              interval: 30s
+        config:
+          # These maps are merged into the chart's default config. The pipelines below reuse the chart's own names
+          # (traces, metrics) so they REPLACE its defaults — a `null` to remove them would be dropped by Argo CD's
+          # valuesObject. The chart's other receivers stay defined but belong to no pipeline, so they never start.
+          receivers:
+            otlp:
+              protocols:
+                http: { endpoint: 0.0.0.0:4318 }
+                grpc: { endpoint: 0.0.0.0:4317 }
+          processors:
+            # Acts on the whole process: when one exporter's queue grows (Langfuse unreachable), it refuses data for
+            # BOTH pipelines. Requests are unaffected — the api exports in the background (design §4.2).
+            memory_limiter:
+              check_interval: 1s
+              limit_percentage: 80
+              spike_limit_percentage: 20
+            batch: {}
+            # Request and response headers can carry cookies or tokens; nothing that leaves the cluster keeps them.
+            attributes/drop-headers:
+              actions:
+                - { pattern: ^http\.request\.header\..*, action: delete }
+                - { pattern: ^http\.response\.header\..*, action: delete }
+            # An ALLOWLIST, keyed on the pod's resource attribute, not on a span attribute: every span a fake-mode pod
+            # emits is dropped, not just its generation span. A pod that lost the attribute is dropped too — kept in
+            # the cluster, not sent out (design §4.2). Add a provider here only when it is a real one.
+            filter/real-providers-only:
+              error_mode: ignore
+              traces:
+                span:
+                  - 'resource.attributes["anime.llm.provider"] != "gemini"'
+          connectors:
+            spanmetrics:
+              # Exemplars link a slow bucket to an example trace. One of four settings the link needs; the others are
+              # enable_open_metrics below, Prometheus's exemplar-storage, and the Grafana datasource (design §4.2).
+              exemplars: { enabled: true }
+              histogram:
+                explicit:
+                  buckets: [100ms, 250ms, 500ms, 1s, 1.5s, 2s, 3s, 4s, 8s, 16s]
+          exporters:
+            otlp/tempo:
+              endpoint: tempo.tracing.svc.cluster.local:4317
+              tls: { insecure: true } # inside the cluster
+            otlphttp/langfuse:
+              endpoint: {{ .Values.langfuse.otlpEndpoint | quote }}
+              headers:
+                Authorization: "Basic ${env:LANGFUSE_AUTH}"
+                # Without it, Langfuse may take up to 10 minutes to make directly ingested OTel data visible — long
+                # enough for the guide's presence and absence checks to read a delay as an answer.
+                x-langfuse-ingestion-version: "4"
+            prometheus:
+              endpoint: 0.0.0.0:8889
+              enable_open_metrics: true
+          service:
+            pipelines:
+              traces:
+                receivers: [otlp]
+                processors: [memory_limiter, attributes/drop-headers, batch]
+                exporters: [otlp/tempo, spanmetrics]
+              traces/langfuse:
+                receivers: [otlp]
+                processors: [memory_limiter, attributes/drop-headers, filter/real-providers-only, batch]
+                exporters: [otlphttp/langfuse]
+              metrics:
+                receivers: [spanmetrics]
+                processors: [batch]
+                exporters: [prometheus]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tracing
+  # SkipDryRunOnMissingResource: its PodMonitor's CRD comes from the monitoring stack, in the same wave.
+  {{- include "root.syncPolicy" (list "CreateNamespace=true" "SkipDryRunOnMissingResource=true") | nindent 2 }}
+---
+# Wave 1: the dashboards, as ConfigMaps Grafana's sidecar loads by label (deploy/dashboards/).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dashboards
+  {{- include "root.metadata" . | nindent 2 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: deploy/dashboards
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  {{- include "root.syncPolicy" (list) | nindent 2 }}
+{{- end }}

@@ -109,9 +109,10 @@ would add realistic-looking dollars. The denominator is only honest if it can be
 obvious request counter has no model label, so it would count every drill request and dilute the figure. The design
 uses a request count that does carry the model. **A ratio is only as filtered as its less-filtered half.**
 
-And a value can be present without being real. When the model reports no usage, the token attributes are written as
-zero — so "the span has token attributes" is true of a span with no token data at all, and the cost built on it is a
-cheap day that never happened.
+And a value can be present without being real. When the model reported no usage, the token attributes used to be
+written as zero — so "the span has token attributes" was true of a span with no token data at all, and the cost built
+on it was a cheap day that never happened. Stage 8 writes them only when the model reports them; the check still asks
+for non-zero values, because the metrics' counters keep the old default.
 
 ## Decision 6 — capture the evidence before the teardown
 
@@ -141,7 +142,8 @@ counts the provider reports are the ones it would bill.
 
 ## Known limits
 
-- **Prompt capture is not built yet.**
+- **Prompt capture is built but unproven:** which attribute names Langfuse maps to a generation's text is checked in
+  the run.
 - **Tempo keeps nothing across a teardown.**
 - **The cost is an estimate at list price**, for a project that runs on a free tier — what the traffic *would* cost.
 

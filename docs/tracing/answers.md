@@ -137,8 +137,8 @@ bình thường, chỉ là không có gì để bấm — và không ai để ý
 ### A5. Ghi nội dung
 
 **A5.1** **Ý chính:** "Vì không span nào mang prompt hay câu trả lời. Langfuse sẽ nhận thời gian và số token,
-không có chữ nào để xem — mà chữ mới là thứ đáng đọc nhất khi một service LLM trả lời sai. Việc ghi nội dung chưa
-được viết; cho tới khi có, #11 chỉ chấm cấu trúc của span."
+không có chữ nào để xem — mà chữ mới là thứ đáng đọc nhất khi một service LLM trả lời sai. Nên stage 8 viết việc ghi
+nội dung sau cờ `OTEL_CAPTURE_CONTENT` — tắt trong code, bật bởi chart ở đây."
 
 **A5.2** **Ý chính:** "Ô nhập là văn bản tự do. 'Nội dung là sở thích anime' mô tả ô đó *dùng để làm gì*, không
 phải người ta gõ gì vào. Bật ghi thì bất cứ thứ gì người dùng gõ đều được chép sang một dịch vụ bên thứ ba. Tắt
@@ -163,7 +163,8 @@ Panel hiện luôn label nó đang cộng, để bộ lọc nhìn thấy đượ
 
 **Mẹo:** "tỉ số chỉ sạch bằng vế kém sạch hơn của nó" là câu đáng nhớ.
 
-**A6.3** **Ý chính:** "Vì khi model không báo usage, code ghi token bằng không. Attribute *có mặt* và bằng không
+**A6.3** **Ý chính:** "Vì khi model không báo usage, code cũ ghi token bằng không — stage 8 đã sửa để chỉ ghi khi
+model báo, nhưng counter metrics vẫn cộng số không. Attribute *có mặt* và bằng không
 trông y hệt một giá trị thật tình cờ bằng không. Nên 'span có attribute token' đúng cả khi việc thu token hỏng
 hoàn toàn. Chi phí tính từ cùng số token đó, nên dashboard báo một ngày rẻ bất thường mà thực ra không có thật.
 Phép kiểm đòi số token *khác không*, từ request model thật."
