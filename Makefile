@@ -51,7 +51,7 @@ cluster_output = $(TF_CLUSTER) output -raw $(1)
 
 .PHONY: shared-init shared-plan shared init plan infra kubeconfig tunnel ready bootstrap-init bootstrap-plan \
         bootstrap up vpn-config pins image apps loadtest-baseline loadtest-ramp loadtest-steady prom prom-range \
-        rollout-status rollout promote-full slo-generate slo-check langfuse-obs down infra-destroy
+        rollout-status rollout promote-full slo-generate slo-check langfuse-obs langfuse-count down infra-destroy
 
 # --- shared: survives every teardown -----------------------------------------------------------------------------
 shared-init:
@@ -276,6 +276,22 @@ langfuse-obs:
 	    (.data[] | "  \(.name)  type=\(.type)  model=\(.providedModelName // .model // "-")  usage=\(.usageDetails // .usage // {} | tostring)")' \
 	    /tmp/langfuse-obs.json
 	else cat /tmp/langfuse-obs.json; echo; fi
+
+# How many traces reached Langfuse in a time window (M7 in docs/evidence/guide-measurements.md): after a fake-mode run
+# the answer must be 0. It counts DISTINCT traces among the window's observations, read from the first page only:
+# `observations: 100` means the page is full, and `distinct traces` is then a lower bound.   make -s langfuse-count FROM=<RFC3339> TO=<RFC3339>
+langfuse-count:
+	lf=$$(sed -n 's/^  otlpEndpoint: *"\{0,1\}\(https:\/\/[^/"]*\).*/\1/p' deploy/argocd/root/values.yaml)
+	[ -n "$$lf" ] || { echo "no Langfuse host in deploy/argocd/root/values.yaml"; exit 1; }
+	[ -n "$(FROM)" ] && [ -n "$(TO)" ] || { echo "usage: make -s langfuse-count FROM=<RFC3339> TO=<RFC3339>"; exit 1; }
+	auth=$$(aws secretsmanager get-secret-value --region $(REGION) --secret-id anime/langfuse --query SecretString \
+	  --output text | jq -r '"\(.LANGFUSE_PUBLIC_KEY):\(.LANGFUSE_SECRET_KEY)"')
+	code=$$(curl -s -o /tmp/langfuse-count.json -w '%{http_code}' -u "$$auth" \
+	  "$$lf/api/public/v2/observations?fromStartTime=$(FROM)&toStartTime=$(TO)&limit=100")
+	echo "langfuse http $$code"
+	if [ "$$code" = 200 ]; then
+	  jq -r '"observations: \(.data | length)  distinct traces: \([.data[].traceId] | unique | length)"' /tmp/langfuse-count.json
+	else cat /tmp/langfuse-count.json; echo; fi
 
 # --- stage 6: the SLO rules, generated from the Sloth spec -------------------------------------------------------
 # Sloth runs in a container (nothing installed), pinned by version: a different Sloth may write different rules, and

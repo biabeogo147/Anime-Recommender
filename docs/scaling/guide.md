@@ -220,7 +220,15 @@ echo "== Cluster Autoscaler"; kubectl -n kube-system logs $(kubectl -n kube-syst
 } | tee ~/anime-evidence/scaling-events.txt
 ```
 
-**3.3 — the return.** Leave window 3 running for **30 more minutes**:
+**3.3 — the return.** As soon as k6 finishes, keep a light load running in window 2 for the whole return, so that
+scale-in happens under traffic and can be seen to drop requests or not (M5 in
+[guide-measurements](../evidence/guide-measurements.md#m5--scaling-out-and-back)):
+
+```bash
+cd ~/Anime-Recommender && RPS=5 DURATION=30m make loadtest-steady
+```
+
+Leave window 3 running for the same **30 minutes**:
 - replicas start falling after the 5-minute window, then one per minute: 8 to 2 in about 11 minutes;
 - nodes fall after 10 minutes unneeded, and not within 10 minutes of the last scale-up.
 

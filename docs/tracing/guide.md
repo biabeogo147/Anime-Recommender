@@ -156,6 +156,9 @@ jq -r '[.. | objects | select(has("key") and .key == "anime.llm.provider")][0].v
 
 Expected: `fake` and an id; `tempo: 200`; `provider on the fake trace: fake`.
 
+If the CV measurement M7 is being taken, run its first block now, while the api is still in fake mode
+([guide-measurements](../evidence/guide-measurements.md#m7--drill-traffic-kept-out-of-langfuse)).
+
 Then put the api back in gemini mode, as in [stage 5, section 5](../delivery/guide.md#5-back-to-gemini--ops), and
 prove the absence **after** a later real trace has arrived. A later gemini trace that is visible means ingestion has
 caught up past the fake one, so its absence is an answer and not a delay (design §6, row 11).

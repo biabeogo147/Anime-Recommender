@@ -11,7 +11,7 @@ export const options = {
       executor: 'constant-arrival-rate',
       rate: parseInt(__ENV.RPS || '20', 10),
       timeUnit: '1s',
-      duration: __ENV.DURATION || '1h', // the SLO drill needs about three clean hours first: DURATION=4h (SLO A5.2)
+      duration: __ENV.DURATION || '1h', // the SLO drill (short, as built) runs DURATION=2h30m; the full one of design §4.3 needs 4h (SLO A5.2)
       preAllocatedVUs: 40,
       maxVUs: 200,
     },

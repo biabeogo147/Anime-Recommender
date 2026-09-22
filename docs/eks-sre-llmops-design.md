@@ -671,7 +671,12 @@ would come from the uncalibrated branch. With about three hours of clean traffic
 minutes, and the 1h/5m pair fires first with a margin of a few minutes (all computed). So `steady.js` runs for
 **three hours** before the faulty version is promoted, and the record reads each window's burn rate at the moment
 the page fired, rather than inferring the pair from its name. Both ticket pairs cross within a couple of minutes
-of the fault either way, into the ticket channel, and are recorded as uncalibrated.
+of the fault either way, as `[TICKET]` messages, and are recorded as uncalibrated.
+
+**This build runs the short drill.** For time, the drill in `docs/slo/guide.md` runs on about one clean hour, not
+three. By the arithmetic above, the 6h/30m pair then probably pages first, at about 4 minutes. The 1h/5m pair's
+own crossing, about 8 minutes, is still read from its condition: one full clean hour is all its 1-hour window needs.
+The evidence records both and which paged; the CV claims only the time to the page.
 
 **Time-to-alert is a sum, recorded in parts:** the scrape that first carries failing requests; the recording
 rules that turn counters into burn-rate ratios, evaluated on their own interval; the alert rule's evaluation that

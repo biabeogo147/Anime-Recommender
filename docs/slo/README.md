@@ -102,6 +102,10 @@ pair, computed from far less than six hours. So the drill runs about three hours
 the one-hour pair win, and records **each window's burn rate at the moment the page fired** — the only way to say
 which pair it was. A page from any other pair on a young store is a different claim.
 
+For time, this build runs the short drill instead: one clean hour. The six-hour pair then probably pages first, and
+the drill still reads the one-hour pair's own crossing, which one full clean hour already calibrates
+([guide](guide.md), section 3).
+
 ## Decision 5 — a drill whose number is explicable
 
 *Concept: [§7 time-to-alert, and what it is made of](concepts.md#7-time-to-alert-and-what-it-is-made-of).*

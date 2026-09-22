@@ -11,8 +11,14 @@ Commands and checks only. The reasoning is in the comments of these files:
 The "SLO A…" references are answers in [answers.md](answers.md).
 
 Machines: **laptop** (git, browser), **ops** (inside tmux; start each block with
-`cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime`). The drill needs about **four and a half hours** of
-cluster time: three hours of clean traffic, then the fault and its recovery.
+`cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime`). The drill needs about **two and a half hours** of
+cluster time: one hour of clean traffic, then the fault and its recovery.
+
+**This build runs the short drill.** Design §4.3 describes three clean hours, which let the calibrated 1h/5m pair fire
+first. Here there is about one clean hour, so the 6h/30m pair will probably fire first, at about 4 minutes. The page then
+proves that a fast burn reaches a person, and how long that took from the fault. The calibrated 1h/5m pair is still
+measured: its 1-hour window holds a full clean hour, so its own crossing time (3.4) is the calibrated one, about
+8 minutes. The evidence records both, and which paged; the CV claims only the time to the Discord page.
 
 Criterion closed ([design §6](../eks-sre-llmops-design.md#6-verification-and-evidence-definition-of-done)):
 - **#10:** the fast-burn page reaches Discord during the fault drill. The evidence is the time to alert in its parts,
@@ -165,37 +171,38 @@ A failed count above zero means Discord refused the webhook: check the URL in 0.
 ## 3. Criterion #10 — the alert drill — ops
 
 The arithmetic is in design §4.3. The fault is 50% of requests, at **all** traffic: a canary's share would dilute it
-below the page threshold. The three clean hours before it let the calibrated 1h/5m pair fire first.
+below the page threshold.
 
-**3.1 — fake mode, then three hours of clean traffic.** Put the api in fake mode with **only the mode-switch block**
+**3.1 — fake mode, then an hour of clean traffic.** Put the api in fake mode with **only the mode-switch block**
 of [stage 5, section 2](../delivery/guide.md#2-fake-mode-for-the-drills--ops), if it is not already. Do not start that
-section's 45-minute k6. Then, in window 2, five hours of traffic, which covers the clean hours, the fault and the
-recovery:
+section's 45-minute k6. Then, in window 2, two and a half hours of traffic, which covers the clean hour, the fault, the
+recovery and the half hour until the page resolves:
 
 ```bash
-cd ~/Anime-Recommender && DURATION=5h make loadtest-steady
+cd ~/Anime-Recommender && DURATION=2h30m make loadtest-steady
 ```
 
-After **three hours**, in window 1, check that the store really holds clean traffic, and how old it is:
+After **one hour**, in window 1, check that the store really holds clean traffic, and how old it is:
 
 ```bash
 cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
 R='route="/recommend"'
 {
-make -s prom Q="sum(increase(anime_http_requests_total{$R}[3h]))"
-make -s prom Q="sum(increase(anime_http_requests_total{$R,status=~\"5..\"}[3h])) or vector(0)"
+make -s prom Q="sum(increase(anime_http_requests_total{$R}[1h]))"
+make -s prom Q="sum(increase(anime_http_requests_total{$R,status=~\"5..\"}[1h])) or vector(0)"
 make -s prom Q='(time() - min(prometheus_tsdb_lowest_timestamp_seconds)) / 3600'
 } | tee ~/anime-evidence/alert-clean.txt
 make -s rollout-status
 ```
 
 Expected:
-- about 216,000 requests (20 per second for 3 hours), and `0` errors or very close;
-- the store's age in hours, more than 3;
-- `phase=Healthy`, with `stable` equal to `latest`. A Rollout that is not Healthy here means the clean hours ran on a
+- about 72,000 requests (20 per second for an hour), and `0` errors or very close;
+- the store's age in hours;
+- `phase=Healthy`, with `stable` equal to `latest`. A Rollout that is not Healthy here means the clean hour ran on a
   canary split: stop, and see troubleshooting.
 
-Fewer requests, or errors, mean the hours are not clean: wait longer, or report it.
+Fewer requests, or errors, mean the hour is not clean: wait a little longer (the k6 run has about ten minutes of
+spare), or report it.
 
 **3.2 — the fault, promoted straight to all traffic.** The times and hashes are written to files, for 3.4 and 3.5.
 
@@ -220,7 +227,8 @@ make -s rollout-status
 Expected: `Plan: 0 to add, 1 to change`, `patched`, then `phase=Healthy` with `stable` equal to `latest`, and a hash
 different from `alert.clean-hash`. The file `alert.fault` holds the moment the faulty version had all traffic.
 
-**3.3 — wait for the page.** By the arithmetic, it comes in about 8 minutes, plus scrape, evaluation and grouping.
+**3.3 — wait for the page.** By the arithmetic, it comes in about 4 minutes on a one-hour store (the 6h/30m pair;
+about 8 if the 1h/5m pair wins), plus scrape, evaluation and grouping.
 The ticket arrives first — its pairs cross within a couple of minutes — and is not the page.
 
 ```bash
@@ -239,12 +247,14 @@ That is the last part of the sum.
 
 **3.4 — the parts, and which pair fired.** Sloth's alerts have no `for:`, so an alert fires on the first evaluation
 that sees its condition; there is no pending state. The page is the OR of two pairs, so each pair's own condition is
-followed separately, and the one that became true first is the one that fired.
+followed separately, and the one that became true first is the one that fired. Run this block **ten minutes after
+the page**, with the fault still on (before 3.5): the range reaches ten minutes past the page, so the 1h/5m pair's
+own crossing is inside it even when the 6h/30m pair paged first.
 
 ```bash
 cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
 E=~/anime-evidence; F0=$(cat $E/alert.fault); FS=$(cat $E/alert.firing-seen)
-S=$(date -u -d "$F0 - 2 minutes" +%FT%TZ); End=$(date -u -d "$FS + 3 minutes" +%FT%TZ)
+S=$(date -u -d "$F0 - 2 minutes" +%FT%TZ); End=$(date -u -d "$FS + 10 minutes" +%FT%TZ)
 # The first 15-second point where the expression has a value above zero, as a UTC time.
 first() {
   t=$(make -s prom-range START=$S END=$End STEP=15s Q="$1" | awk '/@\[/ && $1+0 > 0 {gsub(/[^0-9.]/,"",$2); print $2; exit}')
@@ -350,9 +360,9 @@ Report the files in `~/anime-evidence/` whose names start with `alert`, and the 
 | Evaluation failures above 0 | A query in the spec is wrong | Prometheus UI → Rules (through the VPN): the failing rule shows its error |
 | No Discord message in 2.3, failed count 0 | The alert matched no route | 2.2's tree; `severity=page` exactly |
 | Failed count above 0 | Discord refused the webhook | The URL in `anime/alerting`; test it with `curl` on ops |
-| Rollout not Healthy at the end of 3.1 | A release (the merge's new digests) paused on an inconclusive canary | Let it walk under the running k6, or promote it as in stage 5, 3.4; then restart the 3 clean hours |
+| Rollout not Healthy at the end of 3.1 | A release (the merge's new digests) paused on an inconclusive canary | Let it walk under the running k6, or promote it as in stage 5, 3.4; then restart the clean hour |
 | `NO PAGE WITHIN 20 MINUTES` | The fault is not reaching all traffic, or not injected | The error ratio in 3.4; the Rollout's template must show `FAULT_RATE=0.5` and `LLM_PROVIDER=fake` |
-| The page came from 6h/30m | Too little clean traffic before the fault | Report it as it is; a rerun needs a longer clean period |
+| The page came from 6h/30m | Expected in the short drill: one clean hour is too little for the 1h/5m pair to win | Record it as it is; only the three-hour drill of design §4.3 would change it |
 | 3.5 `STOPPED` | The revert canary was judged against the faulty stable and failed, or paused | Read `make -s rollout`; push it through with `promote-full`, since the fault is what is being removed |
 | The latency alert fires in the drill too | Faulty requests take as long as good ones, so latency should not burn | Report it with the latency burn rates; check T in the spec |
 
