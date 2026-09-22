@@ -165,11 +165,15 @@ The first api/ui pods may have started before the load balancer's target group e
 cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
 kubectl -n anime rollout restart deploy/anime-api deploy/anime-ui
 kubectl -n anime rollout status deploy/anime-api --timeout=5m && kubectl -n anime rollout status deploy/anime-ui --timeout=5m
-kubectl -n anime get pods -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,READY:.status.containerStatuses[0].ready,GATES:.spec.readinessGates[*].conditionType'
+# An old api pod drains for up to 45 s after the rollout reports done (preStop, deregistration delay): wait it out.
+for i in $(seq 18); do [ -z "$(kubectl -n anime get pods -o jsonpath='{.items[?(@.metadata.deletionTimestamp)].metadata.name}')" ] && break; sleep 5; done
+kubectl -n anime get pods -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,READY:.status.containerStatuses[0].ready,DELETING:.metadata.deletionTimestamp,GATES:.spec.readinessGates[*].conditionType'
 ```
 
-Expected: four pods, `READY true`, each with a `target-health.elbv2.k8s.aws/…` gate, the two api pods preferably on
-different nodes (a preference — after a Spot reclaim they can share one until the next restart).
+Expected: four pods, `READY true`, `DELETING <none>`, each with a `target-health.elbv2.k8s.aws/…` gate, the two api
+pods preferably on different nodes (a preference — after a Spot reclaim they can share one until the next restart). A
+fifth api pod with a `DELETING` time is the old one still draining: the api waits in `preStop` and the load balancer
+keeps deregistering it, up to the 45 s grace period (design §4.5).
 
 ---
 
