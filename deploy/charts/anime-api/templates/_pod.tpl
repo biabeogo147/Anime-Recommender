@@ -35,12 +35,15 @@ spec:
       image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
       ports:
         - { name: http, containerPort: 8000 }
-      # GOOGLE_API_KEY and HF_TOKEN, from the Secret External Secrets writes (deploy/platform/base).
+      # GOOGLE_API_KEY, OPENAI_API_KEY and HF_TOKEN: every key of anime/llm, from the Secret External Secrets writes
+      # (deploy/platform/base). The provider in use reads its own key and ignores the other.
       envFrom:
         - secretRef: { name: anime-llm }
       env:
         - { name: LLM_PROVIDER, value: {{ .Values.llm.provider | quote }} }
-        - { name: MODEL_NAME, value: {{ .Values.llm.model | quote }} }
+        # The provider's own model. fake has none (the app names it "fake"), so it gets an empty value and the app's
+        # default, which it does not use.
+        - { name: MODEL_NAME, value: {{ index .Values.llm.models .Values.llm.provider | default "" | quote }} }
         - { name: FAULT_RATE, value: {{ .Values.llm.faultRate | quote }} }
         {{- if has "tracing" .Values.stages }}
         # Tracing (stage 8) is on only when the endpoint is set (src/anime/telemetry.py). The provider goes onto every

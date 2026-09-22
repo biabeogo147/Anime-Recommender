@@ -10,12 +10,17 @@ def _env(name: str, default: str) -> str:
     return value if value not in (None, "") else default
 
 
+# The model each real provider runs when MODEL_NAME is not set; the cluster sets it from the chart's own map.
+DEFAULT_MODELS = {"gemini": "gemini-3.5-flash-lite", "openai": "gpt-4o-mini"}
+
+
 @dataclass(frozen=True)
 class Settings:
     llm_provider: str
     model_name: str
     embedding_model_name: str
     google_api_key: str | None
+    openai_api_key: str | None
     hf_token: str | None
     retriever_k: int
     llm_timeout_s: float
@@ -34,11 +39,13 @@ class Settings:
 
 
 def get_settings() -> Settings:
+    provider = _env("LLM_PROVIDER", "gemini")
     return Settings(
-        llm_provider=_env("LLM_PROVIDER", "gemini"),
-        model_name=_env("MODEL_NAME", "gemini-3.5-flash-lite"),
+        llm_provider=provider,
+        model_name=_env("MODEL_NAME", DEFAULT_MODELS.get(provider, DEFAULT_MODELS["gemini"])),
         embedding_model_name=_env("EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2"),
         google_api_key=os.getenv("GOOGLE_API_KEY"),
+        openai_api_key=os.getenv("OPENAI_API_KEY"),
         hf_token=os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN"),
         retriever_k=int(_env("RETRIEVER_K", "4")),
         llm_timeout_s=float(_env("LLM_TIMEOUT_S", "30")),

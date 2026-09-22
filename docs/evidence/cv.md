@@ -5,8 +5,8 @@ Every number in the CV's Anime entry, with the file it came from and the mode it
 
 | Placeholder | Measurement | Value | Mode | Source |
 |---|---|---|---|---|
-| `[T-SLO]` | M1 | *pending* | gemini | `t-value.txt`, from `t-buckets.txt` (load 2.2) |
-| `[N-BASELINE]` | M1 | *pending* | gemini | `t-count.txt` |
+| `[T-SLO]` | M1 | *pending* | real: openai `gpt-4o-mini` | `t-value.txt`, from `t-buckets.txt` (load 2.2) |
+| `[N-BASELINE]` | M1 | *pending* | real: openai `gpt-4o-mini` | `t-count.txt` |
 | `[KNEE-RPS]` | M2 | *pending* | fake, 2 replicas | `ramp-rate.txt`, `ramp-p95.txt` (load 3.4) |
 | `[INFLIGHT-KNEE]` | M2 | *pending* | fake, 2 replicas | `ramp-inflight.txt` |
 | `[T-ABORT]` | M3 | *pending* | fake, 20 RPS | `rollback-time.txt` (delivery 4.2) |
@@ -15,7 +15,7 @@ Every number in the CV's Anime entry, with the file it came from and the mode it
 | `[PODS-MAX]` | M5 | *pending* | fake, ramp | `scaling-desired.txt`, `scaling-ready.txt` |
 | `[NODES-MAX]` | M5 | *pending* | fake, ramp | `scaling-nodes.txt` |
 | `[ERR-SCALEIN]` | M5 | *pending* | fake, RPS=5, 30-min return | `scaling-errors-scalein.txt` (k6 `failed`) |
-| `[COST-PER-1K]` | M6 | *pending* | gemini | `cost-per-1000.txt`, `cost-pricing-date.txt` (tracing 3.2) |
+| `[COST-PER-1K]` | M6 | *pending* | real: openai `gpt-4o-mini` | `cost-per-1000.txt`, `cost-pricing-date.txt` (tracing 3.2) |
 | `[N-DRILL]` | M7 | *pending* | fake, 20 RPS, 5 min | `m7-counts.txt` |
 | `[LF-LEAK]` | M7 | *pending* | fake | `m7-counts.txt` (`langfuse-count`) |
 | `[T-REBUILD]` | M8 | *pending* | — | `m8.txt` |

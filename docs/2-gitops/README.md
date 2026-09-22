@@ -19,7 +19,7 @@ installed and one root Application pointing at a directory in Git. From the work
 port-forward to Argo CD's UI. From anywhere else, nothing works:
 
 - **no traffic can arrive** — an `Ingress` needs a controller to turn it into a load balancer, and there is none;
-- **no secret can be read** — the Gemini key and the webhook are in Secrets Manager, and nothing in the cluster
+- **no secret can be read** — the model keys and the webhook are in Secrets Manager, and nothing in the cluster
   reads from there;
 - **nothing has a name** — there are no load balancers yet, so nothing for a record to point at;
 - **nothing can be looked at from a browser** — no UI answers on a hostname.

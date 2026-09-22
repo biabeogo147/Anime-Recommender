@@ -1,9 +1,12 @@
 """Model providers. `fake` exists for load tests and failure drills: no network, controllable latency and errors."""
 
 import hashlib
+import json
 import logging
 import random
 import time
+import urllib.error
+import urllib.request
 from collections.abc import Callable
 
 import numpy as np
@@ -105,6 +108,67 @@ class FakeLLM:
         )
 
 
+class OpenAIChat:
+    """OpenAI's Chat Completions API (gpt-4o-mini by default in the cluster), called with the standard library.
+
+    No SDK and no LangChain integration: either would be a new dependency and a regenerated uv.lock, for one POST.
+    It answers like FakeLLM and the Gemini client do — an AIMessage whose usage_metadata the recommender turns into
+    token attributes and the cost metric reads — so nothing downstream knows which provider answered.
+
+    Added on 2026-09-22, when gemini-3.5-flash-lite took about 50 s per call from the ops workstation and every call
+    through the api hit its 30 s timeout; gpt-4o-mini answered in 1–3 s from the same place (design §4.1).
+    """
+
+    URL = "https://api.openai.com/v1/chat/completions"
+
+    def __init__(self, model: str, api_key: str, timeout_s: float, url: str = URL,
+                 opener: Callable = urllib.request.urlopen):
+        self.model, self.api_key, self.timeout_s, self.url, self.opener = model, api_key, timeout_s, url, opener
+
+    def invoke(self, prompt_value) -> AIMessage:
+        text = prompt_value.to_string() if hasattr(prompt_value, "to_string") else str(prompt_value)
+        request = urllib.request.Request(
+            self.url,
+            data=json.dumps({"model": self.model, "messages": [{"role": "user", "content": text}]}).encode(),
+            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+        )
+        # No retry. T is the latency of one call, and a retry hidden in here would fold a failure's wait into a success;
+        # a failed call is an UpstreamError, a 503 the client can retry, and a count in the LLM error metric.
+        try:
+            with self.opener(request, timeout=self.timeout_s) as response:
+                body = json.load(response)
+            content = body["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as exc:
+            # The message ends up in the log line and on the span as an exception event. For 401/403 OpenAI's text
+            # echoes a masked form of the key ("sk-proj-****abcd"), so it is replaced; for everything else (a rate
+            # limit, an overload) OpenAI's own text says what was wrong. The request, which holds the key, is never
+            # put into the message.
+            detail = "authentication failed"
+            if exc.code not in (401, 403):
+                try:
+                    detail = json.load(exc).get("error", {}).get("message", "")
+                except (ValueError, AttributeError, OSError):
+                    detail = ""
+            raise UpstreamError(f"OpenAI HTTP {exc.code}: {detail}".strip()) from None
+        except OSError as exc:  # URLError, a connect or read timeout (TimeoutError), a reset connection
+            raise UpstreamError(f"OpenAI unreachable: {type(exc).__name__}") from None
+        except (ValueError, KeyError, IndexError, TypeError) as exc:  # a 200 whose body is not the expected shape
+            raise UpstreamError(f"OpenAI bad response: {type(exc).__name__}") from None
+        if content is None:  # a refusal carries no text
+            raise UpstreamError("OpenAI returned no content")
+
+        usage = body.get("usage") or {}
+        # Set only when the API reported usage, the rule the recommender's token attributes follow (design §6, row 11).
+        usage_metadata = None
+        if "prompt_tokens" in usage and "completion_tokens" in usage:
+            usage_metadata = {
+                "input_tokens": usage["prompt_tokens"],
+                "output_tokens": usage["completion_tokens"],
+                "total_tokens": usage.get("total_tokens", usage["prompt_tokens"] + usage["completion_tokens"]),
+            }
+        return AIMessage(content=content, usage_metadata=usage_metadata)
+
+
 def get_embeddings(settings: Settings, provider: str | None = None) -> Embeddings:
     provider = provider or ("fake" if settings.fake else "hf")
     if provider == "fake":
@@ -123,6 +187,10 @@ def get_embeddings(settings: Settings, provider: str | None = None) -> Embedding
 def get_llm(settings: Settings):
     if settings.fake:
         return FakeLLM(settings.fake_latency_ms, settings.fault_rate)
+    if settings.llm_provider == "openai":
+        if not settings.openai_api_key:
+            raise RuntimeError("OPENAI_API_KEY is not set")
+        return OpenAIChat(settings.model_name, settings.openai_api_key, settings.llm_timeout_s)
     if settings.llm_provider != "gemini":
         raise ValueError(f"Unknown LLM provider: {settings.llm_provider}")
     if not settings.google_api_key:

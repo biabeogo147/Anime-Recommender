@@ -103,7 +103,7 @@ stage) and the `MLops-Common` submodule (dropped once CI no longer uses the on-p
   Medical's `shared` stack already owns; Anime reads that zone with a `data` source and only ever creates
   records inside it. See [§11](#11-resolved-decisions) for the coupling this accepts.
 - Admin on this GitHub repository, to create the OIDC trust and the Actions variables.
-- A Gemini API key, and a Hugging Face token with the **Inference Providers** permission.
+- An OpenAI API key (a Gemini API key to run Gemini instead), and a Hugging Face token with the **Inference Providers** permission.
 - A Langfuse Cloud project (free tier) with its public and secret keys.
 - A Discord incoming webhook for alerts.
 
@@ -152,7 +152,7 @@ flowchart TB
         end
     end
 
-    EXT["Gemini · Hugging Face"]
+    EXT["OpenAI or Gemini · Hugging Face"]
     LF["Langfuse Cloud"]
     DIS["Discord"]
 
@@ -274,7 +274,7 @@ it is issued once and AWS renews it, and nothing in a rebuild touches it.
 - **GitHub OIDC provider and role:** trust limited to
   `repo:biabeogo147/Anime-Recommender:ref:refs/heads/main`, permissions limited to pushing to those two
   repositories.
-- **Secrets Manager:** `anime/llm` (`GOOGLE_API_KEY`, `HF_TOKEN`), `anime/langfuse` (public and secret key),
+- **Secrets Manager:** `anime/llm` (`OPENAI_API_KEY`, `GOOGLE_API_KEY`, `HF_TOKEN`), `anime/langfuse` (public and secret key),
   `anime/alerting` (the Discord webhook), and `anime/wireguard` (the gateway's keys, readable only by the
   gateway's own role — no node and no pod can read it).
 - **Budgets:** alarms at 50 and 100 USD, with the same default tags as Medical.
@@ -333,7 +333,7 @@ flowchart LR
     RET -->|"embed query"| HF["HF Inference API"]
     HF -->|"failure: unhandled today<br/>500, not counted as an LLM error"| E500["500"]
     RET --> GEN["chat span<br/>gen_ai.request.model"]
-    GEN --> LLM["Gemini"]
+    GEN --> LLM["OpenAI or Gemini"]
     GEN -->|"upstream error"| E503["503 + Retry-After"]
     GEN --> COST["tokens → pricing.yaml<br/>→ anime_llm_cost_usd_total"]
     COST --> OUT["200<br/>{recommendations, model<br/>retrieved_titles, trace_id}"]
@@ -419,7 +419,8 @@ and T can be 2.5 or 3. That is a change to `src/anime/metrics.py`, made in the b
 until it lands, the gate's real threshold is the bucket geometry, not the parameter.
 
 **Configuration** is environment variables only, read once into a frozen `Settings` in `src/anime/config.py`:
-`LLM_PROVIDER` (`gemini` default), `MODEL_NAME` (`gemini-3.5-flash-lite`), `EMBEDDING_MODEL_NAME`,
+`LLM_PROVIDER` (`gemini` default in the app, `openai` in the cluster), `MODEL_NAME` (by provider:
+`gemini-3.5-flash-lite` or `gpt-4o-mini`), `GOOGLE_API_KEY` or `OPENAI_API_KEY`, `EMBEDDING_MODEL_NAME`,
 `RETRIEVER_K` (4), `LLM_TIMEOUT_S` (30), `FAKE_LATENCY_MS` (800), `FAULT_RATE` (0), `EXPECTED_DOCS` (269),
 and the four paths. The Helm values set them per environment. Three reads live outside this module on
 purpose and are the complete list: `src/anime/telemetry.py` tests `OTEL_EXPORTER_OTLP_ENDPOINT` to decide
@@ -444,8 +445,18 @@ drills. It is set per rollout in values and is never the default.
 | Errors | Raises with probability `FAULT_RATE` — a failure that can be asked for, at a chosen rate |
 | Tokens | Synthetic counts, so the token and cost pipelines still run and can be tested |
 
-The rule that keeps this honest: **a number produced in `fake` mode and a number produced in `gemini` mode are
-different claims**, and every record states which mode it came from.
+**Two real providers.** `gemini` (`gemini-3.5-flash-lite`, through LangChain's Google client) and `openai`
+(`gpt-4o-mini`, one HTTPS call with the standard library, `OpenAIChat` in `src/anime/providers.py`, so no new
+dependency). Both return the same message shape with token usage, so tracing and cost do not care which one answered.
+`openai` was added and made the cluster's default on 2026-09-22. That day `gemini-3.5-flash-lite` took about 50 s per
+call, measured with curl from the ops workstation. Every call through the api hit the 30 s timeout (`504
+DEADLINE_EXCEEDED` or `499 CANCELLED`), and 4 of 6 probe requests in load step 1.2 failed. `gpt-4o-mini` answered in
+1.2 to 3.1 s from the same machine. The app phase had measured Gemini at 2.7 to 3.0 s, so this was the model's state
+that day, not a code fault. Gemini stays selectable: `api_llm_provider = "gemini"` in `terraform.tfvars`. The guides
+call either provider **real mode**.
+
+The rule that keeps this honest: **a number produced in `fake` mode and a number produced in real mode are
+different claims**, and every record states which mode it came from, and in real mode which provider and model.
 
 **Container hardening.** Multi-stage builds, non-root (UID 10001), read-only root filesystem, an `emptyDir`
 for `/tmp`, dropped capabilities.
@@ -585,7 +596,7 @@ flowchart LR
 
 - **Availability 99.5%.** SLI = `1 − rate(anime_http_requests_total{route="/recommend",status=~"5.."}[5m])
   / rate(anime_http_requests_total{route="/recommend"}[5m])`, with Sloth substituting its own window per rule.
-- **Latency: 95% of `/recommend` under T.** **T is not chosen; it is measured**, during the `gemini`-mode
+- **Latency: 95% of `/recommend` under T.** **T is not chosen; it is measured**, during the real-mode
   baseline ([§4.5](#45-autoscaling-and-load-testing)) — and it is read from **the same server-side histogram
   the SLI counts**, not from k6. k6's request duration covers sending, waiting and receiving on an open
   connection — DNS, connecting and the TLS handshake are timed separately, and with keep-alive happen once
@@ -647,7 +658,7 @@ errors become 5% overall — a burn rate of 10×, under the 1h/5m pair's 13.44×
 the 6h/30m pair's 5.6× only after more than an hour of it (computed) — longer than a drill, so the silence in
 between would be read as broken alerting.
 `FAULT_RATE` alone does nothing: `providers.get_llm` passes it to `FakeLLM`, which is only constructed when
-`LLM_PROVIDER == "fake"`. Set the fault rate on a `gemini` rollout and the drill injects **zero** faults, no
+`LLM_PROVIDER == "fake"`. Set the fault rate on a real-provider rollout and the drill injects **zero** faults, no
 alert ever fires, and the absence looks like a healthy service.
 
 At 10% errors the burn rate against a 99.5% target is 20×, and the 1-hour window needs roughly 40 minutes
@@ -737,7 +748,7 @@ canary's hash **and** the stable one:
 
 - **Success rate** ≥ 0.99.
 - **Latency, relative:** canary p95 ≤ 1.2 × the **stable** ReplicaSet's p95 over the same window. Not `≤ T` —
-  see [§4.3](#43-slos-and-alerting-deployslo): T is a gemini-mode number and the drills are fake-mode, so an
+  see [§4.3](#43-slos-and-alerting-deployslo): T is a real-mode number and the drills are fake-mode, so an
   absolute gate could not fail. A ratio between two ReplicaSets measured in the same window removes the mode
   from the question.
 
@@ -770,7 +781,7 @@ already proved that path.
 
 **The rollback drill.** Drills run with the whole api already in fake mode, so stable and canary are compared in
 the same mode. The change under test adds `FAULT_RATE=0.2` to a version whose values also pin
-`LLM_PROVIDER=fake` — the fault rate is read only by the fake provider, so on a `gemini` version it injects
+`LLM_PROVIDER=fake` — the fault rate is read only by the fake provider, so on a real-provider version it injects
 nothing and the bad version is **promoted**, which is the false pass named in
 [§6](#6-verification-and-evidence-definition-of-done) row 9.
 The analysis fails at the 10% step and the Rollout aborts, returning 100% of traffic to stable.
@@ -797,7 +808,7 @@ flowchart LR
 ```
 
 **Why in-flight requests and not CPU.** Each request spends almost all its time waiting on two remote APIs —
-Hugging Face for the embedding, Gemini for the generation. CPU therefore barely moves under load, and a CPU
+Hugging Face for the embedding, the model provider (OpenAI or Gemini) for the generation. CPU therefore barely moves under load, and a CPU
 HPA would sit at 5% while requests queued. The gauge of requests currently being served is the only signal
 that actually tracks demand here.
 
@@ -864,7 +875,7 @@ starts before the knee rather than at it. A threshold chosen before that number 
 
 | Script | Mode | What it produces |
 |---|---|---|
-| `baseline.js` | gemini, at whatever rate the provider's free tier allows, **until at least 200 requests have completed** | Real p50 and p95 against `https://api.anime.recruitai.io.vn`, run from the ops workstation. **This is the run T is read from** — server-side, from Prometheus, over exactly this run's window. Two hundred because a p95 rests on its slowest 5%: over 60 requests that is three samples, over 200 it is ten. The duration follows from the count, not the other way round |
+| `baseline.js` | real mode, at whatever rate the provider's free tier allows, **until at least 200 requests have completed** | Real p50 and p95 against `https://api.anime.recruitai.io.vn`, run from the ops workstation. **This is the run T is read from** — server-side, from Prometheus, over exactly this run's window. Two hundred because a p95 rests on its slowest 5%: over 60 requests that is three samples, over 200 it is ten. The duration follows from the count, not the other way round |
 | `ramp.js` | fake, **ramping arrival rate** over 10 min | The highest *offered* rate the service sustains before p95 breaks away from this run's own low-load p95, with no dropped iterations; **the in-flight count per pod at that point**, which sets stage 7's trigger; per-pod CPU and memory, which set its requests; error rate; pods and nodes over time. An *open* model, on purpose: a ramp of virtual users waits for each response before sending the next, so a slowing service quietly receives fewer requests and saturation hides as a lower rate — coordinated omission. **Not compared with T** — see [§4.3](#43-slos-and-alerting-deployslo) |
 | `steady.js` | fake, 20 RPS constant arrival | Traffic for the canary analysis and the alert drill |
 
@@ -1119,7 +1130,7 @@ address, which clears within the record's TTL.
 
 | Failure | Behaviour |
 |---|---|
-| Gemini 429 or 5xx | 503 with `Retry-After`, counted in `anime_llm_request_duration_seconds{outcome="error"}` and in the 5xx SLI. The retry is the client's own (`max_retries=1`); whether that means one retry or one attempt, and whether it jitters, is the library's behaviour and **no test in this repository covers it**. The jittered backoff we do own and test is `BatchedEmbeddings._with_retry`, on the embedding path |
+| Model provider 429 or 5xx (Gemini or OpenAI) | 503 with `Retry-After`, counted in `anime_llm_request_duration_seconds{outcome="error"}` and in the 5xx SLI. On Gemini the retry is the client's own (`max_retries=1`); whether that means one retry or one attempt, and whether it jitters, is the library's behaviour and **no test in this repository covers it**. On OpenAI there is none: one call, and its failure is the 503 (tested in `tests/test_providers.py`). The jittered backoff we do own and test is `BatchedEmbeddings._with_retry`, on the embedding path |
 | Hugging Face embedding failure at query time | **Today: 500, with no `Retry-After` and no LLM error metric** — the `rag.retrieve` leg has no handler and `BatchedEmbeddings` re-raises the original exception ([§4.1](#41-the-application)). It reaches the 5xx SLI only through the middleware's status fallback. The fix is to map it to `UpstreamError` like the model path. Readiness reflects only local state either way, so the probe does not flap on an upstream outage |
 | Index missing or wrong in the image | `/readyz` returns 503, the new pods never become Ready, and the Rollout does not progress. The CI assertion should prevent it reaching here |
 | Spot interruption | Managed node group rebalance handles the termination notice. `minAvailable: 1` PDB on the api; minimum 2 replicas spread across nodes |
@@ -1130,7 +1141,7 @@ address, which clears within the record's TTL.
 | ACM validation record missing from the zone | The certificate stays `PENDING_VALIDATION`, the ALB gets no HTTPS listener, and the Ingress looks healthy while port 443 answers nothing. The zone belongs to Medical's `shared` stack; Anime only writes records into it, so a zone that was deleted or recreated breaks this silently |
 | The autoscaler's query returns nothing | Treated as an error: replicas hold, then fall back to the current count if higher. Never read as zero load |
 | No Spot capacity when a node is needed | New pods stay `Pending` and the Cluster Autoscaler keeps trying; the service runs on what it has. The scaling run records how long it waited |
-| Hugging Face unavailable while scaling out, in gemini mode | A new pod's index load embeds a probe query, so it cannot become ready; scale-out stalls until the provider returns. Existing pods keep serving |
+| Hugging Face unavailable while scaling out, in real mode | A new pod's index load embeds a probe query, so it cannot become ready; scale-out stalls until the provider returns. Existing pods keep serving |
 | AWS Load Balancer Controller unhealthy | No ALB can be created and no weight can be changed: the service is unreachable *and* releases stall. First thing to check when a rollout hangs with no AnalysisRun |
 | OTel Collector or Langfuse unavailable | The SDK's batch exporter drops spans from a bounded queue; requests are unaffected. The collector's `memory_limiter` prevents it from being the thing that runs the node out of memory |
 | Prometheus restarted or its volume lost | Every window starts empty and returns nothing — *no data*, not *no errors* — until samples arrive. After that the longer windows are worse than empty: a 1-day or 3-day `rate()` over a store a few hours old is computed from the hours that exist, so every rule whose long window exceeds the store's age — the 6h/30m page pair as well as both ticket pairs — quietly behaves like a shorter window, keeping its threshold, and can fire on a burst it was designed to ignore. On a stack torn down nightly only the 1h/5m pair is calibrated for most of a session, and the drill is arranged — three hours of clean traffic first — so that it is the branch that fires first, which the record confirms from each window's burn rate. (28 days is the budget period, not any rule's range.) See [§6](#6-verification-and-evidence-definition-of-done) |
@@ -1156,13 +1167,13 @@ check passes wrongly.
 | 3 | CI end to end | Push to main → signed image in ECR → Argo CD synced | `cosign verify` output, pipeline duration | `Synced` means synced to the revision Argo CD *has*, which a repo-server that cannot reach GitHub keeps indefinitely. Compare `status.sync.revision` against `git rev-parse origin/main`. Second: verifying by tag instead of by the digest pinned in `deploy/charts/anime-*/values.yaml` verifies a different image than the one running. Third: an identity pattern that accepts any workflow or any ref of the repository passes for a signature made from a feature branch |
 | 4 | Image size | `docker image ls` before and after the multi-stage build | MB before and after | A "before" taken from a different base image or a warm cache, or one image compared against two. State both images and the method |
 | 5 | Index negative test | CI fails when the CSV is truncated | the CI run, with the error text | The build failing for an unrelated reason — a missing token, a network error — and being counted as the assertion firing. Require the literal `IndexValidationError` line |
-| 6 | Latency baseline | k6 `baseline.js` in gemini mode, at least 200 requests | server-side p95 → T; k6's client-side p95 beside it; the sample count | A threshold measured in `fake` mode and enforced against `gemini` traffic, or the reverse — the mode belongs on the same line as the number. **T read from k6 and enforced on the server-side histogram**: loose by the network and TLS time, on every request, for ever. And a p95 from a few dozen requests, which a single slow call can move by a bucket |
+| 6 | Latency baseline | k6 `baseline.js` in real mode (provider and model named), at least 200 requests | server-side p95 → T; k6's client-side p95 beside it; the sample count | A threshold measured in `fake` mode and enforced against real-mode traffic, or the reverse — the mode belongs on the same line as the number. **T read from k6 and enforced on the server-side histogram**: loose by the network and TLS time, on every request, for ever. And a p95 from a few dozen requests, which a single slow call can move by a bucket |
 | 7 | Scale | k6 `ramp.js` in fake mode, ramping arrival rate, at the **minimum** replica count | highest sustained offered rate before p95 breaks away from the same run's low-load p95, with no dropped iterations; pods and nodes over time; error rate | Three. **A closed-model ramp** — virtual users waiting on responses — shows a throughput ceiling but understates latency, because the requests it never sent are never timed; the arrival-rate model and its dropped-iterations count expose the queue. **A plateau that is the load generator's**, read as the service's limit — record the workstation's CPU beside the dropped iterations, since the service's own slowness also exhausts the generator's pool. And comparing this run's p95 against **T**: a fake-mode p95 is a fraction of a gemini-mode T, so the comparison fails only long after saturation began |
 | 8 | Canary promotion | A good version walks 10 → 50 → 100 | the Rollout timeline and each AnalysisRun's measured values | A query that matches **no series** — a metric typo, or a missing `rollouts-pod-template-hash` filter — returns an empty vector. By default that makes each measurement **error**, and repeated errors abort every release — loud, but blamed on the release. The silent version comes from "fixing" the errors: a query ending in `or vector(0)`, or a condition that tolerates an empty result, and from then on an empty query passes. Worse, a filter that selects the **stable** hash returns a healthy non-empty number and promotes a broken canary. Require the recorded measurement to be non-empty **and** to carry the canary ReplicaSet's own `rollouts-pod-template-hash`. Two more, both about plumbing rather than logic: **the hash never reaches the series** — no `podTargetLabels` — so every filtered query is empty from the first probe; and **each pod scraped once per Service**, which doubles the request count and lets the minimum-traffic guard pass on half the traffic it asks for |
 | 9 | Canary rollback | A version with `LLM_PROVIDER=fake` **and** `FAULT_RATE=0.2` aborts itself | time to abort, the failing measurement, requests affected | **`FAULT_RATE` is read only by the fake provider.** Set it on a `gemini` rollout and it injects nothing: the canary stays healthy, the analysis passes, the release is promoted — and the drill gets filed as proof that rollback works. Assert a non-zero canary error rate *before* trusting the abort. Second: a rollout that failed for an unrelated reason — an image that never pulls stalls until the progress deadline and turns Degraded, and aborts only if configured to — credited to the analysis; the record must carry the AnalysisRun's own failure |
 | 10 | Alerting | The fast-burn page reaches Discord during the fault drill | time-to-alert in its parts, the `alertname` and objective, and which pair fired | Four. **The rule never loaded** — a PrometheusRule the monitoring stack does not select is accepted and ignored, and the drill ends with no page and no error. **The fault diluted by a canary's share**, so the burn stays under the threshold and silence is read as broken alerting. **The rule fired and the webhook refused**, so nothing arrives — there is no dead-man's switch to catch it. And **the wrong pair**: a store younger than a rule's long window makes that rule evaluate less data than it names, so a page from the 6h/30m pair on a young store is not the calibrated 1h/5m pair working. Record the `alertname`, the severity label, the objective, and each window's burn rate at the moment it fired — the name alone does not say which pair |
-| 11 | Tracing | A `/recommend` trace shows retrieve and generate spans with **non-zero** tokens, in `gemini` mode | the span attributes as text, from both sinks | `recommender.py` wrote `usage.get("input_tokens", 0)`, so when usage metadata was missing the attribute was **present and zero** (stage 8 sets it only when reported; the metrics counters still add zero) — "the trace carries `gen_ai.*`" passes while token capture is entirely broken. Fake mode is worse: `FakeLLM` fabricates plausible counts, so a screenshot proves nothing. Assert non-zero values, name the mode, and check Tempo **and** Langfuse. And the split itself: a fake-mode request from the same session, looked up by the trace id in its response, is in Tempo and absent from Langfuse — absence alone is also what a broken Langfuse export looks like, which is why the real-mode trace must be present in the same session |
-| 12 | Cost metric | The dashboard shows cost per 1,000 requests **in `gemini` mode** | the value, the mode, and the `pricing.yaml` date | **`config/pricing.yaml` carries a `fake:` entry priced identically to `gemini-3.5-flash-lite`**, and fake-mode metrics are labelled `model="fake"`. A fake-mode run therefore produces a realistic dollar figure out of fabricated tokens, numerically indistinguishable from a real one — it defeats the rule that the two modes are different claims, silently. Always read the `model` label. The other path is a `MODEL_NAME` absent from the file, where every price resolves to zero: a confident `$0.00` |
+| 11 | Tracing | A `/recommend` trace shows retrieve and generate spans with **non-zero** tokens, in real mode | the span attributes as text, from both sinks | `recommender.py` wrote `usage.get("input_tokens", 0)`, so when usage metadata was missing the attribute was **present and zero** (stage 8 sets it only when reported; the metrics counters still add zero) — "the trace carries `gen_ai.*`" passes while token capture is entirely broken. Fake mode is worse: `FakeLLM` fabricates plausible counts, so a screenshot proves nothing. Assert non-zero values, name the mode, and check Tempo **and** Langfuse. And the split itself: a fake-mode request from the same session, looked up by the trace id in its response, is in Tempo and absent from Langfuse — absence alone is also what a broken Langfuse export looks like, which is why the real-mode trace must be present in the same session |
+| 12 | Cost metric | The dashboard shows cost per 1,000 requests **in real mode** | the value, the mode, and the `pricing.yaml` date | **`config/pricing.yaml` carries a `fake:` entry priced identically to `gemini-3.5-flash-lite`**, and fake-mode metrics are labelled `model="fake"`. A fake-mode run therefore produces a realistic dollar figure out of fabricated tokens, numerically indistinguishable from a real one — it defeats the rule that the two modes are different claims, silently. Always read the `model` label. The other path is a `MODEL_NAME` absent from the file, where every price resolves to zero: a confident `$0.00` |
 | 13 (P1) | Eval gate | A pull request that degrades retrieval is blocked | the CI run, `hit@4` before and after | A baseline regenerated inside the same pull request it is meant to judge. The baseline's commit must predate the pull request's base |
 | 14 | Autoscaling | k6 `ramp.js` against a live `ScaledObject` and the Cluster Autoscaler: replicas move from 2 toward 8, nodes from 2 toward 4, and both come back | replicas and nodes over time, the trigger's value, the pod and node scale-out delays, and the scale-down against the HPA's window | §1 calls autoscaling a P0, so it needs a row of its own — #7 is measured at a fixed replica count, stages before KEDA exists. Four false passes. Replicas that grew because a deploy rolled pods, not because the trigger fired — record the trigger's value. A run seen scaling out but never back, hiding a stuck `ScaledObject`. **Pods that scaled while nodes did not**, the extra ones `Pending` — replica count alone looks like success. And **a scale-down caused by an empty query** rather than by falling load, which is what a default Prometheus trigger does when the series vanish |
 | 15 | Public TLS | For **both** `anime` and `api.anime`: port 80 returns 301, and HTTPS returns **200** with a chain that verifies with no `-k`. The served leaf's serial matches the one ACM certificate, read back from `describe-listener-certificates` | the two redirects, the two 200s, the certificate ARN and the matching serial | Testing with `-k`, or against the ALB's own `*.elb.amazonaws.com` name where a mismatch is expected and tells you nothing. A **verified chain over a 404 or 503** — TLS completes whether or not a listener rule matches or a target group is healthy, so the status code must be asserted beside the chain. A **different ACM certificate**: with no `certificate-arn` annotation the controller discovers one by host match, and the zone is shared with Medical, so "it verified" can be true of a certificate this design never mentions. And one name tested while two are claimed |
@@ -1245,11 +1256,11 @@ needs.
 
 | Risk | Mitigation |
 |---|---|
-| Gemini and Hugging Face free-tier limits distort measurements | Real-provider runs are limited to the low-rate baseline; scale and canary numbers come from fake mode, and **every claim states its mode** |
+| Model-provider and Hugging Face rate limits distort measurements | Real-provider runs are limited to the low-rate baseline; scale and canary numbers come from fake mode, and **every claim states its mode** |
 | Spot capacity unavailable | Only one eligible type, so one Spot pool per zone across two zones. Fall back to `capacity_type = "ON_DEMAND"` on the same type, also eligible, at the On-Demand price for as long as the shortage lasts |
 | **The account's credit runs out** | The Free plan holds 91.64 USD of credit (2026-09-22), shared with Medical, and the account is closed when it is spent, or when the plan expires on 2027-02-13, unless it is upgraded to a paid plan. A running Anime cluster is estimated — not measured — at roughly 0.4–0.6 USD an hour. Every session ends with `make down`, and Medical's idle cluster is stopped. The shared stack's budget warns on Anime's own spend only, counted before credits (`include_credit = false`), so it fires while the credit is still paying; the credit itself is read at session start (`aws freetier get-account-plan-state`, terraform guide 0.3) |
 | ALB traffic routing takes longer to wire than planned | Fallback: a replica-ratio canary with no traffic router, using the same AnalysisTemplate. Weaker, and the evidence would say so |
-| **One NAT gateway, not one per zone** | A deliberate cost choice, and a single point of failure for everything the pods reach outside the VPC: Gemini, Hugging Face, Langfuse and the Discord webhook. A zone failure that takes the NAT takes all four at once, and the SLI records it as the service's own errors. Accepted; the alternative is a second NAT and its hourly cost |
+| **One NAT gateway, not one per zone** | A deliberate cost choice, and a single point of failure for everything the pods reach outside the VPC: the model provider (OpenAI or Gemini), Hugging Face, Langfuse and the Discord webhook. A zone failure that takes the NAT takes all four at once, and the SLI records it as the service's own errors. Accepted; the alternative is a second NAT and its hourly cost |
 | **The Route 53 zone belongs to Medical** | Anime reads it with a `data` source and writes only its own records. Destroying or recreating Medical's `shared` stack invalidates ACM's validation record and Anime's names at once. Accepted because a second registered domain costs money every year; recorded because the blast radius crosses a project boundary |
 | **ACM renewal on a certificate that is often unattached** | Managed renewal starts about 60 days before expiry and needs the validation CNAME in place; whether it also needs the certificate to be *in use* at that moment has not been checked against AWS's current documentation. On a nightly-teardown stack the certificate has no load balancer for part of every day. Verify before relying on "renewed, not re-issued"; the fallback is harmless — a re-issue — but the claim would be wrong |
 | **The WireGuard gateway is a single point of control** | Losing it costs every admin UI and `kubectl` at the same time, while the service itself keeps serving. That asymmetry is deliberate — nothing about operator access sits in the request path — but it means a rebuild's first check is the tunnel, not the app |

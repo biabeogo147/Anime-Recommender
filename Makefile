@@ -251,7 +251,7 @@ rollout: rollout-status
 	  (.status.metricResults[]? | "  \(.name) \(.phase): " + ([.measurements[]? | "\(.phase)=\(.value // "-")"] | join(" ")))'
 
 # Promote to 100% with NO further steps and NO analysis — what `kubectl argo rollouts promote --full` does. Used only for
-# the api's MODE switches (gemini ↔ fake), which are not releases under test and have no traffic to be judged on, and
+# the api's MODE switches (a real provider ↔ fake), which are not releases under test and have no traffic to be judged on, and
 # for the SLO alert drill, whose fault must reach ALL traffic at once (design §4.3). Never to push a release past an
 # analysis that stopped it (Delivery A7.2).
 promote-full:

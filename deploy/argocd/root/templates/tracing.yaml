@@ -123,12 +123,14 @@ spec:
                 - { pattern: ^http\.response\.header\..*, action: delete }
             # An ALLOWLIST, keyed on the pod's resource attribute, not on a span attribute: every span a fake-mode pod
             # emits is dropped, not just its generation span. A pod that lost the attribute is dropped too — kept in
-            # the cluster, not sent out (design §4.2). Add a provider here only when it is a real one.
+            # the cluster, not sent out (design §4.2). Add a provider here only when it is a real one. ONE condition
+            # joined with `and`: the filter drops a span when ANY listed condition is true, so two separate `!=` lines
+            # would drop every span, the real providers' included.
             filter/real-providers-only:
               error_mode: ignore
               traces:
                 span:
-                  - 'resource.attributes["anime.llm.provider"] != "gemini"'
+                  - 'resource.attributes["anime.llm.provider"] != "gemini" and resource.attributes["anime.llm.provider"] != "openai"'
           connectors:
             spanmetrics:
               # Exemplars link a slow bucket to an example trace. One of four settings the link needs; the others are

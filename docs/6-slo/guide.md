@@ -327,8 +327,8 @@ too, so it resolves only once the 30-minute window has also fallen — about hal
 k6 running until then. Stopped earlier, the ratios would go absent and the alert would resolve for lack of traffic,
 not for recovery.
 
-**3.6 — after the RESOLVED message**, stop k6 in window 3 (`Ctrl-c`). Then put the api back in gemini mode, as in
-[stage 5, section 5](../5-delivery/guide.md#5-back-to-gemini--ops).
+**3.6 — after the RESOLVED message**, stop k6 in window 3 (`Ctrl-c`). Then put the api back in real mode, as in
+[stage 5, section 5](../5-delivery/guide.md#5-back-to-real-mode--ops).
 
 ---
 

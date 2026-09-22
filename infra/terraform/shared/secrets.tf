@@ -2,7 +2,7 @@
 #   aws secretsmanager put-secret-value --secret-id anime/<name> --secret-string file://...
 # so they never enter Git or Terraform state (docs/1-terraform/guide.md, step 2).
 #
-#   anime/llm        {"GOOGLE_API_KEY": "...", "HF_TOKEN": "..."}        read by External Secrets
+#   anime/llm        {"OPENAI_API_KEY": "...", "GOOGLE_API_KEY": "...", "HF_TOKEN": "..."}   read by External Secrets
 #   anime/langfuse   {"LANGFUSE_PUBLIC_KEY": "...", "LANGFUSE_SECRET_KEY": "..."}   read by External Secrets
 #   anime/alerting   {"DISCORD_WEBHOOK_URL": "..."}                      read by External Secrets
 #   anime/wireguard  {"serverPrivateKey": "...", "operatorPublicKey": "..."}  read by the gateway ONLY

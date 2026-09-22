@@ -133,12 +133,18 @@ kubectl get clustersecretstore aws-secrets-manager -o jsonpath='store ready: {.s
 for es in anime/anime-llm monitoring/grafana-admin; do
   kubectl -n ${es%/*} get externalsecret ${es#*/} -o jsonpath="${es}: {.status.conditions[?(@.type==\"Ready\")].status}{\"\n\"}"
 done
+# The key of the provider the api runs (tfvars; the default is openai), not just "some model key": a Secret with only
+# the Gemini key passes a looser check and then fails the moment the api starts in openai mode.
+P=$(sed -n 's/^api_llm_provider *= *"\(.*\)"/\1/p' infra/terraform/bootstrap/terraform.tfvars); P=${P:-openai}
+K=$([ "$P" = gemini ] && echo GOOGLE_API_KEY || echo OPENAI_API_KEY)
 kubectl -n anime get secret anime-llm -o json 2>/dev/null \
-  | jq -e '.data | (length == 2) and all(.[]; length > 0)' >/dev/null && echo "anime-llm has both keys" || echo "SECRET anime-llm MISSING OR INCOMPLETE"
+  | jq -e --arg k "$K" --arg p "$P" '.data | all(.[]; length > 0) and has("HF_TOKEN") and ($p == "fake" or has($k))' >/dev/null \
+  && echo "anime-llm has the keys ($P)" || echo "SECRET anime-llm MISSING OR INCOMPLETE for $P ($K)"
 ```
 
 Expected: `names OK (8)`, `all Synced+Healthy`, four `… at <hash>`, `store ready: True`, both ExternalSecrets `True`,
-`anime-llm has both keys`. Why each: "all Healthy" is also true of none, so the names and count are asserted; `Synced`
+`anime-llm has the keys (openai)`: `HF_TOKEN` and the running provider's key, none empty. Why each: "all Healthy"
+is also true of none, so the names and count are asserted; `Synced`
 means "synced to what Argo CD fetched", so the revision is compared with the branch; Argo CD cannot judge every kind, so
 the store and the ExternalSecrets are read for their own `Ready` (GitOps A7.1). The four Helm-repo Applications have a
 chart version as revision, so they are covered by the name and status lines, not the revision loop.

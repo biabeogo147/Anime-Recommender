@@ -47,7 +47,7 @@ The baseline run produces two p95s, from two vantage points:
 
 ```mermaid
 flowchart LR
-    WS["k6 on the ops workstation<br/>gemini mode"] -->|"HTTPS"| ALB["Public ALB"] --> API["anime-api"]
+    WS["k6 on the ops workstation<br/>real mode"] -->|"HTTPS"| ALB["Public ALB"] --> API["anime-api"]
     API -->|"times each request"| PROM["Prometheus"]
     WS -.->|"client p95"| K6P["what a direct client waits"]
     PROM -.->|"server p95"| SRV["what the SLO will count"]
@@ -126,7 +126,7 @@ in [stage 7](../eks-sre-llmops-design.md#9-build-order), so scaling begins befor
 
 ```mermaid
 flowchart LR
-    GEM["gemini-mode baseline"] --> T(["T"]) --> SLO["The SLO · stage 6"]
+    GEM["real-mode baseline"] --> T(["T"]) --> SLO["The SLO · stage 6"]
     FAKE["fake-mode ramp"] --> KNEE(["in-flight per pod at the knee"]) --> KEDA["The autoscaler · stage 7"]
     FAKE -.->|"never compared with T"| T
 

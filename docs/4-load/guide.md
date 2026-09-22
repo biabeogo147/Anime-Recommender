@@ -35,13 +35,18 @@ cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
 F=infra/terraform/bootstrap/terraform.tfvars
 sed -i 's/^enabled_stages .*/enabled_stages            = ["gitops", "load"]/' $F
 grep -q '^enabled_stages.*"load"' $F && echo "load enabled" || echo "ENABLED_STAGES NOT SET"
-grep -q '^api_llm_provider' $F || echo 'api_llm_provider          = "gemini"' >> $F
+# SET, not only added: a tfvars from before 2026-09-22 still says "gemini".
+grep -q '^api_llm_provider' $F && sed -i 's/^api_llm_provider .*/api_llm_provider          = "openai"/' $F \
+  || echo 'api_llm_provider          = "openai"' >> $F
 grep -q '^api_fault_rate' $F   || echo 'api_fault_rate            = "0"' >> $F
 grep -E '^(enabled_stages|api_)' $F
+# An api switched to openai without its key never becomes ready: check the key is stored before applying.
+aws secretsmanager get-secret-value --secret-id anime/llm --query SecretString --output text \
+  | jq -e 'has("OPENAI_API_KEY")' >/dev/null && echo "openai key stored" || echo "NO OPENAI_API_KEY in anime/llm: terraform guide 2.6 first"
 make bootstrap-plan
 ```
 
-Expected: `load enabled`, the three lines, `Plan: 0 to add, 1 to change, 0 to destroy.` Then apply, and wait for the
+Expected: `load enabled`, the three lines, `openai key stored`, `Plan: 0 to add, 1 to change, 0 to destroy.` Then apply, and wait for the
 PodMonitor. The root passes `load` down to `anime-api` only when it next syncs, which can be minutes away:
 
 ```bash
@@ -87,8 +92,8 @@ An empty answer anywhere is **not** zero: stop and see troubleshooting.
 
 ## 2. Criterion #6 — T — ops
 
-**2.1 — the baseline, in Gemini mode.** 220 requests at 10 per minute take about 23 minutes. The margin over 200 covers
-requests that fail. Keep the rate under the free tier's limit. If you know your tier allows more, `RATE_PER_MINUTE=15`
+**2.1 — the baseline, in real mode (openai).** 220 requests at 10 per minute take about 23 minutes. The margin over 200 covers
+requests that fail. Keep the rate under the provider's limit. If you know your tier allows more, `RATE_PER_MINUTE=15`
 shortens the run.
 
 ```bash
@@ -97,7 +102,7 @@ grep '^api_llm_provider' infra/terraform/bootstrap/terraform.tfvars
 TARGET_REQUESTS=220 RATE_PER_MINUTE=10 make loadtest-baseline
 ```
 
-Expected: `api_llm_provider = "gemini"`, then k6's summary and a `window: <start> → <end>` line.
+Expected: `api_llm_provider = "openai"`, then k6's summary and a `window: <start> → <end>` line.
 
 **2.2 — read T from the server's histogram, over exactly that window.** The total counter is non-empty (1.2), so the
 error query below can fall back to `vector(0)` without hiding a missing series. The fallback exists because a clean run
@@ -226,19 +231,19 @@ requests; skip them. Read them in this order:
 
 Report the readings, the factor from 3.1, and the raw files if anything is ambiguous.
 
-**3.5 — back to Gemini.**
+**3.5 — back to real mode.**
 
 ```bash
 cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
-sed -i 's/^api_llm_provider .*/api_llm_provider          = "gemini"/' infra/terraform/bootstrap/terraform.tfvars
+sed -i 's/^api_llm_provider .*/api_llm_provider          = "openai"/' infra/terraform/bootstrap/terraform.tfvars
 make bootstrap-plan && make bootstrap
 kubectl -n argocd annotate application root argocd.argoproj.io/refresh=hard --overwrite
 mode() { kubectl -n anime get deploy anime-api -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="LLM_PROVIDER")].value}'; }
-for i in $(seq 20); do [ "$(mode)" = gemini ] && break; sleep 15; done; echo "template provider: $(mode)"
+for i in $(seq 20); do [ "$(mode)" = openai ] && break; sleep 15; done; echo "template provider: $(mode)"
 kubectl -n anime rollout status deploy/anime-api --timeout=5m
 ```
 
-Expected: `template provider: gemini`, `successfully rolled out`.
+Expected: `template provider: openai`, `successfully rolled out`. To run the real mode on Gemini instead, use `gemini` wherever these blocks write `openai` (design §4.1).
 
 ---
 
@@ -249,7 +254,7 @@ Report:
 - the ramp's readings and the factor (3.4);
 - `cat ~/anime-evidence/*-k6-image.txt`.
 
-Every figure carries its mode: T is **gemini**, capacity is **fake**. A fake-mode number is never compared with T
+Every figure carries its mode: T is **real mode, `gpt-4o-mini` on openai**, capacity is **fake**. A fake-mode number is never compared with T
 (Load A5.2). The figures become `docs/evidence/load.md`. The stage 7 threshold and the api's requests are then written
 from them.
 

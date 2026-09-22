@@ -13,7 +13,7 @@ from anime.telemetry import capture_content, tracer
 
 # The GenAI semantic conventions' provider names; they are still in development, so this is checked against the
 # version in use (design §4.2). The fake provider is named plainly, so a trace can never pass for a real model's.
-PROVIDER_NAMES = {"gemini": "gcp.gemini", "fake": "fake"}
+PROVIDER_NAMES = {"gemini": "gcp.gemini", "openai": "openai", "fake": "fake"}
 
 
 @dataclass
