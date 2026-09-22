@@ -130,7 +130,7 @@ lượng đi theo số lượng, không phải ngược lại."
 
 *Nếu được hỏi thêm:* baseline gửi ở tốc độ mà tier miễn phí cho phép: `[điền: tốc độ gửi của baseline]`.
 
-**A3.7** **Ý chính:** "Tuỳ lỗi đến từ đâu. Lỗi trả về nhanh — 503 từ phía model, hay 500 khi phần embedding lỗi — nằm
+**A3.7** **Ý chính:** "Tuỳ lỗi đến từ đâu. Lỗi trả về nhanh — 503 từ phía model hay từ phần embedding — nằm
 chung phân phối với request thành công, vì histogram không chia theo mã trạng thái, và kéo p95 xuống. Nhưng trong
 đường gọi có retry với backoff, nên rate limit cũng có thể làm request chậm đi và đẩy T lên **[kiểm chứng: client
 Gemini có retry khi bị giới hạn tốc độ không]**. Vì vậy baseline ghi lại số lỗi, để nhận ra T bị méo theo chiều nào."
@@ -180,11 +180,11 @@ chạm tới trần. Trần đó thuộc về lần chạy autoscaling ở stage
 chạy, nên nó đếm cả request đang xếp hàng chờ thread — middleware tăng gauge trước khi handler chờ thread; tôi
 ghi nó cạnh số thread. Vì sao scale theo in-flight chứ không theo CPU nằm ở stage Scaling.
 
-**A4.6** **Ý chính:** "Hiện `/healthz`, `/readyz` và `/metrics` là handler đồng bộ, nên chúng chạy chung một thread pool
+**A4.6** **Ý chính:** "Trước stage này `/healthz`, `/readyz` và `/metrics` là handler đồng bộ, nên chúng chạy chung một thread pool
 có giới hạn với các lời gọi model của `/recommend` — bốn mươi thread, mặc định của thư viện bên dưới **[kiểm chứng]**.
 Lúc bão hoà, một lần scrape phải xếp hàng sau các thread đang bận và timeout, nên series in-flight biến mất khỏi kết quả
 query đúng lúc autoscaler cần nó. Probe cũng xếp hàng như vậy: readiness có thể rút một pod đang bận khỏi load balancer,
-còn liveness có thể khiến kubelet khởi động lại nó — tệ hơn nữa. Cả ba không làm việc chặn nào, nên chúng chuyển thành
+còn liveness có thể khiến kubelet khởi động lại nó — tệ hơn nữa. Cả ba không làm việc chặn nào, nên chúng đã chuyển thành
 `async def` và chạy trên event loop, trước lần ramp."
 
 *Nếu được hỏi thêm:* chính thread pool đó có lẽ là giới hạn capacity ở chế độ fake — một trần về đồng thời chứ không

@@ -40,7 +40,7 @@ spec:
           # /healthz says "the process is alive" and stays 200 while the index loads; /readyz says "the index is loaded
           # and I can answer". So readiness is what keeps traffic off a loading pod, and liveness never kills a pod whose
           # load is merely retrying (docs/evidence/local.md, startup resilience). The startup probe only covers the
-          # process coming up. /healthz is still a sync handler; it becomes async before stage 4 (design §4.1).
+          # process coming up. The probes' handlers are async: they do not wait behind a saturated thread pool (design §4.1).
           startupProbe:
             httpGet: { path: /healthz, port: http }
             periodSeconds: 5

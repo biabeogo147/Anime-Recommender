@@ -59,6 +59,30 @@ variable "enabled_stages" {
   default = []
 }
 
+# The api's mode, an OPERATOR switch like enabled_stages: `fake` for the capacity run and every drill, `gemini` for the
+# baseline and normal traffic. Changing either changes the pod template, which is a new version: a rolling update until
+# stage 5, a canary after it — which is exactly how the drills are started (docs/delivery/guide.md).
+variable "api_llm_provider" {
+  type    = string
+  default = "gemini"
+  validation {
+    condition     = contains(["gemini", "fake"], var.api_llm_provider)
+    error_message = "api_llm_provider is gemini or fake."
+  }
+}
+
+variable "api_fault_rate" {
+  # Read ONLY by the fake provider: on a gemini version it injects nothing (Delivery A8.2). The root refuses the
+  # combination instead of letting a drill "pass" on zero faults.
+  type    = string
+  default = "0"
+  # A value the api cannot parse would crash every pod at import (config.py reads it with float()), so it is refused here.
+  validation {
+    condition     = can(tonumber(var.api_fault_rate)) && try(tonumber(var.api_fault_rate) >= 0 && tonumber(var.api_fault_rate) <= 1, false)
+    error_message = "api_fault_rate is a number from 0 to 1, as a string, e.g. \"0.2\"."
+  }
+}
+
 provider "helm" {
   kubernetes = {
     config_path = var.kubeconfig_path
@@ -105,6 +129,10 @@ resource "helm_release" "root" {
               stages         = var.enabled_stages
               targetRevision = var.target_revision # every in-repo child follows the same branch as the root
               repoURL        = var.repo_url        # and the same repository
+              api = {
+                provider  = var.api_llm_provider
+                faultRate = var.api_fault_rate
+              }
             }
           }
         }

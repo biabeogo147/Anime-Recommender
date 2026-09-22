@@ -19,7 +19,14 @@ RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504}
 
 
 class UpstreamError(RuntimeError):
-    """A model provider failed; the API maps this to 503."""
+    """A remote dependency failed; the API maps this to 503 with Retry-After.
+
+    `stage` says which one: "llm" for the model call, "retrieval" for the embedding call made to search the index.
+    """
+
+    def __init__(self, message: str, stage: str = "llm"):
+        super().__init__(message)
+        self.stage = stage
 
 
 def _status_code(exc: Exception) -> int | None:

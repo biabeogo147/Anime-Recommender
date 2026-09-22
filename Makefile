@@ -45,7 +45,8 @@ TUNNEL_PORT ?= 6443
 cluster_output = $(TF_CLUSTER) output -raw $(1)
 
 .PHONY: shared-init shared-plan shared init plan infra kubeconfig tunnel ready bootstrap-init bootstrap-plan \
-        bootstrap up vpn-config pins image apps down infra-destroy
+        bootstrap up vpn-config pins image apps loadtest-baseline loadtest-ramp loadtest-steady prom prom-range \
+        down infra-destroy
 
 # --- shared: survives every teardown -----------------------------------------------------------------------------
 shared-init:
@@ -174,6 +175,44 @@ image:
 	    --query 'imageDetails[0].imageDigest' --output text)
 	  printf '%-4s digest: %s\n' $$svc "$$d"
 	done
+
+# --- stage 4: load tests and the queries that read them -----------------------------------------------------------
+# k6 runs in a container on the workstation (docker is there; nothing is installed). Its end-of-test summary is saved in
+# ~/anime-evidence, because metrics die with the cluster and evidence is captured at the time (Load A7.2). Each run
+# records the digest of the k6 image it used next to its own summary (<name>-k6-image.txt). A rerun of the same
+# target overwrites that run's files, so copy them aside first if the earlier run is still wanted.
+K6_IMAGE ?= grafana/k6:latest
+# --user: the image runs as its own uid (12345), which could not write into a directory the workstation user owns — k6
+# would print "failed to handle the end-of-test summary" and still exit 0, leaving no summary file.
+K6 = docker run --rm -i --network host --user "$$(id -u):$$(id -g)" \
+  -v $(CURDIR)/loadtest/k6:/scripts:ro -v $(HOME)/anime-evidence:/out \
+  -e BASE_URL -e TARGET_REQUESTS -e RATE_PER_MINUTE -e MAX_RPS -e MAX_VUS -e RPS -e DURATION $(K6_IMAGE)
+
+loadtest-baseline loadtest-ramp loadtest-steady:
+	mkdir -p $(HOME)/anime-evidence
+	name=$(patsubst loadtest-%,%,$@)
+	docker pull -q $(K6_IMAGE) >/dev/null && docker image inspect $(K6_IMAGE) --format '{{index .RepoDigests 0}}' \
+	  > $(HOME)/anime-evidence/$$name-k6-image.txt
+	date -u +%Y-%m-%dT%H:%M:%SZ > $(HOME)/anime-evidence/$$name.start
+	# The end of the window is written however k6 stops — a failed threshold, an error, or Ctrl-C on a long steady run
+	# — because every range query in the guides reads START and END from these two files.
+	trap 'date -u +%Y-%m-%dT%H:%M:%SZ > $(HOME)/anime-evidence/$$name.end
+	  echo "window: $$(cat $(HOME)/anime-evidence/$$name.start) → $$(cat $(HOME)/anime-evidence/$$name.end)"' EXIT
+	# The ramp also writes every data point with its timestamp: the summary has only the run's TOTAL of dropped
+	# iterations, and capacity needs to know whether the first one came before the knee or after it.
+	$(K6) run --summary-export /out/$$name-summary.json $(if $(filter loadtest-ramp,$@),--out csv=/out/ramp-points.csv) \
+	  /scripts/$$name.js
+
+# One PromQL expression, evaluated inside the Prometheus pod with promtool — no port-forward, no extra tool.
+#   make -s prom Q='sum(up{pod=~"anime-api.*"})'            instant, now
+#   make -s prom Q='…' AT=2026-09-22T10:00:00Z               instant, at a time
+#   make -s prom-range Q='…' START=… END=… STEP=30s           a range, for the knee
+PROM_POD := prometheus-kube-prometheus-stack-prometheus-0
+PROM = kubectl -n monitoring exec $(PROM_POD) -c prometheus -- promtool query
+prom:
+	$(PROM) instant $(if $(AT),--time=$(AT)) http://localhost:9090 '$(Q)'
+prom-range:
+	$(PROM) range --start=$(START) --end=$(END) --step=$(or $(STEP),30s) http://localhost:9090 '$(Q)'
 
 # Sync and health of every Application, by name.
 apps:

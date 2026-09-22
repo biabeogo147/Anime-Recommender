@@ -27,6 +27,15 @@ spec:
         ingress:
           certificateArn: {{ $.Values.pins.certificateArn | quote }}
           domain: {{ $.Values.domain }}
+        {{- if eq $svc "api" }}
+        {{- /* Compared as a number, so "0.0" is zero too. */}}
+        {{- if and (ne (float64 $.Values.api.faultRate) 0.0) (ne $.Values.api.provider "fake") }}
+        {{- fail "api.faultRate is read only by the fake provider: set api_llm_provider = \"fake\" as well" }}
+        {{- end }}
+        llm:
+          provider: {{ $.Values.api.provider | quote }}
+          faultRate: {{ $.Values.api.faultRate | quote }}
+        {{- end }}
   destination:
     server: https://kubernetes.default.svc
     namespace: anime

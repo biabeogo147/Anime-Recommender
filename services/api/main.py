@@ -109,19 +109,23 @@ def create_app(
             metrics.HTTP_REQUESTS.labels(route_path, request.method, str(status)).inc()
             metrics.HTTP_LATENCY.labels(route_path).observe(time.perf_counter() - started)
 
+    # The three endpoints below are `async def` on purpose. A plain `def` handler runs in the same bounded thread pool as
+    # /recommend's model calls, so at saturation a probe or a scrape would queue behind forty busy threads, time out, and
+    # mark a busy pod unready — or make the in-flight series vanish just when the autoscaler needs it (design §4.1).
+    # None of them blocks, so they run on the event loop, independent of the pool.
     @app.get("/healthz")
-    def healthz():
+    async def healthz():
         return {"status": "ok"}
 
     @app.get("/readyz")
-    def readyz(response: Response):
+    async def readyz(response: Response):
         if state.recommender is None:
             response.status_code = 503
             return {"status": "not ready", "error": state.error}
         return {"status": "ready"}
 
     @app.get("/metrics")
-    def prometheus_metrics():
+    async def prometheus_metrics():
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     @app.post("/recommend", response_model=RecommendResponse)
@@ -133,11 +137,14 @@ def create_app(
         try:
             result = await run_in_threadpool(recommender.recommend, body.query)
         except UpstreamError as exc:
-            metrics.LLM_LATENCY.labels(recommender.model_name, "error").observe(time.perf_counter() - started)
-            logger.warning("Upstream model failure: %s", exc)
-            raise HTTPException(
-                status_code=503, detail="Upstream model unavailable", headers={"Retry-After": "2"}
-            ) from exc
+            metrics.UPSTREAM_ERRORS.labels(exc.stage).inc()
+            if exc.stage == "llm":
+                # Timed from before the thread pool: an error's latency includes queueing and retrieval, so under
+                # saturation it is longer than the model call itself. The "ok" series is the model call alone.
+                metrics.LLM_LATENCY.labels(recommender.model_name, "error").observe(time.perf_counter() - started)
+            logger.warning("Upstream failure (%s): %s", exc.stage, exc)
+            detail = "Upstream model unavailable" if exc.stage == "llm" else "Retrieval unavailable"
+            raise HTTPException(status_code=503, detail=detail, headers={"Retry-After": "2"}) from exc
 
         metrics.RETRIEVAL_LATENCY.observe(result.retrieval_s)
         metrics.LLM_LATENCY.labels(result.model, "ok").observe(result.llm_s)

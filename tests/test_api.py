@@ -99,3 +99,19 @@ def test_metrics_exported(settings):
     ):
         assert name in text, name
     assert 'route="/metrics"' not in text
+
+
+def test_embedding_failure_maps_to_503(settings):
+    with _client(settings) as client:
+        _wait_until(client, _ready)
+        recommender = client.app.state.anime.recommender
+
+        def broken_search(*args, **kwargs):
+            raise ConnectionError("embedding endpoint unreachable")
+
+        recommender.vectorstore.similarity_search = broken_search
+        resp = client.post("/recommend", json={"query": "mecha"})
+        assert resp.status_code == 503
+        assert resp.headers["retry-after"] == "2"
+        assert resp.json()["detail"] == "Retrieval unavailable"
+        assert 'anime_upstream_errors_total{stage="retrieval"}' in client.get("/metrics").text

@@ -26,6 +26,11 @@ pins:
     externalDns: PIN_ME
     kubePrometheusStack: PIN_ME
 
+# The api's mode; set by make bootstrap from terraform.tfvars (api_llm_provider, api_fault_rate).
+api:
+  provider: gemini
+  faultRate: "0"
+
 # Two values that Terraform decides and the charts need; kept equal to infra/terraform/cluster/variables.tf.
 network:
   vpcCidr: 10.30.0.0/16

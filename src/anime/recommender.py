@@ -35,7 +35,14 @@ class Recommender:
         t = tracer()
         with t.start_as_current_span("rag.retrieve") as span:
             t0 = time.perf_counter()
-            docs = self.vectorstore.similarity_search(query, k=self.k)
+            # The search embeds the query through the embedding API. Its failure used to escape as an unhandled 500,
+            # with no Retry-After and nothing in any error metric; it is an upstream failure like the model's. The
+            # catch is deliberately broad: a local fault in the index lands here too, so the 503 says "retrieval",
+            # not "embedding", and the stage label is where to start, not a diagnosis.
+            try:
+                docs = self.vectorstore.similarity_search(query, k=self.k)
+            except Exception as exc:
+                raise UpstreamError(f"{type(exc).__name__}: {exc}", stage="retrieval") from exc
             retrieval_s = time.perf_counter() - t0
             span.set_attribute("rag.top_k", self.k)
             span.set_attribute("rag.docs_returned", len(docs))
