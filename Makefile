@@ -146,6 +146,12 @@ pins: shared-init
 	         prometheus-community/kube-prometheus-stack; do
 	  printf '%-45s %s\n' "$$c" "$$(helm search repo $$c -o json | jq -r '.[0].version')"
 	done
+	# GitHub Actions used by .github/workflows, resolved from tag to COMMIT SHA once (unauthenticated API: 60 calls/h).
+	for a in actions/checkout@v4 docker/setup-buildx-action@v3 docker/build-push-action@v6 aquasecurity/trivy-action@v0.35.0 \
+	         github/codeql-action@v4 aws-actions/configure-aws-credentials@v4 aws-actions/amazon-ecr-login@v2 \
+	         sigstore/cosign-installer@v3 anchore/sbom-action@v0; do
+	  printf '%-45s %s\n' "$$a" "$$(curl -fsS https://api.github.com/repos/$${a%@*}/commits/$${a#*@} | jq -r .sha || echo LOOKUP-FAILED)"
+	done
 
 # Build both images on the workstation and push them by digest — the stand-in for CI until stage 3. The Hugging Face
 # token reaches the index build as a BuildKit secret, so it never becomes a layer (docs/evidence/local.md). Prints the two

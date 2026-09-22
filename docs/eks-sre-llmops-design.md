@@ -928,8 +928,9 @@ Two consequences of that one sentence. **`main` is protected** — people reach 
 whose CI is green — so the bot needs an identity the protection lets through, and that identity is the single
 exception to the rule, named in the repository's ruleset. **And `[skip ci]` is a real guard, not decoration:** a
 push made with the workflow's own token does not start new workflow runs, but a push made with any other
-credential — a deploy key, an app token — does. Which identity the bot uses is settled when the ruleset is
-written; the marker stays either way.
+credential — a deploy key, an app token — does. **Settled:** a ruleset's bypass list cannot name the workflow's own
+token, so the bot pushes with a **deploy key** that is the ruleset's one bypass; its pushes do start runs, and `[skip ci]`
+is therefore the only thing preventing a loop.
 
 **`eval.yml` (P1)** runs on pull requests touching `src/`, `data/` or `prompts/`: retrieval-only evaluation
 over `eval/golden.jsonl` (20 queries with expected titles), computing `hit@4` and failing if it drops below

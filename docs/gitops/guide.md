@@ -34,9 +34,9 @@ Expected: a buildx version and `tools ok`. `dig` missing: `sudo apt-get install 
 
 ## 1. Pins — the values only this account knows
 
-Eight `PIN_ME` values: the registry, the certificate ARN and four chart versions in `deploy/argocd/root/values.yaml`, and
-the two image digests in the charts. None is a secret. They are committed before `gitops` is switched on, so Argo CD never
-renders a guessed value.
+Eight `PIN_ME` values — the registry, the certificate ARN and four chart versions in `deploy/argocd/root/values.yaml`, and
+the two image digests in the charts — plus the commit SHA of each GitHub Action in `.github/workflows/` (stage 3).
+None is a secret. They are committed before `gitops` is switched on, so Argo CD never renders a guessed value.
 
 **1.1 — ops: read them, and build the two images** (several minutes: the build embeds 269 anime).
 
@@ -46,7 +46,8 @@ make -s pins
 make image > /tmp/anime-image.log 2>&1; echo "exit=$?"; tail -2 /tmp/anime-image.log
 ```
 
-Expected: an account id, a registry, a certificate ARN and four chart versions (none `null`); `exit=0`; then
+Expected: an account id, a registry, a certificate ARN, four chart versions (none `null`) and nine action SHAs (none
+`LOOKUP-FAILED`); `exit=0`; then
 `api  digest: sha256:…` and `ui   digest: sha256:…`. `exit` not 0: read `/tmp/anime-image.log`. **Report all of it** —
 the values are committed on the laptop (by me; you push), and nothing below runs before that.
 
@@ -55,7 +56,7 @@ the values are committed on the laptop (by me; you push), and nothing below runs
 ```bash
 cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
 git pull --ff-only
-git grep -nE ':[[:space:]]*"?PIN_ME' -- deploy || echo "no PIN_ME left"
+git grep -nE ':[[:space:]]*"?PIN_ME|@PIN_ME' -- deploy .github || echo "no PIN_ME left"
 ```
 
 Expected: `no PIN_ME left`.

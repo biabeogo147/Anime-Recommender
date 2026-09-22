@@ -15,6 +15,5 @@ chroma_db/
 index/
 logs/
 docs/
-MLops-Common/
 llmops-k8s.yaml
 docker-compose.yml

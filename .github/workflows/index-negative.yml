@@ -1,0 +1,60 @@
+# Criterion #5: CI fails when the catalogue is truncated — and fails for the RIGHT reason.
+#
+# Locally the check was made to fail by setting the expected count off by one (docs/evidence/local.md). That proves the
+# comparison works. This proves it catches the fault that would actually happen: a partial data file. The build failing
+# is not enough — a build also fails for a missing token or a network error — so the job passes only if the log carries
+# the literal `IndexValidationError` (CI/CD A3.2, A3.3). Run by hand from the Actions tab.
+name: index-negative
+
+on:
+  workflow_dispatch:
+    inputs:
+      drop_rows:
+        description: "How many catalogue rows to remove"
+        default: "10"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  truncated-catalogue-fails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@PIN_ME # v4
+      - uses: docker/setup-buildx-action@PIN_ME # v3
+      # Drop whole ROWS with a CSV parser, keeping the header: cutting bytes could leave 269 rows with a broken synopsis
+      # (the check would then pass on damaged data), and an empty file fails with a different error (missing columns).
+      - name: truncate the catalogue
+        # The input goes through the environment, never into the script text: an input interpolated with ${{ }} becomes
+        # code for whoever can dispatch the workflow.
+        env:
+          DROP_ROWS: ${{ inputs.drop_rows }}
+        run: |
+          [[ "$DROP_ROWS" =~ ^[1-9][0-9]*$ ]] || { echo "::error::drop_rows must be a positive integer"; exit 1; }
+          python3 - "$DROP_ROWS" <<'PY'
+          import csv, sys
+          path = "data/anime_with_synopsis.csv"
+          with open(path, newline="", encoding="utf-8") as f:
+              rows = list(csv.reader(f))
+          header, body = rows[0], rows[1:]
+          keep = body[: len(body) - int(sys.argv[1])]
+          with open(path, "w", newline="", encoding="utf-8") as f:
+              csv.writer(f).writerows([header, *keep])
+          print(f"rows: {len(body)} -> {len(keep)}")
+          PY
+      - name: build the index stage and expect IndexValidationError
+        run: |
+          set +e
+          docker buildx build -f services/api/Dockerfile --target index --progress=plain \
+            --secret id=hf_token,env=HF_TOKEN . > build.log 2>&1
+          rc=$?
+          set -e
+          tail -20 build.log
+          [ "$rc" -ne 0 ] || { echo "::error::the build SUCCEEDED on a truncated catalogue"; exit 1; }
+          # The ROW-count message specifically: "Index holds N vectors" is the other variant (a partial embedding), and
+          # would not prove that the check of the catalogue fired.
+          grep -m1 -E 'IndexValidationError: Loaded [0-9]+ documents' build.log             || { echo "::error::the build failed, but not on the document-count check"; exit 1; }
+          echo "failed on IndexValidationError, as it must" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}

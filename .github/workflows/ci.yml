@@ -1,0 +1,265 @@
+# CI: turn a change into a tested, scanned, signed image and ONE line in Git — then stop. It never talks to the cluster;
+# Argo CD pulls the commit (CI/CD A2.1).
+#
+#   pull request from a fork   lint + unit tests only (no secrets, so no index, so no image)
+#   pull request from here     + index + build + scan; no image leaves the runner
+#   push to main               + push by digest, sign, attest the SBOM, bot commit of the digests
+#
+# Every third-party action is pinned by COMMIT SHA (the `PIN_ME` values come from `make pins`, which resolves each tag
+# once). A tag can be moved — trivy-action's were, in March 2026 — and a moved tag in a job holding HF_TOKEN and an
+# OIDC token hands both to whoever moved it.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      trivy_severity:
+        # The Trivy positive control (design §4.6): run once with a LOWER threshold, e.g. "HIGH,CRITICAL", until a finding
+        # WITH a fix is in scope — that run must go red. Until it has, the gate is reported as unproven, not as passing.
+        description: "Severities that fail the scan"
+        default: CRITICAL
+        required: false
+
+permissions:
+  contents: read
+
+# One run per branch at a time. Pull requests cancel their older runs; main never does — a cancel between push and sign
+# would leave an unsigned image in ECR.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  AWS_REGION: ap-southeast-1
+  SEVERITY: ${{ inputs.trivy_severity || 'CRITICAL' }}
+  IS_RELEASE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+jobs:
+  # ---------------------------------------------------------------------------------------------------------------
+  lint-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@PIN_ME # v4
+      - uses: docker/setup-buildx-action@PIN_ME # v3
+      # The Dockerfile's `test` target runs ruff and pytest in the locked environment — the same one the image uses.
+      - name: ruff + pytest
+        run: docker buildx build -f services/api/Dockerfile --target test .
+      - name: hadolint
+        run: |
+          for f in services/api/Dockerfile services/ui/Dockerfile; do
+            docker run --rm -i hadolint/hadolint:v2.12.0 < "$f"
+          done
+      # The SLO rules are generated and committed (stage 6). Regenerating them must reproduce the committed file, or the
+      # spec and the rules have drifted (SLO A4.1). Skipped until deploy/slo exists.
+      - name: sloth generate diff
+        if: hashFiles('deploy/slo/*.sloth.yaml') != ''
+        run: make -s slo-check
+
+  # ---------------------------------------------------------------------------------------------------------------
+  build:
+    needs: lint-test
+    # A fork's pull request cannot read HF_TOKEN, and the index is built INTO the image — so it is linted and tested,
+    # never built. CI proves much less about a change from outside, and whoever merges it should know (CI/CD A6.2).
+    # Dependabot runs without Actions secrets too, and is treated the same way.
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      # OIDC, to AWS and to Sigstore. Pull-request runs get it too (permissions cannot depend on the event): AWS refuses
+      # them — the trust names refs/heads/main only — and a PR-signed image never matches the exact identity every
+      # verification requires (CI/CD A4.3).
+      id-token: write
+      security-events: write # SARIF upload to code scanning
+    strategy:
+      fail-fast: false
+      matrix:
+        svc: [api, ui]
+    steps:
+      - uses: actions/checkout@PIN_ME # v4
+      - uses: docker/setup-buildx-action@PIN_ME # v3
+
+      # Build into the runner's image store first: the scan and the size measurement run against the image BEFORE
+      # anything is pushed, so nothing unscanned ever reaches ECR.
+      - name: build (the index assertion runs inside the api build)
+        uses: docker/build-push-action@PIN_ME # v6
+        with:
+          context: .
+          file: services/${{ matrix.svc }}/Dockerfile
+          target: runtime
+          load: true
+          tags: anime-${{ matrix.svc }}:ci
+          provenance: false # one manifest, one digest — the digest Git will record
+          sbom: false
+          # A BuildKit secret: the token reaches the index build and never becomes a layer (docs/evidence/local.md).
+          secrets: |
+            hf_token=${{ secrets.HF_TOKEN }}
+
+      # Criterion #4: the size of the images CI actually produces, measured the same way as the local "before" —
+      # `docker image ls` on the runner, not ECR's compressed size (CI/CD A7.1). The image store is recorded beside it,
+      # because the containerd store reports sizes differently from the classic one.
+      - name: image size
+        run: |
+          echo "anime-${{ matrix.svc }} $(docker image ls anime-${{ matrix.svc }}:ci --format '{{.Size}}')" \
+            "(docker $(docker version --format '{{.Server.Version}}'), store: $(docker info -f '{{.Driver}}'))" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Two scans. The first records EVERY finding at the threshold, fixable or not, so "nothing fixable" is visibly
+      # different from "nothing there" (CI/CD A3.6). The second is the gate: fixable only — blocking on the unpatchable
+      # teaches people to switch the gate off. The gate is the scan command itself; `trivy convert` of a saved report has
+      # no --ignore-unfixed.
+      - name: trivy — all findings (recorded)
+        uses: aquasecurity/trivy-action@PIN_ME # v0.35.0 — the release after the March 2026 tag incident
+        with:
+          image-ref: anime-${{ matrix.svc }}:ci
+          severity: ${{ env.SEVERITY }}
+          format: json
+          output: trivy-total.json
+          exit-code: "0"
+      - name: trivy — gate (fixable only)
+        uses: aquasecurity/trivy-action@PIN_ME # v0.35.0
+        with:
+          image-ref: anime-${{ matrix.svc }}:ci
+          severity: ${{ env.SEVERITY }}
+          # Without this, the action DROPS the severity filter for SARIF output and gates on every severity.
+          limit-severities-for-sarif: true
+          ignore-unfixed: true
+          format: sarif
+          output: trivy.sarif
+          exit-code: "1"
+      - name: record counts
+        if: always()
+        run: |
+          {
+            echo "### trivy anime-${{ matrix.svc }} at ${SEVERITY}"
+            echo "all findings: $(jq '[.Results[]?.Vulnerabilities[]?] | length' trivy-total.json 2>/dev/null || echo n/a)"
+            echo "fixable (the gate): $(jq '[.runs[].results[]] | length' trivy.sarif 2>/dev/null || echo n/a)"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: upload SARIF
+        if: always() && hashFiles('trivy.sarif') != ''
+        uses: github/codeql-action/upload-sarif@PIN_ME # v4
+        with:
+          sarif_file: trivy.sarif
+          category: trivy-${{ matrix.svc }}
+
+      # ---- push to main only: push, sign, attest --------------------------------------------------------------
+      - name: AWS credentials (OIDC, no key)
+        if: env.IS_RELEASE == 'true'
+        uses: aws-actions/configure-aws-credentials@PIN_ME # v4
+        with:
+          # Trusts exactly repo:<this>:ref:refs/heads/main; may only push to the two repositories.
+          role-to-assume: ${{ vars.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: ECR login
+        if: env.IS_RELEASE == 'true'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@PIN_ME # v2
+      - name: push
+        if: env.IS_RELEASE == 'true'
+        id: push
+        run: |
+          repo="${{ steps.ecr.outputs.registry }}/anime-${{ matrix.svc }}"
+          docker tag anime-${{ matrix.svc }}:ci "$repo:${GITHUB_SHA::12}"
+          docker push "$repo:${GITHUB_SHA::12}"
+          # The digest ECR reports for what was just pushed — the one Git will record and the signature will name.
+          digest=$(aws ecr describe-images --repository-name anime-${{ matrix.svc }} \
+            --image-ids imageTag=${GITHUB_SHA::12} --query 'imageDetails[0].imageDigest' --output text)
+          echo "ref=$repo@$digest" >> "$GITHUB_OUTPUT"
+          echo "pushed $repo@$digest" >> "$GITHUB_STEP_SUMMARY"
+      - uses: sigstore/cosign-installer@PIN_ME # v3
+        if: env.IS_RELEASE == 'true'
+      # Keyless: a throwaway key, a short-lived certificate bound to THIS workflow on THIS branch, and a Rekor entry.
+      # Rekor is public — digest, repository and workflow become public permanently; accepted for a public repository
+      # (CI/CD A4.4). The signature names the DIGEST, never a tag.
+      - name: cosign sign
+        if: env.IS_RELEASE == 'true'
+        run: cosign sign --yes "${{ steps.push.outputs.ref }}"
+      - name: SBOM (SPDX)
+        if: env.IS_RELEASE == 'true'
+        uses: anchore/sbom-action@PIN_ME # v0 — pinned to the SHA of the current release
+        with:
+          image: ${{ steps.push.outputs.ref }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+          upload-artifact: false
+      - name: cosign attest SBOM
+        if: env.IS_RELEASE == 'true'
+        run: cosign attest --yes --type spdxjson --predicate sbom.spdx.json "${{ steps.push.outputs.ref }}"
+
+  # ---------------------------------------------------------------------------------------------------------------
+  # The ONE required status check. A skipped `build` (fork pull request) never expands its matrix, so requiring
+  # "build (api)" would leave such a pull request waiting for ever; this job passes when lint-test passed and build
+  # either passed or was skipped on purpose.
+  ci-ok:
+    needs: [lint-test, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          [ "${{ needs.lint-test.result }}" = success ] || exit 1
+          case "${{ needs.build.result }}" in success|skipped) ;; *) exit 1 ;; esac
+
+  # ---------------------------------------------------------------------------------------------------------------
+  # The hand-off: one commit changing the two digests. Argo CD sees it and does the rest. The only writer to `main` that
+  # is not a person: it pushes with a DEPLOY KEY that is the single bypass in the ruleset — one exemption, not a weaker
+  # rule for everyone (CI/CD A5.1). A deploy key's push DOES start a new run, so `[skip ci]` in the message is the guard
+  # against a loop, not decoration (CI/CD A5.2).
+  release-commit:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Releases never overlap, and never cancel each other.
+    concurrency:
+      group: release-main
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@PIN_ME # v4
+        with:
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+          fetch-depth: 0
+      - uses: aws-actions/configure-aws-credentials@PIN_ME # v4
+        with:
+          role-to-assume: ${{ vars.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      # If a newer human commit has reached main since this run started, ITS run will release; releasing this one now
+      # would write older digests over newer ones — a silent rollback.
+      - name: still the newest change?
+        id: newest
+        run: |
+          git fetch origin main
+          newer=$(git rev-list "${GITHUB_SHA}..origin/main" --invert-grep --author='anime-ci\[bot\]' | head -1)
+          if [ -n "$newer" ]; then echo "newer commit $newer on main will release"; echo "skip=true" >> "$GITHUB_OUTPUT"; fi
+      # Read back from ECR by this commit's tag rather than passed between jobs: outputs of a matrix job keep only one
+      # leg's values, and a digest from the wrong leg would be a silent wrong release. An anchored sed rewrites ONLY the
+      # digest value and keeps the rest of the file byte for byte; the check after it proves one line changed per file.
+      - name: write the digests
+        if: steps.newest.outputs.skip != 'true'
+        run: |
+          git checkout -B main origin/main
+          for svc in api ui; do
+            d=$(aws ecr describe-images --repository-name anime-$svc --image-ids imageTag=${GITHUB_SHA::12} \
+              --query 'imageDetails[0].imageDigest' --output text)
+            case "$d" in sha256:*) ;; *) echo "no digest for anime-$svc:${GITHUB_SHA::12}"; exit 1 ;; esac
+            sed -i -E "s|^(  digest: )[^ ]+|\1$d|" deploy/charts/anime-$svc/values.yaml
+          done
+          git diff --numstat deploy/charts | awk '{ if ($1 != 1 || $2 != 1) bad = 1 } END { exit bad }' \
+            || { git diff; echo "more than the digest line changed"; exit 1; }
+      - name: commit and push
+        if: steps.newest.outputs.skip != 'true'
+        run: |
+          git config user.name "anime-ci[bot]"
+          git config user.email "anime-ci-bot@users.noreply.github.com"
+          if git diff --quiet deploy/charts; then echo "digests unchanged; nothing to release"; exit 0; fi
+          git add deploy/charts/anime-api/values.yaml deploy/charts/anime-ui/values.yaml
+          git commit -m "release: ${GITHUB_SHA::12} [skip ci]"
+          git push origin main
