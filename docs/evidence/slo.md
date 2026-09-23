@@ -35,10 +35,17 @@ passes.
 | 5-minute error ratio **recorded** | `11:06:23Z` | **+15 s** — the recording rules |
 | Page alert **firing** in Prometheus | `11:14:23Z` | **+8 m 00 s** — the window arithmetic |
 | Seen by the polling loop (±10 s) | `11:14:25Z` | |
-| `[PAGE] … FIRING` in Discord | *pending* | Alertmanager's `group_wait` plus delivery |
+| `[PAGE] … FIRING` in Discord | `11:14Z` | Alertmanager's 30 s `group_wait` plus delivery |
 
-**Fault → alert firing: 9 m 00 s.** Only the first minute is system latency; the remaining eight are the window
-arithmetic, and they are the point rather than a delay to be tuned away. The measured error ratio at that moment
+**Fault → alert firing: 9 m 00 s. Fault → the message in Discord: 9 m 30 s.**
+
+The Discord figure is bounded rather than exact, and the bound is stated rather than rounded away: Discord
+displays minutes, so the message fell inside `11:14:00Z–11:14:59Z`; it cannot precede the alert's own
+`11:14:23Z`, and Alertmanager holds a new group for 30 s (`group_wait`) before sending. That leaves
+`11:14:53Z–11:14:59Z`, so **9 m 30 s to 9 m 36 s** from the fault. The figure quoted is the lower bound.
+
+Only the first minute of that is system latency; the eight minutes in the middle are the window arithmetic, and
+they are the point rather than a delay to be tuned away. The measured error ratio at that moment
 was **0.497**, and Alertmanager's Discord delivery failures over the preceding 30 minutes were **0**.
 
 ### Which pair fired, and why it matters
@@ -120,5 +127,6 @@ Two things follow, and both belong in the record rather than in a footnote:
 The last one is the instructive failure: the diagnostic said "no pair was ever true" while the alert it was
 diagnosing was firing. The burn rates in the same output contradicted it, which is why the block prints both.
 
-**#10: pass**, once the Discord `FIRING` timestamp is recorded — the criterion asks for the time until a
-**person** is reached, not until Prometheus raises the alert.
+**#10: pass.** The criterion asks for the time until a **person** is reached, not until Prometheus raises the
+alert, and that is the 9 m 30 s above: 45 s of scrape, 15 s of recording rules, 8 minutes of window arithmetic,
+then Alertmanager's 30 s hold and the delivery itself.
