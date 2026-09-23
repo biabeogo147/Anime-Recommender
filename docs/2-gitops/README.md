@@ -6,6 +6,8 @@ are how traffic gets in, where secrets come from, and what the names are.**
 **Where this sits.** The `ARGO`, `LBC`, `ESO`, `EDNS`, `ALB` and `IALB` boxes in
 [design §3](../eks-sre-llmops-design.md#3-architecture). Criteria **#2**, **#15** and **#16**.
 
+**Compared with Medical:** Medical's `gitops` stage, decision by decision, in [stage by stage](../aws/compare-by-stage.md#gitops).
+
 Ideas are in [`concepts.md`](concepts.md). Parameters — chart versions, annotations, security-group rules —
 are in [design §3](../eks-sre-llmops-design.md#3-architecture) and
 [§4.7](../eks-sre-llmops-design.md#47-names-tls-and-the-two-ways-in). This page is the reasoning.
@@ -17,7 +19,7 @@ installed and one root Application pointing at a directory in Git. From the work
 port-forward to Argo CD's UI. From anywhere else, nothing works:
 
 - **no traffic can arrive** — an `Ingress` needs a controller to turn it into a load balancer, and there is none;
-- **no secret can be read** — the Gemini key and the webhook are in Secrets Manager, and nothing in the cluster
+- **no secret can be read** — the model keys and the webhook are in Secrets Manager, and nothing in the cluster
   reads from there;
 - **nothing has a name** — there are no load balancers yet, so nothing for a record to point at;
 - **nothing can be looked at from a browser** — no UI answers on a hostname.

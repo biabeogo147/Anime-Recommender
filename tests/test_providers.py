@@ -1,5 +1,8 @@
 import dataclasses
+import io
+import json
 import random
+import urllib.error
 
 import pytest
 from langchain_core.embeddings import Embeddings
@@ -9,10 +12,13 @@ from anime.providers import (
     BatchedEmbeddings,
     FakeLLM,
     HashEmbeddings,
+    OpenAIChat,
     UpstreamError,
     get_embeddings,
     get_llm,
 )
+
+KEY = "sk-test-not-a-real-key"
 
 
 def test_fake_provider_selection(settings):
@@ -26,6 +32,70 @@ def test_real_provider_requires_keys(settings):
         get_llm(real)
     with pytest.raises(RuntimeError, match="HF_TOKEN"):
         get_embeddings(real)
+
+
+def test_openai_provider_selection_and_key(settings):
+    real = dataclasses.replace(settings, llm_provider="openai", model_name="gpt-4o-mini", openai_api_key=None)
+    with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+        get_llm(real)
+    llm = get_llm(dataclasses.replace(real, openai_api_key=KEY))
+    assert isinstance(llm, OpenAIChat) and llm.model == "gpt-4o-mini"
+
+
+def test_openai_parses_answer_and_usage():
+    seen = {}
+
+    def opener(request, timeout):
+        seen["body"], seen["timeout"] = json.loads(request.data), timeout
+        seen["auth"] = request.get_header("Authorization")
+        return io.BytesIO(json.dumps({
+            "choices": [{"message": {"role": "assistant", "content": "1. Shokugeki no Soma"}}],
+            "usage": {"prompt_tokens": 812, "completion_tokens": 95, "total_tokens": 907},
+        }).encode())
+
+    message = OpenAIChat("gpt-4o-mini", KEY, 30, opener=opener).invoke("prompt text")
+    assert message.content == "1. Shokugeki no Soma"
+    assert message.usage_metadata == {"input_tokens": 812, "output_tokens": 95, "total_tokens": 907}
+    assert seen["body"] == {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "prompt text"}]}
+    assert seen["auth"] == f"Bearer {KEY}" and seen["timeout"] == 30
+
+
+def test_openai_missing_usage_is_absent_not_zero():
+    def opener(request, timeout):
+        return io.BytesIO(json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode())
+
+    assert not OpenAIChat("gpt-4o-mini", KEY, 30, opener=opener).invoke("p").usage_metadata
+
+
+def test_openai_auth_error_is_upstream_and_drops_the_masked_key():
+    def opener(request, timeout):
+        body = io.BytesIO(json.dumps({"error": {"message": "Incorrect API key provided: sk-test-****-key"}}).encode())
+        raise urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, body)
+
+    with pytest.raises(UpstreamError) as info:
+        OpenAIChat("gpt-4o-mini", KEY, 30, opener=opener).invoke("p")
+    assert str(info.value) == "OpenAI HTTP 401: authentication failed" and info.value.stage == "llm"
+
+
+def test_openai_rate_limit_keeps_the_providers_reason():
+    def opener(request, timeout):
+        body = io.BytesIO(json.dumps({"error": {"message": "Rate limit reached"}}).encode())
+        raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {}, body)
+
+    with pytest.raises(UpstreamError, match="429: Rate limit reached"):
+        OpenAIChat("gpt-4o-mini", KEY, 30, opener=opener).invoke("p")
+
+
+@pytest.mark.parametrize("failure", [TimeoutError("read timed out"), b"not json", b'{"choices": []}',
+                                     b'{"choices": [{"message": {"content": null}}]}'])
+def test_openai_timeouts_and_bad_answers_are_upstream_errors(failure):
+    def opener(request, timeout):
+        if isinstance(failure, Exception):
+            raise failure
+        return io.BytesIO(failure)
+
+    with pytest.raises(UpstreamError):
+        OpenAIChat("gpt-4o-mini", KEY, 30, opener=opener).invoke("p")
 
 
 def test_hash_embeddings_deterministic_unit_vectors():

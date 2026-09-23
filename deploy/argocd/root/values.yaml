@@ -36,7 +36,7 @@ pins:
 # The api's mode and drill marker; set by make bootstrap from terraform.tfvars (api_llm_provider, api_fault_rate,
 # api_drill).
 api:
-  provider: gemini
+  provider: openai # or gemini, or fake for the drills
   faultRate: "0"
   drill: ""
 

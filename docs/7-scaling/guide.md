@@ -25,7 +25,7 @@ Criterion ([design §6](../eks-sre-llmops-design.md#6-verification-and-evidence-
 ## 0. The numbers from stage 4, into Git — ops, laptop
 
 **0.1 — fake mode first.** The values change in 0.2 is a new pod template, so it is a canary, and a canary is judged
-on traffic. In gemini mode that traffic would spend the free tier's quota. Switch with **only the first block** of
+on traffic. In real mode that traffic would spend the provider's quota and money. Switch with **only the first block** of
 [stage 5, section 2](../5-delivery/guide.md#2-fake-mode-for-the-drills--ops), then start steady traffic in window 3 (k6; window 2 holds the tunnel) and
 leave it running until the end of 0.3:
 
@@ -277,7 +277,7 @@ Read, in this order:
 6. **Errors during scale-in:** the error ratio while replicas were falling. It should be at or near zero; the preStop
    wait and the deregistration delay exist for this.
 
-**3.5 — back to Gemini**, as in [stage 5, section 5](../5-delivery/guide.md#5-back-to-gemini--ops).
+**3.5 — back to real mode**, as in [stage 5, section 5](../5-delivery/guide.md#5-back-to-real-mode--ops).
 
 ---
 

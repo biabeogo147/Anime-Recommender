@@ -61,20 +61,22 @@ variable "enabled_stages" {
   default = []
 }
 
-# The api's mode, an OPERATOR switch like enabled_stages: `fake` for the capacity run and every drill, `gemini` for the
-# baseline and normal traffic. Changing either changes the pod template, which is a new version: a rolling update until
-# stage 5, a canary after it — which is exactly how the drills are started (docs/5-delivery/guide.md).
+# The api's mode, an OPERATOR switch like enabled_stages: `fake` for the capacity run and every drill, a real provider
+# (`openai` or `gemini`) for the baseline and normal traffic. openai is the default since 2026-09-22, when
+# gemini-3.5-flash-lite took about 50 s per call (design §4.1). Changing it changes the pod template, which is a new
+# version: a rolling update until stage 5, a canary after it — which is exactly how the drills are started
+# (docs/5-delivery/guide.md).
 variable "api_llm_provider" {
   type    = string
-  default = "gemini"
+  default = "openai"
   validation {
-    condition     = contains(["gemini", "fake"], var.api_llm_provider)
-    error_message = "api_llm_provider is gemini or fake."
+    condition     = contains(["openai", "gemini", "fake"], var.api_llm_provider)
+    error_message = "api_llm_provider is openai, gemini or fake."
   }
 }
 
 variable "api_fault_rate" {
-  # Read ONLY by the fake provider: on a gemini version it injects nothing (Delivery A8.2). The root refuses the
+  # Read ONLY by the fake provider: on a real-provider version it injects nothing (Delivery A8.2). The root refuses the
   # combination instead of letting a drill "pass" on zero faults.
   type    = string
   default = "0"

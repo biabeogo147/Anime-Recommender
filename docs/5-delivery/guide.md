@@ -21,7 +21,7 @@ Criteria closed ([design §6](../eks-sre-llmops-design.md#6-verification-and-evi
 
 How a version is made in this stage: every change to the api's pod template is a new version. The three used here are
 all `terraform.tfvars` values, applied with `make bootstrap-plan && make bootstrap`:
-- `api_llm_provider`: the mode (gemini ↔ fake);
+- `api_llm_provider`: the mode (a real provider, `openai` or `gemini`, ↔ fake);
 - `api_drill`: a marker annotation, and nothing else — the promotion drill;
 - `api_fault_rate`: the rollback drill.
 
@@ -32,7 +32,7 @@ A new digest from CI walks the same steps. With no traffic, its analysis is inco
 
 ## 0. Before you start — ops
 
-Stage 4 passed, and the api is in gemini mode. The Argo Rollouts chart version was pinned in stage 2 with the others.
+Stage 4 passed, and the api is in real mode (`openai`). The Argo Rollouts chart version was pinned in stage 2 with the others.
 The first command checks that it is not `PIN_ME`.
 
 ```bash
@@ -42,7 +42,7 @@ grep -n 'argoRollouts:' deploy/argocd/root/values.yaml
 grep -E '^(enabled_stages|api_)' infra/terraform/bootstrap/terraform.tfvars
 ```
 
-Expected: a version number after `argoRollouts:`. Then `["gitops", "load"]`, `gemini`, `"0"`.
+Expected: a version number after `argoRollouts:`. Then `["gitops", "load"]`, `openai`, `"0"`.
 
 ---
 
@@ -346,13 +346,13 @@ so no canary starts: `back on the old stable`, then `Synced/Healthy`.
 
 ---
 
-## 5. Back to Gemini — ops
+## 5. Back to real mode — ops
 
 This is a mode switch with no traffic again, so it is pushed through the same way as in section 2.
 
 ```bash
 cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
-sed -i 's/^api_llm_provider .*/api_llm_provider          = "gemini"/' infra/terraform/bootstrap/terraform.tfvars
+sed -i 's/^api_llm_provider .*/api_llm_provider          = "openai"/' infra/terraform/bootstrap/terraform.tfvars
 make bootstrap-plan && make bootstrap
 kubectl -n argocd annotate application root argocd.argoproj.io/refresh=hard --overwrite
 ok=; for i in $(seq 40); do make -s rollout-status | grep -qE 'phase=(Paused|Progressing)' && { ok=1; break; }; sleep 15; done
@@ -362,7 +362,7 @@ for i in $(seq 40); do make -s rollout-status | grep -q 'phase=Healthy' && break
 kubectl -n anime get rollout anime-api -o jsonpath='provider={.spec.template.spec.containers[0].env[?(@.name=="LLM_PROVIDER")].value}{"\n"}'
 ```
 
-Expected: `provider=gemini`, `phase=Healthy`.
+Expected: `provider=openai`, `phase=Healthy`. To run the real mode on Gemini instead, use `gemini` wherever these blocks write `openai` (design §4.1).
 
 ---
 

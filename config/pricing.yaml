@@ -1,8 +1,13 @@
-# USD per 1M tokens, Gemini API paid tier "Standard" list prices.
-# Source: https://ai.google.dev/gemini-api/docs/pricing (page last updated 2026-09-11, checked 2026-09-15).
-# The free tier is used in practice, so these values estimate what traffic would cost on the paid tier.
-# Thinking tokens are billed as output tokens.
+# USD per 1M tokens, list prices.
+# Gemini: API paid tier "Standard". Source: https://ai.google.dev/gemini-api/docs/pricing (page last updated 2026-09-11,
+#   checked 2026-09-15). The free tier is used in practice, so these values estimate what traffic would cost on the paid
+#   tier. Thinking tokens are billed as output tokens.
+# OpenAI: "Standard" tier, uncached input. Source: https://developers.openai.com/api/docs/pricing (the page shows no
+#   update date; read 2026-09-22).
 models:
+  gpt-4o-mini:
+    input_per_1m: 0.15
+    output_per_1m: 0.60
   gemini-3.5-flash-lite:
     input_per_1m: 0.30
     output_per_1m: 2.50

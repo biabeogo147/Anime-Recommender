@@ -1,4 +1,5 @@
-// Criterion #6: the latency baseline T is read from — Gemini mode, at whatever rate the free tier allows, for long enough
+// Criterion #6: the latency baseline T is read from — real mode (OpenAI or Gemini), at whatever rate the provider
+// allows, for long enough
 // that at least 200 requests arrive (the guide checks the server-side count, since a 429 or 503 still counts). Two hundred because a p95 rests on its slowest 5%: over 60 requests that is three
 // samples, over 200 it is ten, and one slow call near a bucket boundary can no longer decide which bucket T lands in
 // (Load A3.6). The DURATION follows from the count and the rate, not the other way round.

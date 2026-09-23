@@ -34,14 +34,14 @@ memory. Every value in `cv.md` names the file it came from, and the mode it was 
 
 ## M1 — The latency target
 
-**At** [load guide 2.2](../4-load/guide.md), in **gemini** mode.
+**At** [load guide 2.2](../4-load/guide.md), in **real** mode (`openai`, `gpt-4o-mini`).
 
 **Record:**
 - `[T-SLO]`: the `T = … le=<boundary>` line, as seconds (`le=3.0` becomes "3 s"). It is printed, not saved; copy
   it into `~/anime-evidence/t-value.txt` at once;
 - `[N-BASELINE]`: the request count from `t-count.txt`, rounded down.
 
-**Valid only if** the count is at least 200 and the mode is gemini. A T read from k6, or from fake mode, is not T.
+**Valid only if** the count is at least 200 and the mode is a real provider, named with the model in `cv.md`. A T read from k6, or from fake mode, is not T.
 
 ## M2 — The knee
 
@@ -117,7 +117,7 @@ did not move: `[NODES-MAX]` is not used, and the CV takes the fallback wording.
 
 ## M6 — Cost per 1,000 requests
 
-**At** [tracing guide 3.2](../8-tracing/guide.md), in **gemini** mode.
+**At** [tracing guide 3.2](../8-tracing/guide.md), in **real** mode (`openai`).
 
 **Record:** `[COST-PER-1K]` = the value in `cost-per-1000.txt`, in USD, rounded to four significant figures, with
 its `model` label and the date in `cost-pricing-date.txt`.
@@ -127,7 +127,7 @@ its `model` label and the date in `cost-pricing-date.txt`.
 ## M7 — Drill traffic kept out of Langfuse
 
 **At** [tracing guide 2.4](../8-tracing/guide.md), right after its first block, while the api is in **fake** mode with
-tracing on, and **before** switching back to gemini. Five minutes of drill traffic, then count what reached each sink.
+tracing on, and **before** switching back to real mode. Five minutes of drill traffic, then count what reached each sink.
 
 ```bash
 cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
@@ -146,7 +146,7 @@ make -s prom AT=$AT Q="sum(increase(traces_span_metrics_calls_total{service_name
 } | tee ~/anime-evidence/m7-counts.txt
 ```
 
-Then put the api back in gemini mode and run the **second block of tracing 2.4**, the later gemini trace. When that
+Then put the api back in real mode and run the **second block of tracing 2.4**, the later real trace. When that
 trace is visible in Langfuse, ingestion has caught up past the drill window. Only then count:
 
 ```bash
@@ -160,7 +160,7 @@ make -s langfuse-count FROM=$(cat ~/anime-evidence/m7.from) TO=$(cat ~/anime-evi
 
 **Valid only if** all three of these hold:
 - `langfuse http 200`;
-- the later gemini trace was found in Langfuse in the same session;
+- the later real trace was found in Langfuse in the same session;
 - the span-metric count is close to the request count, so the traces did exist and reached Tempo.
 
 Without all three, a `0` is also what a broken export looks like, and the clause is dropped.

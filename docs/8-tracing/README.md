@@ -7,6 +7,8 @@ than in deciding what goes where — and in never mistaking a number that exists
 **Where this sits.** The `OTEL`, `TEMPO` and `LF` boxes in [design §3](../eks-sre-llmops-design.md#3-architecture).
 Criteria **#11** and **#12**.
 
+**Compared with Medical:** Medical has no such stage; why is in [stage by stage](../aws/compare-by-stage.md#only-in-anime).
+
 Ideas are in [`concepts.md`](concepts.md); this stage also leans on stage 4's
 [fake provider](../4-load/concepts.md#7-the-fake-provider-as-a-load-source) and
 [empty results](../4-load/concepts.md#8-an-empty-result-is-not-a-zero). Pipelines, attributes, exemplar settings, the

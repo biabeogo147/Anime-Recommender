@@ -7,6 +7,8 @@ what a platform that lives a few hours a day can and cannot show.**
 **Where this sits.** The `PROM` and `DIS` boxes in [design §3](../eks-sre-llmops-design.md#3-architecture).
 Criterion **#10**.
 
+**Compared with Medical:** Medical has no such stage; why is in [stage by stage](../aws/compare-by-stage.md#only-in-anime).
+
 Ideas are in [`concepts.md`](concepts.md). Objectives, windows, factors, routing and the drill's arithmetic are in
 [design §4.3](../eks-sre-llmops-design.md#43-slos-and-alerting-deployslo). This page is the reasoning.
 

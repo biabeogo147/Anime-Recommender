@@ -89,7 +89,7 @@ flowchart LR
     ECR[("ECR<br/>anime-api · anime-ui")]
     SM["Secrets Manager<br/>4 secrets"]
     S3[("S3<br/>Terraform state")]
-    EXT["Gemini · Hugging Face"]
+    EXT["OpenAI or Gemini · Hugging Face"]
     LF["Langfuse Cloud"]
     DIS["Discord"]
 
@@ -150,7 +150,7 @@ flowchart TB
 
     ARGO --> LBC & ESO & PROM & ROLLOUTS & KEDA & CAS & OTEL & TEMPO & API & UI
     LBC -->|"creates both ALBs<br/>and their target groups"| API
-    ESO -->|"Gemini · HF · Langfuse · Discord"| API
+    ESO -->|"OpenAI/Gemini · HF · Langfuse · Discord"| API
     API -->|"scrape /metrics"| PROM
     API -->|"OTLP spans"| OTEL
     OTEL --> TEMPO
@@ -225,7 +225,7 @@ analysis returns `Inconclusive` and waits for a person, because "no errors obser
 evidence of anything.
 
 **And the latency gate is relative, not absolute.** The canary is compared with the **stable** version in the
-same window, not with the SLO threshold T. T is measured against Gemini; every canary drill runs the fake
+same window, not with the SLO threshold T. T is measured against the real model (OpenAI `gpt-4o-mini` by default); every canary drill runs the fake
 provider at a fraction of that latency, so a `p95 ≤ T` gate would sail through saturation and could never
 fail. Reasoning in [design §4.4](docs/eks-sre-llmops-design.md#44-progressive-delivery-argo-rollouts).
 
@@ -243,10 +243,10 @@ the reason for the next one. Rows 1 to 3 are done and measured; the rest is desi
 | 5 *(not built)* | **Argo CD app-of-apps** | Nobody can say what the cluster runs, or put it back after a teardown | Git is the record; one root Application renders the rest — criterion #2 | Traffic still has no way in, and later, a canary will have no way to split it |
 | 6 *(not built)* | **AWS Load Balancer Controller** | An `Ingress` would sit `Pending` forever, and weighted routing does not exist | Two load balancers from one controller: a public one with the weighted target groups the canary depends on, and an internal one | Both answer on an `*.elb.amazonaws.com` name over plain HTTP, and the internal one has no name at all |
 | 7 *(not built)* | **Route 53 + ACM + an internal ALB + WireGuard** | The app answers on an AWS load-balancer name over plain HTTP, and Argo CD, Grafana, Prometheus and Alertmanager would answer to anyone who found them | Real names under `anime.recruitai.io.vn`; one ACM wildcard on **both** load balancers, renewed by AWS with a key that cannot be exported; the four admin names resolve publicly but answer with **private** addresses, reachable only over the VPN. The gateway doubles as the SSM target for `make tunnel`, which lets the Kubernetes API endpoint be closed to the internet entirely — criteria #15, #16 | Keys and webhooks would still have to live in Git |
-| 8 *(not built)* | **External Secrets + EKS Pod Identity** | The Gemini key, HF token, Langfuse keys and Discord webhook have nowhere safe to live | Values arrive from Secrets Manager; Git holds only their names, and no pod holds an AWS access key | Images are still built by hand, unscanned and unsigned |
+| 8 *(not built)* | **External Secrets + EKS Pod Identity** | The model keys, HF token, Langfuse keys and Discord webhook have nowhere safe to live | Values arrive from Secrets Manager; Git holds only their names, and no pod holds an AWS access key | Images are still built by hand, unscanned and unsigned |
 | 9 *(not built)* | **GitHub Actions: test → index → build → Trivy → ECR → cosign** | Whoever can build can ship, and nobody can say what is inside an image | Commit to signed digest with no human in the path, over OIDC with no stored AWS credentials — criteria #3 and #5 | Nothing measures whether what shipped is healthy |
 | 10 *(not built)* | **kube-prometheus-stack** | No metrics leave the pods; health is a guess | Scrape, dashboards, Alertmanager, and the one datastore both controllers below will read | "Healthy" is still a human reading a graph, with no threshold to compare against |
-| 11 *(not built)* | **k6 baseline and ramp** | An SLO threshold chosen without a measurement is a number someone liked | Real latency in gemini mode, read from the server's own histogram, sets the target **T**; a fake-mode ramp at an open arrival rate measures what the minimum replica count can carry — criteria #6, #7 | A threshold nobody is paged about |
+| 11 *(not built)* | **k6 baseline and ramp** | An SLO threshold chosen without a measurement is a number someone liked | Real latency in real mode, read from the server's own histogram, sets the target **T**; a fake-mode ramp at an open arrival rate measures what the minimum replica count can carry — criteria #6, #7 | A threshold nobody is paged about |
 | 12 *(not built)* | **Sloth SLOs + multi-window burn-rate alerts** | A target with no alert is a wish; a naive alert either pages on noise or sleeps through an outage | Fast-burn pages, slow-burn tickets, each with a runbook link — criterion #10 | Alerts fire *after* users were hurt; a bad release still reaches everyone first |
 | 13 *(not built)* | **Argo Rollouts canary + AnalysisRun** | A bad release reaches 100% of users at once, and rollback is a human noticing | 10/50/100 with Prometheus analysis at each step, automatic abort, and a pause when traffic is too thin to judge — criteria #8, #9 | Capacity is fixed: a spike queues behind whatever pods exist |
 | 14 *(not built)* | **KEDA on in-flight requests, and the Cluster Autoscaler** | Capacity is whatever replica count was committed, and the obvious remedy does not work here: the pods spend their time waiting on two remote APIs, so CPU barely moves and an HPA on CPU would never fire | Scaling follows in-flight requests — the one signal that tracks demand when the work is waiting, not computing — between 2 and 8 pods; nodes added when pods no longer fit — criterion #14 | You can see *that* a request was slow, never *where* it was slow |
@@ -254,7 +254,7 @@ the reason for the next one. Rows 1 to 3 are done and measured; the rest is desi
 | 16 *(not built, P1)* | **Retrieval eval gate** | Prompt and data changes are merged on opinion | `hit@4` over a golden set, compared against a stored baseline, run in CI with no LLM calls — criterion #13 | — |
 
 **The workload itself:** FastAPI on uvicorn, LangChain, a Chroma index of 269 anime, embeddings from the
-Hugging Face Inference API and generation from Gemini. `/readyz` reports the index, `/metrics` feeds
+Hugging Face Inference API and generation from OpenAI or Gemini (the cluster runs OpenAI since 2026-09-22, design §4.1). `/readyz` reports the index, `/metrics` feeds
 Prometheus, and `config/pricing.yaml` turns tokens into dollars.
 
 ## Trade-offs, on purpose
@@ -319,7 +319,7 @@ and each one points at the box in the architecture it zooms into.
 | 7 · Scaling, pods and nodes | [README](docs/7-scaling/README.md) · [concepts](docs/7-scaling/concepts.md) | [guide](docs/7-scaling/guide.md) | [questions](docs/7-scaling/questions.md) · [answers](docs/7-scaling/answers.md) |
 | 8 · Tracing and cost | [README](docs/8-tracing/README.md) · [concepts](docs/8-tracing/concepts.md) | [guide](docs/8-tracing/guide.md) | [questions](docs/8-tracing/questions.md) · [answers](docs/8-tracing/answers.md) |
 | The whole project | [design](docs/eks-sre-llmops-design.md) | | [questions](docs/common/questions.md) · [answers](docs/common/answers.md) |
-| Managed against self-managed, beside Medical | [design §1](docs/eks-sre-llmops-design.md#1-goal) | | [questions](docs/aws/questions.md) · [answers](docs/aws/answers.md) |
+| Managed against self-managed, beside Medical | [design §1](docs/eks-sre-llmops-design.md#1-goal) · [compared with Medical](docs/aws/compare-to-medical-rag-chatbot.md) | | [questions](docs/aws/questions.md) · [answers](docs/aws/answers.md) |
 | Measured results | [`docs/evidence/`](docs/evidence/) | | |
 
 ---

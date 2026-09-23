@@ -210,9 +210,11 @@ the shell history.
 
 ```bash
 cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
-read -rs -p "GOOGLE_API_KEY: " G; echo; read -rs -p "HF_TOKEN: " H; echo
-aws secretsmanager put-secret-value --secret-id anime/llm \
-  --secret-string "$(jq -n --arg g "$G" --arg h "$H" '{GOOGLE_API_KEY:$g, HF_TOKEN:$h}')" >/dev/null; unset G H
+read -rs -p "OPENAI_API_KEY: " O; echo; read -rs -p "GOOGLE_API_KEY (Enter to skip): " G; echo
+read -rs -p "HF_TOKEN: " H; echo
+# A skipped key is left out rather than stored empty; the api reads only the key of the provider it runs.
+aws secretsmanager put-secret-value --secret-id anime/llm --secret-string "$(jq -n --arg o "$O" --arg g "$G" --arg h "$H" \
+  '{OPENAI_API_KEY:$o, GOOGLE_API_KEY:$g, HF_TOKEN:$h} | with_entries(select(.value != ""))')" >/dev/null; unset O G H
 read -rs -p "LANGFUSE_PUBLIC_KEY: " P; echo; read -rs -p "LANGFUSE_SECRET_KEY: " S; echo
 aws secretsmanager put-secret-value --secret-id anime/langfuse \
   --secret-string "$(jq -n --arg p "$P" --arg s "$S" '{LANGFUSE_PUBLIC_KEY:$p, LANGFUSE_SECRET_KEY:$s}')" >/dev/null; unset P S
@@ -224,8 +226,41 @@ for s in llm langfuse alerting; do printf '%-9s ' $s; aws secretsmanager get-sec
 ```
 
 This block reads input, so paste it in two parts if your terminal struggles: up to the last `unset D`, then the `for`
-loop. Expected: every length above `0`. A secret you skipped prints `ResourceNotFoundException … AWSCURRENT` — expected
-until you set it.
+loop. Pasted whole, a `read` can take the next pasted line as its answer. Expected: every length above `0`. A secret you
+skipped prints `ResourceNotFoundException … AWSCURRENT` — expected until you set it. `anime/llm` needs `HF_TOKEN` and
+the key of the provider the api runs: `OPENAI_API_KEY` by default, `GOOGLE_API_KEY` for Gemini.
+
+**2.6 — ops: add one key to `anime/llm` without losing the others.** `put-secret-value` replaces the whole JSON, so a
+key is added by reading the current value and merging into it. Used on 2026-09-22 to add `OPENAI_API_KEY` to a secret
+that held only the Gemini and Hugging Face keys. Paste the first line alone and type the key:
+
+```bash
+read -rs -p "OPENAI_API_KEY: " O; echo; echo "length: ${#O}"
+```
+
+Then, with the length above `0`:
+
+```bash
+cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
+cur=$(aws secretsmanager get-secret-value --secret-id anime/llm --query SecretString --output text)
+aws secretsmanager put-secret-value --secret-id anime/llm \
+  --secret-string "$(jq -c --arg o "$O" '. + {OPENAI_API_KEY:$o}' <<<"$cur")" >/dev/null; unset O cur
+aws secretsmanager get-secret-value --secret-id anime/llm --query SecretString --output text | jq -c 'map_values(length)'
+```
+
+Expected: the keys that were there before, with their lengths, plus `OPENAI_API_KEY` (about 164 for a project key).
+
+A cluster built after this reads the new value when it starts. A cluster **already running** would pick it up only at
+the ExternalSecret's next hourly refresh, and a pod switched to `openai` before that would never become ready
+(`OPENAI_API_KEY is not set`). So, only if the cluster is up (tunnel open), copy it now and check:
+
+```bash
+cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
+kubectl -n anime annotate externalsecret anime-llm force-sync=$(date +%s) --overwrite
+sleep 15
+kubectl -n anime get secret anime-llm -o json | jq -e '.data | has("OPENAI_API_KEY")' >/dev/null \
+  && echo "OPENAI_API_KEY in the cluster" || echo "NOT YET: wait and rerun the last command"
+```
 
 ---
 

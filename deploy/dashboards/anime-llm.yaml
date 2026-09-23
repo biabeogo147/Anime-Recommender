@@ -27,7 +27,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [{
             "refId": "A", "legendFormat": "model={{model}}",
-            "expr": "1000 * sum by (model) (rate(anime_llm_cost_usd_total{model=~\"gemini-.*|gemma-.*\"}[5m])) / sum by (model) (rate(anime_llm_request_duration_seconds_count{outcome=\"ok\",model=~\"gemini-.*|gemma-.*\"}[5m]))"
+            "expr": "1000 * sum by (model) (rate(anime_llm_cost_usd_total{model=~\"gemini-.*|gemma-.*|gpt-.*\"}[5m])) / sum by (model) (rate(anime_llm_request_duration_seconds_count{outcome=\"ok\",model=~\"gemini-.*|gemma-.*|gpt-.*\"}[5m]))"
           }]
         },
         {
@@ -36,7 +36,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [{
             "refId": "A", "legendFormat": "{{model}} {{type}}",
-            "expr": "60 * sum by (model, type) (rate(anime_llm_tokens_total{model=~\"gemini-.*|gemma-.*\"}[5m]))"
+            "expr": "60 * sum by (model, type) (rate(anime_llm_tokens_total{model=~\"gemini-.*|gemma-.*|gpt-.*\"}[5m]))"
           }]
         },
         {
