@@ -137,8 +137,14 @@ E=~/anime-evidence; ID=$(cat $E/trace-real.id)
 make -s langfuse-obs ID=$ID | tee $E/trace-real-langfuse.txt
 ```
 
-Expected: `langfuse http 200`, then observations for the same spans. The `chat` observation has type `GENERATION`,
-the model, and non-zero input and output usage. `observations: 0` right away can be ingestion's delay: wait two
+Expected: `langfuse http 200`, then observations for the same spans, and under them a `generation` block with the
+model, non-zero usage and a cost.
+
+**The list endpoint does not carry the model or the usage.** `/api/public/v2/observations` returns a summary whose
+`modelId`, `inputPrice`, `outputPrice` and `totalPrice` are `null` even when Langfuse holds all of them — measured
+2026-09-23, where the web UI showed `gpt-4o-mini`, 1,418 tokens and `$0.00042` for a trace whose list rows were
+empty. `make langfuse-obs` therefore fetches each `GENERATION` by id from `/api/public/observations/<id>`. Reading
+only the list is the false pass to avoid here: it looks exactly like a provider that reported no usage. `observations: 0` right away can be ingestion's delay: wait two
 minutes and rerun. `401` is the keys or the region, never an absence — and the message says which: *"Confirm that you've configured
 the correct host"* points at the region rather than the key. Check the prefixes without printing the keys:
 `LANGFUSE_PUBLIC_KEY` starts `pk-lf-` and `LANGFUSE_SECRET_KEY` starts `sk-lf-`; if they are the other way round,
