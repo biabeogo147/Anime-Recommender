@@ -161,6 +161,15 @@ Expected, five lines to report:
 low-load value is the average of the first four p95 points that are numbers. Change the factor here, not after seeing
 the graph, and report it with the result.
 
+The rule is already written in [`docs/evidence/load.md`](../evidence/load.md), and committed before this run: Git's
+history is what makes "written first" checkable later. Changing the factor means changing it there, in a commit of its
+own, before the ramp. Keep a copy beside the run's own files too:
+
+```bash
+cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
+sed -n '/^## #7/,$p' docs/evidence/load.md | tee ~/anime-evidence/ramp-knee-rule.txt
+```
+
 **3.2 — fake mode.** Two replicas, no autoscaler, a provider that costs nothing. The loop waits until the Deployment's
 template really says `fake`. Only then does `rollout status` mean the new pods are the ones serving.
 
