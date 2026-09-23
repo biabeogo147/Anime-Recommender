@@ -16,8 +16,11 @@ Bộ liên quan: [tổng quan project](../common/questions.md), [Terraform](../1
 Medical: `Medical-RAG-Chatbot/docs/aws/questions.md`. Câu nào trùng với một bộ stage thì ở đây chỉ trả lời ở mức ranh
 giới và trỏ sang bộ đó.
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Phía Medical **đã dựng và đã chạy**; phía Anime **mới thiết kế,
-chưa dựng**. Câu trả lời tốt nói phía Medical bằng kinh nghiệm, phía Anime bằng thiết kế, và không trộn hai thì với nhau.
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Phía Medical **đã dựng và đã chạy**. Phía Anime, tính tới
+**2026-09-23**, đã dựng tới stage 4: cụm, cây GitOps và pipeline CI/CD đang chạy trên AWS, criteria #1, #3, #4, #5, #6
+đã đóng có bằng chứng; canary, cảnh báo SLO, autoscaler và tracing thì **mới thiết kế**. Câu trả lời tốt nói đúng thì
+cho từng phần — quá khứ cho phần đã chạy, "tôi thiết kế" cho phần chưa — và không trộn hai thì với nhau. Trạng thái
+từng criterion đọc ở [`docs/evidence/`](../evidence/), không đọc ở câu này.
 
 ---
 

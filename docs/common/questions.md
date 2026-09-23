@@ -16,9 +16,10 @@ Bộ theo stage: [Terraform](../1-terraform/questions.md) · [GitOps](../2-gitop
 [Scaling](../7-scaling/questions.md) · [Tracing](../8-tracing/questions.md). So sánh với Medical:
 [managed so với self-managed](../aws/questions.md).
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Phần app **đã làm và đã đo, chạy local**; mọi thứ bên dưới nó
-**mới thiết kế, chưa dựng**. Câu trả lời tốt nói được con số thật của phần đã đo, và không bao giờ mượn thì quá khứ cho
-phần chưa dựng.
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Phần app **đã làm và đã đo, chạy local**. Bên dưới nó, tính tới
+**2026-09-23**: hạ tầng, GitOps và CI/CD **đã dựng và đã đo trên AWS**; canary, SLO, autoscaler và tracing **mới thiết
+kế**. Câu trả lời tốt nói được con số thật của phần đã đo, và không bao giờ mượn thì quá khứ cho phần chưa dựng —
+trạng thái từng criterion đọc ở [`docs/evidence/`](../evidence/).
 
 ---
 

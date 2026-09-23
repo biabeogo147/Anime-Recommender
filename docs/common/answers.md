@@ -4,8 +4,9 @@
 ngôi thứ nhất, thường là đủ. *Nếu được hỏi thêm* dùng khi người phỏng vấn đào sâu. Dòng **Mẹo** là lời nhắc cho
 bạn, không nói ra. Tham chiếu dạng `SLO A5.2` trỏ tới bộ của stage tương ứng.
 
-Phần app **đã làm và đã đo, chạy local** — nói bằng kinh nghiệm được. Mọi thứ bên dưới **mới thiết kế, chưa dựng** —
-nói bằng "tôi thiết kế", "tôi chọn". Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật; ghi chú **[kiểm chứng]** là
+Phần app **đã làm và đã đo, chạy local** — nói bằng kinh nghiệm được. Bên dưới nó, tính tới **2026-09-23**: hạ tầng,
+GitOps và CI/CD **đã dựng và đã đo trên AWS** (criteria #1, #3, #4, #5, #6, xem [`docs/evidence/`](../evidence/)) — cũng
+nói bằng kinh nghiệm; canary, SLO, autoscaler và tracing **mới thiết kế** — nói bằng "tôi thiết kế", "tôi chọn". Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật; ghi chú **[kiểm chứng]** là
 hành vi của công cụ cần xác nhận trước khi nói chắc. Số thập phân viết bằng dấu chấm.
 
 Thuật ngữ dùng thống nhất trong bộ này: **phase app** cho phần đã làm; **stage** cho tám giai đoạn hạ tầng; **tiêu chí**
@@ -38,10 +39,13 @@ cho mười sáu điều kiện hoàn thành trong design; **pass sai** cho mộ
 
 **A1.1** **Ý chính:** "Anime Recommender là một app RAG gợi ý anime — workload thì nhỏ, còn chủ đề là vận hành nó như một
 đội SRE: SLO với alert theo burn rate, canary tự rollback, autoscaling theo đúng tín hiệu, và một LLM mà tôi thấy được chi
-phí. Phần app tôi đã làm và đo, chạy local. Phần hạ tầng trên EKS tôi đã thiết kế trọn vẹn — tám stage, mười sáu tiêu chí
-hoàn thành — nhưng chưa dựng. Nó là bản managed song song với Medical, project mà tôi đã tự dựng Kubernetes bằng kubeadm."
+phí. Phần app tôi đã làm và đo, chạy local. Trên EKS tôi đã dựng tới stage 4: cụm, cây GitOps và pipeline CI/CD đang
+chạy, năm tiêu chí đã đóng bằng số đo thật — trong đó có mức trễ mục tiêu T = 8 giây, lấy từ 230 request thật. Bốn stage
+còn lại — canary, SLO, autoscaling, tracing — tôi đã thiết kế trọn vẹn nhưng chưa dựng. Nó là bản managed song song với
+Medical, project mà tôi đã tự dựng Kubernetes bằng kubeadm."
 
-**Mẹo:** câu "đã làm và đo" với "đã thiết kế, chưa dựng" phải nằm trong mười giây đầu. Mọi câu hỏi sau đó sẽ dựa trên nó.
+**Mẹo:** ba thì phải nằm trong mười giây đầu — **đã đo ở local**, **đã dựng và đo trên AWS**, **đã thiết kế nhưng chưa
+dựng**. Mọi câu hỏi sau đó sẽ dựa trên nó, nên nói sai thì ở đây là hỏng cả buổi.
 
 **A1.2** **Ý chính:** "App tách thành hai: một API FastAPI giữ index vector 269 anime và gọi Gemini, và một UI
 Streamlit mỏng. Phase app sửa sáu lỗi thật và đo kết quả: một image 6.45 GB thành hai image cộng lại 1.18 GB,

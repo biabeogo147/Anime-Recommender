@@ -5,7 +5,9 @@ ngôi thứ nhất, thường là đủ. *Nếu được hỏi thêm* dùng khi 
 bạn, không nói ra. Tham chiếu dạng `Terraform A5.2` trỏ tới bộ tương ứng của Anime.
 
 Phía Medical **đã dựng và đã chạy** — kể bằng kinh nghiệm được, nhưng chỉ những gì evidence của Medical ghi. Phía Anime
-**mới thiết kế, chưa dựng** — kể bằng "tôi thiết kế", "tôi chọn". Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật;
+tính tới **2026-09-23** đã chạy tới stage 4 (criteria #1, #3, #4, #5, #6 đóng có bằng chứng trong
+[`docs/evidence/`](../evidence/)); phần canary, SLO, autoscaler và tracing **mới thiết kế** — phần đó kể bằng "tôi thiết
+kế", "tôi chọn". Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật;
 ghi chú **[kiểm chứng]** là hành vi của dịch vụ cần xác nhận trước khi nói chắc. Số thập phân viết bằng dấu chấm.
 
 Thuật ngữ dùng thống nhất trong bộ này: **self-managed** cho cụm kubeadm của Medical; **managed** cho EKS và các dịch vụ
@@ -16,7 +18,8 @@ cho IAM role.
 
 | Số | Giá trị | Dùng ở |
 |---|---|---|
-| Dựng lại toàn bộ nền tảng Medical từ stack rỗng | 14 m 11 s | A2.1 |
+| Dựng lại toàn bộ nền tảng Medical từ stack rỗng | 21 m 47 s (17 Application, 8 sync wave) | A2.1 |
+| Điểm trễ mục tiêu của Anime (T), từ 230 request thật | 8 s | Load A1.1 |
 | Chi phí Medical khi chạy | khoảng 0.53 USD/giờ | A2.6 |
 
 **Còn phải điền:**
