@@ -8,7 +8,7 @@ image:
   repository: "" # <registry>/anime-api, from the root's pins
   # Pulled by DIGEST, never by tag: Git records it, Argo CD deploys it, the signature is on it, so all three always name
   # the same image (CI/CD A2.2). Until CI exists, `make image` builds it and prints this value.
-  digest: sha256:e80696c77b2a8bec728b2cf22cfc939c32ee80b83634f65a515b7f0ec56b9eca
+  digest: sha256:9e04cc4e8a95a7f249a67679c6f9127de34326dabb4939640b4245e5c11f90f0
 
 # Two replicas, preferably on different nodes. The spread is a preference (ScheduleAnyway), so after a Spot reclaim both
 # can land on one node until the next rollout — not a guarantee that a reclaim takes only one (Terraform A4.2).
