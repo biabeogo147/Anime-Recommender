@@ -46,19 +46,30 @@ aws secretsmanager get-secret-value --secret-id anime/llm --query SecretString -
 make bootstrap-plan
 ```
 
-Expected: `load enabled`, the three lines, `openai key stored`, `Plan: 0 to add, 1 to change, 0 to destroy.` Then apply, and wait for the
-PodMonitor. The root passes `load` down to `anime-api` only when it next syncs, which can be minutes away:
+Expected: `load enabled`, the three lines, `openai key stored`, `Plan: 0 to add, 1 to change, 0 to destroy.` Then apply
+and wait. The PodMonitor belongs to `anime-api`, at **wave 1**, and the CRD it needs comes from
+kube-prometheus-stack at wave 0 — so on a cluster rebuilt this session the waves run first, about 15 minutes; on a
+cluster already at 8/8 it is a minute or two. The loop reports what is still missing, so a stall is visible rather
+than silent:
 
 ```bash
 cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
 make bootstrap
 kubectl -n argocd annotate application root argocd.argoproj.io/refresh=hard --overwrite
-for i in $(seq 30); do kubectl -n anime get podmonitor anime-api >/dev/null 2>&1 && break; sleep 10; done
+for i in $(seq 150); do
+  kubectl -n anime get podmonitor anime-api >/dev/null 2>&1 && { echo "PodMonitor is there"; break; }
+  [ $((i % 6)) -eq 0 ] && kubectl -n argocd get applications -o jsonpath='{range .items[*]}{.metadata.name}={.status.sync.status}/{.status.health.status} {end}{"\n"}'
+  sleep 10
+done
 kubectl -n anime get podmonitor anime-api
 ```
 
-Expected: `Apply complete!`, then the PodMonitor listed. `NotFound` after five minutes: compare the stages in
-`kubectl -n argocd get application anime-api -o jsonpath='{.spec.source.helm.valuesObject.stages}'` with the tfvars.
+Expected: `Apply complete!`, the Applications reaching `Synced/Healthy` one wave at a time, then `PodMonitor is
+there`. Two stalls to tell apart if 25 minutes pass:
+- **`anime-api` is not `Synced/Healthy`**: read `kubectl -n anime get pods`. A pod stuck not-Ready with
+  `OPENAI_API_KEY is not set` in its log means the key never reached the Secret ([1-terraform, 2.6](../1-terraform/guide.md#2-the-shared-stack)).
+- **`anime-api` is `Synced/Healthy` but there is no PodMonitor**: the stage never reached the child. Compare
+  `kubectl -n argocd get application anime-api -o jsonpath='{.spec.source.helm.valuesObject.stages}'` with the tfvars.
 
 **1.2 — the api is scraped, by name.** Before you trust any number, check two things. The target exists and is up. The
 TOTAL request counter has samples — not the error counter, which has none until something fails (Load A2.3). Six
