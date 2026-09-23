@@ -34,6 +34,12 @@ từng criterion đọc ở [`docs/evidence/`](../evidence/), không đọc ở 
 
 **A1.3** "Managed" rốt cuộc là chuyển cái gì sang AWS, và cái gì vẫn là của mình?
 
+**A1.4** Câu hỏi nào chỉ Medical trả lời được, còn Anime thì không?
+
+**A1.5** Câu hỏi nào chỉ Anime trả lời được, còn Medical thì không?
+
+**A1.6** Có chuyện gì mà cả hai project đều không chứng minh được không?
+
 ### A2. Control plane: kubeadm so với EKS
 
 **A2.1** Với kubeadm, bạn phải tự lo những gì mà EKS lo thay?

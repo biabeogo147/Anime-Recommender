@@ -38,10 +38,11 @@ cho IAM role.
 
 **A1.1** **Ý chính:** "Vì một project không dạy tốt được cả hai thứ: vận hành cụm, và vận hành service chạy trên cụm.
 Medical tự dựng cụm bằng kubeadm, nên trọng tâm là vận hành cụm: etcd, chứng chỉ, nâng cấp, chuỗi cung ứng. Anime dùng EKS,
-nên trọng tâm dời sang vận hành service: SLO, canary, autoscaling, quan sát LLM. Medical tôi đã dựng và chạy; Anime tôi mới
-thiết kế."
+nên trọng tâm dời sang vận hành service: SLO, canary, autoscaling, quan sát LLM. Medical tôi đã dựng và chạy xong. Anime
+tôi đã dựng tới stage 4 — cụm, GitOps và CI/CD đang chạy — còn canary, SLO, autoscaling và tracing thì mới thiết kế."
 
-**Mẹo:** câu cuối quan trọng. Nói rõ bên nào đã chạy, bên nào mới thiết kế, ngay từ đầu.
+**Mẹo:** câu cuối quan trọng. Nói rõ phần nào đã chạy, phần nào mới thiết kế, ngay từ đầu — và đọc trạng thái hiện tại ở
+[`docs/evidence/`](../evidence/) trước buổi phỏng vấn, đừng tin câu này nếu nó cũ hơn lần chạy gần nhất.
 
 **A1.2** **Ý chính:** "Năm chỗ chính. Cụm: kubeadm trên EC2 so với EKS với node group Spot. CI: Jenkins trong cụm
 so với GitHub Actions. Ký image: khoá KMS so với keyless. Danh tính pod: IRSA dựng tay so với Pod Identity. Chứng
@@ -52,16 +53,55 @@ dùng canary thay môi trường dev, và Kyverno với vận hành etcd chỉ c
 control plane, cấp và gia hạn chứng chỉ, chạy agent cấp credential cho pod; tôi vẫn phải cấu hình đúng, giới hạn
 quyền đúng, và chứng minh nó chạy. Một policy IAM quá rộng trên EKS vẫn là lỗi của tôi."
 
+**A1.4** **Ý chính:** "Những câu cần một control plane của chính mình. *Dựng lại cụm từ đầu* — kubeadm trên ba EC2,
+API server sau NLB nội bộ, chạy Ansible lần hai thì `changed=0`. *Khôi phục khi mất state* — snapshot etcd theo lịch
+lên S3, và một drill khôi phục đo được RTO 7 phút 02 giây. *Nâng cấp Kubernetes* — một playbook đi từng node. *Chặn
+image chưa ký ở admission* — Kyverno từ chối trong prod, tức không chỉ ký mà còn ép. *Vận hành chứng chỉ* —
+cert-manager với wildcard Let's Encrypt qua DNS-01. Trên EKS không có cái nào trong số đó để mà làm: không có control
+plane để dựng, không có etcd để snapshot, chứng chỉ do ACM cấp và gia hạn."
+
+*Nếu được hỏi thêm:* vì sao Anime không làm — không phải bỏ quên, mà EKS lấy mất chính cái đối tượng; đường hồi phục
+của Anime là Git cộng dựng lại, và đó là phép đo M8 chứ không phải một bản khôi phục etcd.
+
+**Mẹo:** đừng nói "Anime chưa làm mấy cái đó". Nói "EKS không để lại cái đó cho tôi làm" — khác nhau hoàn toàn.
+
+**A1.5** **Ý chính:** "Những câu cần một service đáng đo, và một cụm do người khác giữ cho sống. *Hứa gì với người
+dùng* — mức trễ mục tiêu đọc phía server từ traffic thật, đặt đúng biên histogram có thật, rồi viết SLO theo nó.
+*Khi nào thì scale* — theo số request đang bay chứ không theo CPU, với ngưỡng lấy từ điểm service thật sự bão hoà.
+*Release có an toàn không* — canary đi 10 → 50 → 100 dựa trên số đo, bản lỗi tự huỷ, không có người bấm nút. *Một
+request tốn bao nhiêu* — span `gen_ai.*`, số token và ước tính tiền. Medical không có SLO, không có autoscaler,
+không có trace, nên chưa bao giờ cần tới những con số này."
+
+*Nếu được hỏi thêm:* một câu nữa chỉ Anime có — *ghép dịch vụ managed lại với nhau*: ALB sinh ra từ Ingress, một
+IngressGroup cho bốn giao diện, readiness gate, external-dns viết tên, ACM gắn vào listener, mỗi controller một IAM
+role qua Pod Identity. Cụm self-managed không có gì trong đó.
+
+**Mẹo:** ở đây nên kể kèm một lỗi thật đã gặp — ví dụ CA của webhook không khớp Secret vì chart sinh CA mới mỗi lần
+render. Nó chứng minh mình đã vận hành thật, chứ không chỉ đọc tài liệu.
+
+**A1.6** **Ý chính:** "Có, và tôi biết chúng là gì. Không multi-region, và ngoài etcd thì không có DR. Không service
+mesh. Không traffic người dùng thật — mọi tải đều do k6 sinh ra, và cụm bị xoá giữa các phiên. Không on-call: cảnh
+báo đi vào webhook chat, không có ca trực, không có dead-man's switch. Không multi-tenancy. Không khung tuân thủ nào.
+Và không có xác thực trước các giao diện nội bộ — VPN là cổng duy nhất."
+
+*Nếu được hỏi thêm:* phần lớn những thứ đó được ghi thẳng là **non-goal** trong design, kèm lý do: một người vận
+hành, ngân sách khoảng 0.53 USD/giờ khi cụm chạy, và cụm bị xoá khi không dùng. Vault chẳng hạn bị loại có ghi lý do:
+thêm một hệ thống có trạng thái phải tự vận hành và unseal.
+
+**Mẹo:** đây là câu dễ ghi điểm nhất trong ba câu. Trả lời được ngay, gọn, không vòng vo, cho thấy mình biết ranh
+giới của chính mình. Danh sách đầy đủ ở [what each project proves](what-each-project-proves.md#what-neither-project-proves).
+
 ### A2. Control plane: kubeadm so với EKS
 
 **A2.1** **Ý chính:** "Với kubeadm, tôi lo API server, etcd, scheduler và controller manager trên ba máy, quorum
 của etcd, backup etcd, chứng chỉ của control plane — hết hạn sau một năm, phải gia hạn — và nâng cấp. Ở Medical,
-dựng cụm là một playbook Ansible nhiều role, và dựng lại toàn bộ nền tảng từ stack rỗng đo được 14 phút 11 giây.
-Snapshot etcd và drill khôi phục là việc đang làm ở giai đoạn vận hành tiếp theo. Với EKS, AWS chạy cả bốn thành
+dựng cụm là một playbook Ansible nhiều role, và dựng lại toàn bộ nền tảng từ stack rỗng đo được 21 phút 47 giây với
+17 Application. Snapshot etcd và drill khôi phục đã chạy: RTO 7 phút 02 giây. Với EKS, AWS chạy cả bốn thành
 phần đó; tôi không đăng nhập vào máy control plane nào và không vá chúng — còn AMI của worker thì vẫn là việc của
 tôi."
 
-*Nếu được hỏi thêm:* RTO khôi phục etcd của Medical `[điền: RTO]`; thời gian dựng lại EKS `[điền: thời gian dựng lại]`.
+*Nếu được hỏi thêm:* RTO khôi phục etcd của Medical là 7 phút 02 giây (`Medical-RAG-Chatbot/docs/evidence/drills.md`);
+thời gian dựng lại EKS `[điền: thời gian dựng lại]` — phép đo M8, chưa chạy.
 
 **A2.2** **Ý chính:** "Truy cập trực tiếp vào etcd — không có snapshot nào để lấy, nên khôi phục trên EKS nghĩa
 là dựng lại từ Terraform và Git. Cờ của API server, admission plugin, audit policy. Metric của etcd. Chứng chỉ

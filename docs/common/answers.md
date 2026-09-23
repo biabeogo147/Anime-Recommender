@@ -73,7 +73,8 @@ cụm như một thứ có sẵn và trả lời 'bạn có vận hành được
 bằng chứng khác nhau. Và vì dùng chung tài khoản AWS, zone và workstation với Medical, EKS là lựa chọn tự nhiên
 cho vế managed."
 
-*Nếu được hỏi thêm:* bộ so sánh riêng ở AWS A1.1.
+*Nếu được hỏi thêm:* bộ so sánh riêng ở AWS A1.1; câu nào chỉ một bên trả lời được, và câu nào cả hai đều không,
+ở AWS A1.4–A1.6 và [what each project proves](../aws/what-each-project-proves.md).
 
 ### A2. Trạng thái thật
 
