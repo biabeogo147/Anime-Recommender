@@ -28,8 +28,10 @@ Every number in the CV's Anime entry, with the file it came from and the mode it
   it, **8 s**; k6's client-side p95 was **6.28 s**. T is a boundary because the SLI reads the counter at `le=T`
   (`src/anime/metrics.py`). Measured on OpenAI `gpt-4o-mini`; a T measured on another provider is a different number.
 
-- **M4:** which window pair fired first, the 1h/5m pair's own crossing time, each window's burn rate at firing, the
-  store's age, and the error ratio at firing. *Pending.*
+- **M4:** the **1h/5m pair** fired — 5m at 99.43 and 1h at 14.66 against a factor of 13.44 — while the 6h/30m pair
+  failed on its 6h leg, 5.30 against 5.6. That makes the 9 m 30 s the *calibrated* crossing time, on a store that
+  held a full clean hour. The error ratio at firing was 0.497, and Discord delivery failures were 0
+  ([slo](slo.md#which-pair-fired-and-why-it-matters)).
 - **M5:** the node prediction from scaling 2.4, and whether it held. **It held**: 7 replicas fit two nodes, the
   8th went `Pending` with `Insufficient cpu`, and the Cluster Autoscaler added a third node 40 s later
   ([scaling](scaling.md#the-prediction-written-before-the-run)).

@@ -77,6 +77,25 @@ answer to two significant figures.
 
 **#12: pass.**
 
+### The dashboard, which is the half a person actually sees
+
+![The Anime — LLM dashboard, four panels](images/anime-llm-dashboard.png)
+
+Prometheus holding the right number and an operator seeing it are two different claims, and the criterion asks
+for the second. Four panels, read left to right:
+
+| Panel | What it shows | What that settles |
+|---|---|---|
+| **Cost per 1,000 requests** — *real models only* | legend `model=gpt-4o-mini`, values 0.42–0.45 | the same figure the query returned, drawn from the same metric |
+| **Tokens per minute** — *real models only* | `gpt-4o-mini` input and output | token counts reach the panel, not just the metric |
+| **p95 latency** — *every mode* | **both** `generation model=fake` and `model=gpt-4o-mini` | the filter is visible: fake is present here and absent above |
+| **Span duration p95** | **exemplar dots**, with `chat gpt-4o-mini`, `chat fake`, `rag.retrieve` | a point on a latency chart opens the trace behind it |
+
+**The third row is the one worth pausing on.** Two panels sit side by side over the same data: the cost panel
+filters fake mode out, the latency panel keeps it in. The filter is not asserted in a config file somebody has to
+trust — it is **visible**, as the presence of `model=fake` in one legend and its absence from the other. That is
+the same argument as the Langfuse leak count, made visually instead of numerically.
+
 **The false pass this rules out** is a confident `0`: a model absent from `config/pricing.yaml`, or present at a
 price of zero, produces a dashboard that draws a clean flat line at nothing. The check is not that the panel
 renders but that the value is above zero and the price line behind it exists.
