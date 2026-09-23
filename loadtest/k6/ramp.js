@@ -32,8 +32,13 @@ export const options = {
         // HOLD=10m — because a new node takes minutes, and a ramp that ends first never sees one.
         { target: MAX_RPS, duration: __ENV.HOLD || '2m' },
       ],
-      preAllocatedVUs: 50,
-      maxVUs: parseInt(__ENV.MAX_VUS || '1000', 10),
+      // preAllocatedVUs are initialized before the run starts; every VU beyond them is initialized DURING the run,
+      // which is slow enough to drop iterations while the service is still healthy. On 2026-09-23, with 50
+      // preallocated, the first drop came at about 50 req/s with p95 still at 1.43 s — the generator's doing, not the
+      // pods' — and that invalidated the run's capacity figure (3.1's first validity condition). Keep this above the
+      // VUs in use at the knee, which is rate x latency there: 88 x 1.9 s was about 170 in that run.
+      preAllocatedVUs: parseInt(__ENV.PRE_VUS || '300', 10),
+      maxVUs: parseInt(__ENV.MAX_VUS || '1500', 10),
     },
   },
   summaryTrendStats: ['avg', 'med', 'p(95)', 'p(99)', 'max', 'count'],

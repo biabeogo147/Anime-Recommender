@@ -42,6 +42,38 @@ The capacity figure is valid only if both hold:
   virtual-user limit, not the service);
 - the ops workstation was not saturated — its busiest `vmstat` sample below about 90% CPU.
 
+### Run 1, 2026-09-23 03:00:02Z - 03:10:16Z: discarded by the rule above
+
+Not a failed run: 39455 requests, every one a 200, pods and nodes at 2 and 2 throughout. It is discarded because of
+the first validity condition, and it is kept here because that is what the condition is for.
+
+- Low-load p95 = mean(1.431, 1.427, 1.415, 1.455) = **1.432 s**; the threshold is 1.5 x that = **2.148 s**.
+- p95 held 1.43 s for ten points, then 1.93 (under the threshold), then **3.34 s at 03:07:32Z — the knee**.
+- The last point before it, 03:07:02Z, served **88.2 req/s**, at 84.5 in-flight per pod.
+- **But the first dropped iteration came at 03:03:21Z**, four minutes earlier, when the offered rate was about
+  50 req/s and p95 was still 1.43 s. The service was healthy there, so the drops were the generator's: `ramp.js` had
+  `preAllocatedVUs: 50`, and k6 initializes any VU beyond that number during the run, slowly enough to drop
+  iterations. The workstation was not the cause either — its busiest sample was 46% CPU.
+
+So 88.2 req/s is not reported as the capacity. `PRE_VUS` now defaults to 300 (`loadtest/k6/ramp.js`), and the run is
+repeated.
+
+What the run does establish, because neither reading depends on the generator keeping up:
+
+- **The flat region is the fake provider's own latency, not the service's.** `FakeLLM` sleeps a lognormal around a
+  800 ms median with sigma 0.35, whose p95 is 0.8 x exp(1.645 x 0.35) = **1.42 s**. Measured: **1.43 s**. At low load
+  the api adds nothing measurable.
+- **The ceiling is the thread pool, not the CPU.** `/recommend` runs the model call in FastAPI's thread pool, 40
+  threads per pod; at a mean sleep of 0.8 x exp(0.35^2/2) = 0.85 s that allows 47 req/s per pod, **94.1 req/s for
+  two** — computed in `loadtest/k6/ramp.js` before the run. The served rate plateaued at **93.9 req/s** while the
+  offered rate kept climbing to 120. CPU stayed at 0.23 cores per pod and memory at 142 MiB, so neither was the limit:
+  the threads were, each one asleep waiting for the provider.
+
+Past the knee the queue grew as that arithmetic predicts: in-flight per pod went 84 -> 170 -> 308 -> 499, p95 went to
+15.6 s, and still nothing failed - 0 errors at every point.
+
+### Run 2
+
 | Reading (fake mode, 2 replicas, no autoscaler) | Value |
 |---|---|
 | Low-load p95 | *pending* |

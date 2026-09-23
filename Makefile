@@ -206,7 +206,7 @@ K6_IMAGE ?= grafana/k6:latest
 # would print "failed to handle the end-of-test summary" and still exit 0, leaving no summary file.
 K6 = docker run --rm -i --network host --user "$$(id -u):$$(id -g)" \
   -v $(CURDIR)/loadtest/k6:/scripts:ro -v $(HOME)/anime-evidence:/out \
-  -e BASE_URL -e TARGET_REQUESTS -e RATE_PER_MINUTE -e MAX_RPS -e MAX_VUS -e HOLD -e RPS -e DURATION \
+  -e BASE_URL -e TARGET_REQUESTS -e RATE_PER_MINUTE -e MAX_RPS -e MAX_VUS -e PRE_VUS -e HOLD -e RPS -e DURATION \
   $(K6_IMAGE)
 
 loadtest-baseline loadtest-ramp loadtest-steady:

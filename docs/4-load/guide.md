@@ -200,8 +200,14 @@ cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
 make loadtest-ramp
 ```
 
-Then stop `vmstat` in that third window (`Ctrl-c`). If 3.4 shows no break-away and no dropped iterations, the knee is
-above the ramp: run again with `MAX_RPS=200 MAX_VUS=1500`. The knee must be inside the ramp to be measured.
+Then stop `vmstat` in that third window (`Ctrl-c`). Two reasons to run it again, both decided in 3.4:
+
+- **no break-away and no dropped iterations** — the knee is above the ramp, so `MAX_RPS=200 MAX_VUS=2500 PRE_VUS=600
+  make loadtest-ramp`. The knee has to be inside the ramp to be measured;
+- **the first dropped iteration came before the knee** — the generator ran out of virtual users while the service was
+  still healthy, so the run says nothing about capacity. Raise `PRE_VUS` above the VUs in use at the knee (rate x
+  latency there, which 3.4 prints as in-flight) and run again. Iterations dropped *after* the knee are expected: past
+  the knee the offered rate exceeds what the service can serve, so the VUs in use grow without bound.
 
 **3.4 — read the run.** Queries use `[2m]`, four scrape intervals, so one late scrape does not put a gap exactly where
 the knee is. Each point therefore describes the two minutes before it. The range starts two minutes after k6 did, so
