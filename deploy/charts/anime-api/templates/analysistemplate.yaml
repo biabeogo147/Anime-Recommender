@@ -67,8 +67,12 @@ spec:
       interval: 30s
       count: 4
       failureLimit: 1
-      successCondition: len(result) > 0 && !isNaN(result[0]) && !isInf(result[0], 0) && result[0] <= {{ .Values.analysis.maxLatencyRatio }}
-      failureCondition: len(result) > 0 && !isNaN(result[0]) && !isInf(result[0], 0) && result[0] > {{ .Values.analysis.maxLatencyRatio }}
+      # isInf takes ONE argument here. Argo Rollouts evaluates these with expr-lang, whose isInf is a unary predicate,
+      # not Go's math.IsInf(f, sign). Written with two it does not fail the metric - it fails to COMPILE, so every
+      # evaluation returns an error, five errors pass consecutiveErrorLimit, and the Rollout aborts a healthy version
+      # on a fault of its own gate (measured 2026-09-23: "too many arguments to call isInf").
+      successCondition: len(result) > 0 && !isNaN(result[0]) && !isInf(result[0]) && result[0] <= {{ .Values.analysis.maxLatencyRatio }}
+      failureCondition: len(result) > 0 && !isNaN(result[0]) && !isInf(result[0]) && result[0] > {{ .Values.analysis.maxLatencyRatio }}
       provider:
         prometheus:
           address: {{ .Values.analysis.prometheus | quote }}
