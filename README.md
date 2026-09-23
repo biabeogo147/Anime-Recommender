@@ -60,9 +60,9 @@ Measured on the cluster since:
 
 Still not measured, because the stage that produces them has not run: the capacity of the minimum replica count
 (#7), time-to-rollback (#9), time-to-alert (#10), cost per 1,000 requests (#12) and the replica count under load
-(#14). Criteria **#2**, **#15** and **#16** — the GitOps tree, HTTPS on the app, and admin UIs that answer only
-over the VPN — were exercised on the cluster in stage 2, but their evidence file is not written yet, so they are
-counted as unevidenced here. The numbers are defined in [design
+(#14). Criteria **#2**, **#15** and **#16** — the GitOps tree, HTTPS on the app, and admin UIs that answer only over
+the VPN — ran on the cluster in stage 2 and matched, but their output was not captured, so
+[gitops](docs/evidence/gitops.md) records them as run rather than quoted. The numbers are defined in [design
 §6](docs/eks-sre-llmops-design.md#6-verification-and-evidence-definition-of-done).
 
 ## Architecture
