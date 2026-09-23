@@ -201,14 +201,21 @@ Expected: `phase=Healthy` with `stable` equal to `latest`, and a request rate ne
 Then, in window 3: the same ramp as stage 4, with the top held for ten minutes, because a new node takes minutes. The
 top rate must be **above** what two pods sustain, or nothing needs to scale: about three times stage 4's capacity.
 `MAX_VUS` follows Little's law with room to spare: the rate times a queued latency of about 10 s. The ramp target
-overwrites stage 4's `ramp*` files, so they are copied aside first. **Replace `CAP=` with stage 4's capacity before
-running.**
+overwrites stage 4's `ramp*` files, so they are copied aside first.
 
 ```bash
 cd ~/Anime-Recommender && mkdir -p ~/anime-evidence/stage4-ramp && cp -n ~/anime-evidence/ramp* ~/anime-evidence/stage4-ramp/ || true
-CAP=40   # ← stage 4's capacity, in requests per second
-MAX_RPS=$((3*CAP)) MAX_VUS=$((30*CAP)) HOLD=10m make loadtest-ramp
+CAP=89   # stage 4's capacity in requests per second, measured 2026-09-23 (docs/evidence/load.md)
+# PRE_VUS: MAX_VUS here is 2670 while ramp.js preallocates 300, so k6 would initialise the rest DURING the run and
+# drop iterations while doing it (stage 4 measured this). Dropped iterations do not invalidate anything here - the
+# reading is "do pods and nodes grow", not throughput - but they lower the offered rate exactly when the HPA should
+# be reacting, so the transient is slower than it needs to be. 800 covers 267 req/s at a 3 s queued latency.
+MAX_RPS=$((3*CAP)) MAX_VUS=$((30*CAP)) PRE_VUS=800 HOLD=10m make loadtest-ramp
 ```
+
+At 267 req/s and a fake-mode service time of about 0.85 s, in-flight is about 227: **32.4 per pod at 7 replicas**
+(over the threshold of 30) and **28.4 at 8** (under it), so the HPA settles at `maxReplicas`. That is the condition
+for the node half to be exercised at all — a top rate that settles below 8 replicas tests the pod half only.
 
 Expected in window 4, over the next 18 minutes:
 - in-flight per pod rises past the threshold;
