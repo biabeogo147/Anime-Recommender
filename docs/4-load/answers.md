@@ -4,8 +4,8 @@
 ngôi thứ nhất, thường là đủ. *Nếu được hỏi thêm* dùng khi người phỏng vấn đào sâu. Dòng **Mẹo** là lời nhắc cho
 bạn, không nói ra. Tham chiếu dạng `CI/CD A8.2` trỏ tới bộ tương ứng.
 
-Stage này **mới thiết kế, chưa chạy**. Mọi câu ở thì hiện tại bên dưới nói về thiết kế, và câu đầu tiên của A1.1
-nói rõ điều đó một lần. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
+Stage này **đang chạy dở**: T đã đo (criterion #6, [evidence](../evidence/load.md)), capacity thì **chưa** — lần ramp
+đầu bị chính quy tắc của nó loại bỏ. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
 chưa đo. Ghi chú **[kiểm chứng]** là hành vi của công cụ cần xác nhận trước khi nói chắc. Số thập phân viết bằng
 dấu chấm.
 
@@ -33,7 +33,7 @@ capacity ở chế độ fake; **điểm gãy** cho chỗ p95 bắt đầu tách
 
 ### A1. Tổng quan
 
-**A1.1** **Ý chính:** "Stage này tôi mới thiết kế, chưa chạy. Nó đo hai con số mà các stage sau không tự bịa ra
+**A1.1** **Ý chính:** "Stage này tôi đang chạy dở: T đã đo, capacity chưa. Nó đo hai con số mà các stage sau không tự bịa ra
 được. Một là T, ngưỡng latency của SLO, đọc từ histogram phía server trong một lần chạy thật với Gemini, ít nhất 200
 request. Hai là bản deploy nhỏ nhất — hai pod, chưa có autoscaler — gánh được bao nhiêu, đo bằng fake provider với tốc
 độ gửi tăng dần. Phần lớn công sức là ở chỗ: mỗi con số phải đo đúng thứ mà sau này nó sẽ phán xét."

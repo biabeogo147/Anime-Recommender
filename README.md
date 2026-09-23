@@ -11,22 +11,26 @@ alerts, a canary that rolls itself back, autoscaling on the right signal, and an
 ![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Tempo_%2B_Langfuse-425CC7?logo=opentelemetry&logoColor=white)
 ![TLS](https://img.shields.io/badge/HTTPS-ACM_wildcard,_admin_UIs_VPN--only-2EA44F?logo=letsencrypt&logoColor=white)
 
-**Status.** The application layer is built and measured. Everything below it — the cluster, the pipeline, the
-SLOs, the canary, the autoscaler, the tracing — is **designed and not yet built**; the pictures and tables
-that follow describe the target, and each one says where it stands.
+**Status, 2026-09-23.** The cluster, the GitOps tree and the CI/CD pipeline are **built and running on AWS**,
+and the load stage is under way: criteria #1, #3, #4, #5 and #6 are closed with evidence in
+[`docs/evidence/`](docs/evidence/). The canary, the SLO alerting, the autoscaler and the tracing are **designed
+and not yet built**. The pictures and tables that follow describe the target, and each one says where it stands.
 
 - **This is the managed counterpart to
   [Medical-RAG-Chatbot](https://github.com/biabeogo147/Medical-RAG-Chatbot).** That one builds a cluster by
   hand with kubeadm and answers *can you run Kubernetes*. This one takes the cluster as given and answers
   *can you run a service on it* — which is a different job with different evidence.
 - **Nothing is claimed here that was not measured.** Every number below links to the
-  measurement that produced it, and everything still unbuilt says so.
+  measurement that produced it; what is built but not yet evidenced says so, and so does what is only designed.
+  Which capability sits where is in
+  [what each project proves](docs/aws/what-each-project-proves.md#the-capability-matrix).
 - **Failure is a first-class mode, not an accident.** A `fake` provider gives deterministic latency and a
   settable error rate, so a rollback drill and a load test cost nothing and repeat exactly.
 
 ## By the numbers
 
-Measured on 2026-09-15, all of it local — the cluster does not exist yet.
+Measured on 2026-09-15, all of it local, before the cluster existed. What has since been measured **on the
+cluster** is listed after them.
 
 - **One 6.45 GB image became two: api 619 MB and ui 559 MB — 1.18 GB together, −82%.** The old image
   pulled PyTorch through an unused `sentence-transformers`; neither new image carries it
@@ -45,11 +49,20 @@ Measured on 2026-09-15, all of it local — the cluster does not exist yet.
 - **17 tests, ruff clean, containers run as UID 10001** ([build](docs/evidence/local.md#build-and-tests)); the
   compose file also sets a read-only root filesystem, which is configured rather than measured.
 
-Not measured yet, because nothing is deployed — which is every criterion except #4, the image size above. Among
-them: the apply time and resource count (#1), the pipeline duration (#3), the latency baseline that sets the SLO
-threshold (#6), the capacity of the minimum replica count (#7), time-to-rollback (#9), time-to-alert (#10), cost
-per 1,000 requests (#12), the replica count under load (#14), and the two access claims — HTTPS on the app (#15)
-and admin UIs that only answer over the VPN (#16). The numbers are defined in [design
+Measured on the cluster since:
+
+- **#1** — the `cluster` stack applied from empty, and a re-plan with no changes
+  ([terraform](docs/evidence/terraform.md)).
+- **#3, #4, #5** — a commit signed, pushed by digest and running; both image sizes; and a truncated catalogue
+  refused at startup ([cicd](docs/evidence/cicd.md)). The pipeline's own duration is still *pending*.
+- **#6** — the latency target the SLO will use: **T = 8 s**, from 230 real requests with 0 errors
+  ([load](docs/evidence/load.md)).
+
+Still not measured, because the stage that produces them has not run: the capacity of the minimum replica count
+(#7), time-to-rollback (#9), time-to-alert (#10), cost per 1,000 requests (#12) and the replica count under load
+(#14). Criteria **#2**, **#15** and **#16** — the GitOps tree, HTTPS on the app, and admin UIs that answer only
+over the VPN — were exercised on the cluster in stage 2, but their evidence file is not written yet, so they are
+counted as unevidenced here. The numbers are defined in [design
 §6](docs/eks-sre-llmops-design.md#6-verification-and-evidence-definition-of-done).
 
 ## Architecture
@@ -319,7 +332,7 @@ and each one points at the box in the architecture it zooms into.
 | 7 · Scaling, pods and nodes | [README](docs/7-scaling/README.md) · [concepts](docs/7-scaling/concepts.md) | [guide](docs/7-scaling/guide.md) | [questions](docs/7-scaling/questions.md) · [answers](docs/7-scaling/answers.md) |
 | 8 · Tracing and cost | [README](docs/8-tracing/README.md) · [concepts](docs/8-tracing/concepts.md) | [guide](docs/8-tracing/guide.md) | [questions](docs/8-tracing/questions.md) · [answers](docs/8-tracing/answers.md) |
 | The whole project | [design](docs/eks-sre-llmops-design.md) | | [questions](docs/common/questions.md) · [answers](docs/common/answers.md) |
-| Managed against self-managed, beside Medical | [design §1](docs/eks-sre-llmops-design.md#1-goal) · [compared with Medical](docs/aws/compare-to-medical-rag-chatbot.md) | | [questions](docs/aws/questions.md) · [answers](docs/aws/answers.md) |
+| Managed against self-managed, beside Medical | [design §1](docs/eks-sre-llmops-design.md#1-goal) · [compared with Medical](docs/aws/compare-to-medical-rag-chatbot.md) · [stage by stage](docs/aws/compare-by-stage.md) · [what each project proves](docs/aws/what-each-project-proves.md) | | [questions](docs/aws/questions.md) · [answers](docs/aws/answers.md) |
 | Measured results | [`docs/evidence/`](docs/evidence/) | | |
 
 ---

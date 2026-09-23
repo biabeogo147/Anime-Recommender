@@ -1,11 +1,12 @@
 # Anime (EKS) compared with Medical (self-managed Kubernetes)
 
 **The two projects run the same kind of workload on the same AWS account, and split one question between them:
-what changes when AWS runs the cluster instead of you.** This page is the map from one to the other. It
-explains the differences of design, not their interview answers; those are in the [AWS Q&A](questions.md)
-([answers](answers.md)). The same comparison one stage at a time (Terraform, the app, GitOps and CI), with the
-reason for each difference, and why each project's extra stages have no counterpart, is in
-[stage by stage](compare-by-stage.md).
+what changes when AWS runs the cluster instead of you.** This page is the map from one to the other: it explains
+the differences of design, and §7 turns the main ones into the sentences an interview actually asks for. The
+rehearsed answers are in the [AWS Q&A](questions.md) ([answers](answers.md)). The same comparison one stage at a
+time (Terraform, the app, GitOps and CI), with the reason for each difference, and why each project's extra
+stages have no counterpart, is in [stage by stage](compare-by-stage.md). Which **skill** each project
+demonstrates, and which it does not, is in [what each project proves](what-each-project-proves.md).
 
 **Sources.**
 - Medical:
@@ -17,14 +18,28 @@ reason for each difference, and why each project's extra stages have no counterp
 
 **Names.** `anime` means `anime.recruitai.io.vn`, and `*.anime` its subdomains (`api.anime`, `grafana.anime`, `vpn.anime`, …).
 
-## 1. In one sentence each
+## 1. In one sentence each, and what each one therefore proves
 
 - **Medical** builds Kubernetes itself. Terraform creates three EC2 instances, and Ansible turns them into a
   kubeadm cluster, where every node is both control plane and worker.
 - **Anime** asks AWS for Kubernetes. Terraform creates an EKS cluster whose control plane AWS runs, and a
   managed node group of Spot instances for the workloads.
 
-Everything else on this page follows from that difference.
+Everything else on this page follows from that difference — including what each project can demonstrate.
+Medical answers **"can you run Kubernetes?"**: the cluster is the work product, so etcd, the certificates, the
+upgrade path and the CI system are all things it owns and can be asked about. Anime answers **"can you run a
+service on Kubernetes?"**: the control plane is someone else's, so the work moves up a level, to what the
+service promises, how it is released, when it scales, and what a request costs.
+
+Neither claim is worth making without the measurement behind it, and the measurements are not restated here:
+one table holds them, in [what each project proves](what-each-project-proves.md), where each capability carries
+its criterion number, its **status** and the path to its evidence — never the value, which is read from that
+path, so a figure re-measured in a drill cannot leave a stale copy behind.
+
+The itemised version of both columns, the shared ground, and what **neither** project proves are in
+[what each project proves](what-each-project-proves.md); the stage-level lists are in
+[Only in Medical](compare-by-stage.md#only-in-medical) and [Only in Anime](compare-by-stage.md#only-in-anime).
+A path above that does not exist yet belongs to a stage that has not run.
 
 ## 2. Who does what
 

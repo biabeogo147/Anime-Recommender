@@ -46,19 +46,30 @@ aws secretsmanager get-secret-value --secret-id anime/llm --query SecretString -
 make bootstrap-plan
 ```
 
-Expected: `load enabled`, the three lines, `openai key stored`, `Plan: 0 to add, 1 to change, 0 to destroy.` Then apply, and wait for the
-PodMonitor. The root passes `load` down to `anime-api` only when it next syncs, which can be minutes away:
+Expected: `load enabled`, the three lines, `openai key stored`, `Plan: 0 to add, 1 to change, 0 to destroy.` Then apply
+and wait. The PodMonitor belongs to `anime-api`, at **wave 1**, and the CRD it needs comes from
+kube-prometheus-stack at wave 0 — so on a cluster rebuilt this session the waves run first, about 15 minutes; on a
+cluster already at 8/8 it is a minute or two. The loop reports what is still missing, so a stall is visible rather
+than silent:
 
 ```bash
 cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
 make bootstrap
 kubectl -n argocd annotate application root argocd.argoproj.io/refresh=hard --overwrite
-for i in $(seq 30); do kubectl -n anime get podmonitor anime-api >/dev/null 2>&1 && break; sleep 10; done
+for i in $(seq 150); do
+  kubectl -n anime get podmonitor anime-api >/dev/null 2>&1 && { echo "PodMonitor is there"; break; }
+  [ $((i % 6)) -eq 0 ] && kubectl -n argocd get applications -o jsonpath='{range .items[*]}{.metadata.name}={.status.sync.status}/{.status.health.status} {end}{"\n"}'
+  sleep 10
+done
 kubectl -n anime get podmonitor anime-api
 ```
 
-Expected: `Apply complete!`, then the PodMonitor listed. `NotFound` after five minutes: compare the stages in
-`kubectl -n argocd get application anime-api -o jsonpath='{.spec.source.helm.valuesObject.stages}'` with the tfvars.
+Expected: `Apply complete!`, the Applications reaching `Synced/Healthy` one wave at a time, then `PodMonitor is
+there`. Two stalls to tell apart if 25 minutes pass:
+- **`anime-api` is not `Synced/Healthy`**: read `kubectl -n anime get pods`. A pod stuck not-Ready with
+  `OPENAI_API_KEY is not set` in its log means the key never reached the Secret ([1-terraform, 2.6](../1-terraform/guide.md#2-the-shared-stack)).
+- **`anime-api` is `Synced/Healthy` but there is no PodMonitor**: the stage never reached the child. Compare
+  `kubectl -n argocd get application anime-api -o jsonpath='{.spec.source.helm.valuesObject.stages}'` with the tfvars.
 
 **1.2 — the api is scraped, by name.** Before you trust any number, check two things. The target exists and is up. The
 TOTAL request counter has samples — not the error counter, which has none until something fails (Load A2.3). Six
@@ -150,6 +161,15 @@ Expected, five lines to report:
 low-load value is the average of the first four p95 points that are numbers. Change the factor here, not after seeing
 the graph, and report it with the result.
 
+The rule is already written in [`docs/evidence/load.md`](../evidence/load.md), and committed before this run: Git's
+history is what makes "written first" checkable later. Changing the factor means changing it there, in a commit of its
+own, before the ramp. Keep a copy beside the run's own files too:
+
+```bash
+cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
+sed -n '/^## #7/,$p' docs/evidence/load.md | tee ~/anime-evidence/ramp-knee-rule.txt
+```
+
 **3.2 — fake mode.** Two replicas, no autoscaler, a provider that costs nothing. The loop waits until the Deployment's
 template really says `fake`. Only then does `rollout status` mean the new pods are the ones serving.
 
@@ -180,8 +200,14 @@ cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
 make loadtest-ramp
 ```
 
-Then stop `vmstat` in that third window (`Ctrl-c`). If 3.4 shows no break-away and no dropped iterations, the knee is
-above the ramp: run again with `MAX_RPS=200 MAX_VUS=1500`. The knee must be inside the ramp to be measured.
+Then stop `vmstat` in that third window (`Ctrl-c`). Two reasons to run it again, both decided in 3.4:
+
+- **no break-away and no dropped iterations** — the knee is above the ramp, so `MAX_RPS=200 MAX_VUS=2500 PRE_VUS=600
+  make loadtest-ramp`. The knee has to be inside the ramp to be measured;
+- **the first dropped iteration came before the knee** — the generator ran out of virtual users while the service was
+  still healthy, so the run says nothing about capacity. Raise `PRE_VUS` above the VUs in use at the knee (rate x
+  latency there, which 3.4 prints as in-flight) and run again. Iterations dropped *after* the knee are expected: past
+  the knee the offered rate exceeds what the service can serve, so the VUs in use grow without bound.
 
 **3.4 — read the run.** Queries use `[2m]`, four scrape intervals, so one late scrape does not put a gap exactly where
 the knee is. Each point therefore describes the two minutes before it. The range starts two minutes after k6 did, so

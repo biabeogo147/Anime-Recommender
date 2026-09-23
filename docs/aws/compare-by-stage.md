@@ -67,9 +67,14 @@ what the cluster needs around it.
   - the Free plan refused two instance types;
   - the default VPC had no subnets;
   - the gateway failed at boot, most likely because its secret was still empty (`docs/evidence/terraform.md`).
-- **Anime:** its evidence records no problems, with every count matching
-  ([evidence](../evidence/terraform.md)). It checked the account before stage 1 and found all four instance
-  types it had planned ineligible ([account check](../evidence/account.md)).
+- **Anime:** the apply itself was clean, with every count matching ([evidence](../evidence/terraform.md)), but
+  three things tripped around it:
+  - the account check, run before stage 1, found all four instance types it had planned ineligible
+    ([account check](../evidence/account.md));
+  - `make down` failed with `NoSuchHostedZone: None`, because the JMESPath filter that looks for leftover DNS
+    records read `!Config.PrivateZone` as `(!Config).PrivateZone` (fixed in the `Makefile`, commit `e8740b4`);
+  - a saved plan file outlived the state it was planned against, so `make infra` refused it as stale. The
+    plan file is local; the state is in S3. Re-running `make plan` is the fix.
 
 ## The application
 
@@ -140,7 +145,11 @@ and how it signs, differ, mostly *by the split*.
 - **Medical** recorded 23 defects, all but one in its guide. Among them:
   - Jenkins plugin versions out of step, which cost four builds;
   - an ECR token printed into a build log.
-- **Anime's** stage 3 has not run yet.
+- **Anime** recorded one defect ([evidence](../evidence/cicd.md)): the first release run failed at *AWS
+  credentials (OIDC, no key)* with `Could not load credentials from any providers`, which the action prints
+  when `role-to-assume` is empty — the repository variable `AWS_CI_ROLE_ARN` was missing. The failure came
+  before the push, so ECR and Git were untouched, and a later release passed. Criteria #3, #4 and #5 are
+  closed; the pipeline's own duration is still pending.
 
 ---
 

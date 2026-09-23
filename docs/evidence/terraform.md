@@ -16,6 +16,13 @@ The three `count OK` lines printed `shared count OK: 15`, `cluster count OK: 92`
 re-plans ran without `-refresh=false`, so a resource that drifted from its configuration would have shown as a change.
 **#1: pass.**
 
+**One caveat on reproducibility, found afterwards.** This run resolved its providers against a range
+(`version = "~> 6.0"`) with no lock file in Git, so "apply from empty, then no changes" was measured against
+whichever provider versions `terraform init` happened to fetch that day — `aws` resolved to **6.66.0**. The three
+`.terraform.lock.hcl` files were committed on 2026-09-23, after the measurement, so a rebuild from here on pins
+the same versions and the claim becomes repeatable. The measurement itself is not re-run for this: what changed
+is that the next one can be compared with it.
+
 ## The cluster, and the way in
 
 | Check | Result |

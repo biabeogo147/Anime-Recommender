@@ -4,8 +4,8 @@
 ngôi thứ nhất, thường là đủ. *Nếu được hỏi thêm* dùng khi người phỏng vấn đào sâu. Dòng **Mẹo** là lời nhắc cho
 bạn, không nói ra. Tham chiếu dạng `GitOps A2.1` trỏ tới bộ tương ứng.
 
-Pipeline **mới thiết kế, chưa dựng**. Mọi câu ở thì hiện tại bên dưới nói về thiết kế, và câu đầu tiên của A1.1
-nói rõ điều đó một lần. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
+Pipeline **đã dựng và đã chạy**: criteria #3, #4, #5 đóng ngày 2026-09-22 ([evidence](../evidence/cicd.md)); riêng
+thời lượng pipeline vẫn *pending*. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
 chưa đo. Ghi chú **[kiểm chứng]** là hành vi của công cụ cần xác nhận trước khi nói chắc. Số thập phân viết bằng
 dấu chấm.
 
@@ -39,7 +39,7 @@ evidence dùng cho lần cố ý làm phép kiểm index đỏ — về bản ch
 
 ### A1. Tổng quan
 
-**A1.1** **Ý chính:** "Pipeline này tôi mới thiết kế, chưa dựng; phần build và test của app thì đã chạy local.
+**A1.1** **Ý chính:** "Pipeline này đã chạy thật, #3, #4, #5 đóng; riêng thời lượng pipeline tôi chưa đo.
 GitHub Actions biến một thay đổi đã merge thành một image đã test, đã scan và đã ký. Image được push lên ECR theo
 digest, rồi pipeline commit đúng một dòng — digest mới — vào Git. Nó dừng ở đó; deploy là việc của Argo CD. Hai quy
 tắc chạy xuyên suốt. Mọi phép kiểm phải từng được thấy thất bại. Và chữ ký phải được verify với đúng workflow, đúng

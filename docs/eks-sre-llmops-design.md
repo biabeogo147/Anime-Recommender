@@ -56,6 +56,11 @@ projects split the subject deliberately so that neither repeats the other:
 
 The application layer is **done and measured**; nothing is deployed anywhere.
 
+**Changed in stage 1-4 (2026-09-23).** That sentence is the baseline of 2026-09-21 and is kept as written, the
+way this document keeps everything else. It is no longer the present: the cluster, the GitOps tree and the
+pipeline are deployed, and criteria #1, #3, #4, #5 and #6 are closed. Current status is read from
+[`docs/evidence/`](evidence/), never from this section.
+
 **What exists in the repository today**
 
 | Path | What it is |
@@ -318,6 +323,15 @@ description of intent, not an order anything enforces.
 can create the ALB **and** the only thing that can shift traffic between the stable and canary target groups.
 If it is unhealthy, the service is unreachable and no release can proceed. Its failure mode is recorded in
 [§5](#5-error-handling-and-failure-modes) and it is the first thing to check when a rollout stalls.
+
+**And it fails in one particular way, twice measured.** Without cert-manager the chart generates its webhook CA at
+render time, so the Secret the controller serves and the `caBundle` the API server trusts match only when one render
+wrote both. A sync that fails halfway and retries has produced two renders (2026-09-22 and again on a fresh cluster
+2026-09-23), and then **every Ingress in the cluster is refused** — the monitoring stack's at wave 0 first, so the
+build stops there. `ignoreDifferences` without `RespectIgnoreDifferences` was not enough. The build therefore checks
+the two fingerprints as its own step ([gitops guide, 2.3](2-gitops/guide.md#2-switch-the-stage-on--ops)) and repairs
+them with one sync plus a restart. A structural fix — cert-manager issuing this CA, or a certificate held outside the
+chart — is open, and is the price of having no cert-manager in this design.
 
 ## 4. Components
 

@@ -1,0 +1,12 @@
+# The laptop is Windows and everything that consumes these files is Linux: the ops workstation, the
+# containers, and the GitHub runners. Without this, an editor or a script that writes CRLF turns every
+# subsequent diff into a whole-file rewrite and every merge into a whole-file conflict - which happened on
+# 2026-09-23 - and a Makefile with CRLF breaks GNU make outright, because the trailing carriage return
+# becomes part of each recipe line.
+* text=auto eol=lf
+
+# Binary: never touched.
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary

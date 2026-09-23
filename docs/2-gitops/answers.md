@@ -4,8 +4,9 @@
 ngôi thứ nhất, thường là đủ. *Nếu được hỏi thêm* dùng khi người phỏng vấn đào sâu. Dòng **Mẹo** là lời nhắc cho
 bạn, không nói ra. Tham chiếu dạng `Terraform A5.4` trỏ tới bộ tương ứng.
 
-Stage này **mới thiết kế, chưa dựng**. Mọi câu ở thì hiện tại bên dưới nói về thiết kế, và câu đầu tiên của A1.1
-nói rõ điều đó một lần. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
+Stage này **đã dựng và đã chạy trên cụm, nhưng chưa viết evidence**: cây Argo CD đã lên 8/8, HTTPS và bốn UI nội bộ
+đã kiểm, song `docs/evidence/gitops.md` chưa tồn tại — nên criteria #2, #15, #16 vẫn tính là **chưa có bằng chứng**.
+Kể được bằng kinh nghiệm, nhưng đừng đọc ra con số nào chưa ghi. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
 chưa đo. Ghi chú **[kiểm chứng]** là hành vi của công cụ cần xác nhận trước khi nói chắc. Số thập phân viết bằng
 dấu chấm.
 
@@ -27,7 +28,7 @@ một check; **nửa âm / nửa dương** cho hai nửa của #16 (tắt VPN ph
 
 ### A1. Tổng quan
 
-**A1.1** **Ý chính:** "Stage này tôi mới thiết kế, chưa dựng. Sau bootstrap không có gì được apply bằng tay: mọi
+**A1.1** **Ý chính:** "Stage này tôi đã dựng và chạy trên cụm, nhưng chưa viết file bằng chứng. Sau bootstrap không có gì được apply bằng tay: mọi
 thành phần là một Application trong Git, và Argo CD trong cụm tự kéo về. Stage này đưa vào bốn thứ, theo một thứ
 tự mà chính cụm phải tự giữ được: controller dựng load balancer, External Secrets, external-dns, và các UI quản
 trị. Kết quả là hai cửa — một ALB public cho app, một ALB nội bộ cho bốn UI chỉ mở qua VPN. Cả hai dùng chung một

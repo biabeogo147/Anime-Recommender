@@ -112,6 +112,36 @@ make -s apps
 Expected: the count climbs wave by wave to `8/8`, then a table of `root` and seven children, all `Synced Healthy`. If
 every wave starts within the same few seconds, the Application health check is not active (troubleshooting).
 
+**2.3 — the load balancer controller's webhook certificate matches.** Run it as soon as 2.2 shows
+`aws-load-balancer-controller` `Synced/Healthy`, in a second window if the loop is still going: every Ingress created
+from wave 0 on depends on it. If 2.2 stalls with Ingresses failing, this is the first thing to check.
+
+The chart has no cert-manager, so it generates a **new CA on every render**. The Secret the controller serves and the
+`caBundle` the API server trusts only match when one render wrote both. A sync that fails halfway and retries can leave
+them from two renders (measured on 2026-09-23: webhook `35:B9:6F…`, Secret `06:12:A9…`, one recorded sync). Then the
+webhook is called and refused, **every Ingress in the cluster is rejected** with `x509: certificate signed by unknown
+authority`, and wave 0 never finishes. One sync plus a restart puts both back in step:
+
+```bash
+cd ~/Anime-Recommender && export KUBECONFIG=$HOME/.kube/anime
+fp() { base64 -d | openssl x509 -noout -fingerprint -sha256 | cut -d= -f2; }
+w=$(kubectl get validatingwebhookconfiguration aws-load-balancer-webhook -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | fp)
+s=$(kubectl -n kube-system get secret aws-load-balancer-tls -o jsonpath='{.data.ca\.crt}' | fp)
+if [ "$w" = "$s" ]; then echo "webhook CA matches the Secret: $w"; else
+  echo "MISMATCH webhook=$w secret=$s — resyncing"
+  kubectl -n argocd patch application aws-load-balancer-controller --type merge -p '{"operation":{"sync":{}}}'
+  sleep 45
+  kubectl -n kube-system rollout restart deploy/aws-load-balancer-controller
+  kubectl -n kube-system rollout status deploy/aws-load-balancer-controller --timeout=3m
+  kubectl get validatingwebhookconfiguration aws-load-balancer-webhook -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | fp
+  kubectl -n kube-system get secret aws-load-balancer-tls -o jsonpath='{.data.ca\.crt}' | fp
+fi
+```
+
+Expected: `webhook CA matches the Secret`, or a `MISMATCH` followed by two identical fingerprints. The restart is what
+makes the pods serve the certificate the sync just wrote. If the two still differ, stop and report: a third render
+happened between the sync and the restart.
+
 ---
 
 ## 3. Criterion #2 — by name, by count, by revision, by readiness — ops
@@ -337,7 +367,7 @@ Next session: stage 1's order, then `make bootstrap-plan && make bootstrap` with
 | Every wave starts within seconds, not in turn | The Application health check is missing from `argocd-cm` | `kubectl -n argocd get cm argocd-cm -o yaml \| grep -c argoproj.io_Application` must be 1; `make bootstrap-plan && make bootstrap` |
 | A child stays `OutOfSync`/`Progressing` after retries | A webhook or CRD was not ready on the first try; retries exhausted | `kubectl -n argocd get application <a> -o jsonpath='{.status.operationState.message}'`; then `kubectl -n argocd patch application <a> --type merge -p '{"operation":{"sync":{}}}'` |
 | `failed calling webhook … elbv2.k8s.aws` | The load balancer controller pods are not Ready yet | Wait; the retry policy re-syncs. Still failing: `kubectl -n kube-system get pods -l app.kubernetes.io/name=aws-load-balancer-controller` |
-| `failed calling webhook "vingress.elbv2.k8s.aws"` … `x509: certificate signed by unknown authority` (pods Ready) | The webhooks' `caBundle` and the Secret `aws-load-balancer-tls` came from two renders of the chart (each render makes a new CA) | Compare the two CAs' fingerprints (`caBundle` of `validatingwebhookconfiguration aws-load-balancer-webhook`, `ca.crt` of the Secret). Different: sync the Application so all three are written from one render, then restart the pods: `kubectl -n argocd patch application aws-load-balancer-controller --type merge -p '{"operation":{"sync":{}}}'`, then `kubectl -n kube-system rollout restart deploy/aws-load-balancer-controller`. Requires the template without `RespectIgnoreDifferences` (the comment there says why) |
+| `failed calling webhook "vingress.elbv2.k8s.aws"` … `x509: certificate signed by unknown authority` (pods Ready) | The webhooks' `caBundle` and the Secret `aws-load-balancer-tls` came from two renders of the chart (each render makes a new CA) | Compare the two CAs' fingerprints (`caBundle` of `validatingwebhookconfiguration aws-load-balancer-webhook`, `ca.crt` of the Secret). Different: sync the Application so all three are written from one render, then restart the pods: `kubectl -n argocd patch application aws-load-balancer-controller --type merge -p '{"operation":{"sync":{}}}'`, then `kubectl -n kube-system rollout restart deploy/aws-load-balancer-controller`. Requires the template without `RespectIgnoreDifferences` (the comment there says why). This is step 2.3, run before the Ingresses exist |
 | `failed calling webhook … external-secrets.io` | External Secrets' webhook not serving yet | Same: wait for its pods, the retry re-syncs |
 | `metadata.annotations: Too long` | A CRD applied client-side | `ServerSideApply=true` missing on that Application's template |
 | `platform` stuck, store not Ready | External Secrets lacks credentials | `kubectl describe clustersecretstore aws-secrets-manager`; `AccessDenied` → the Pod Identity association or the three ARNs |

@@ -16,8 +16,11 @@ Bộ liên quan: [tổng quan project](../common/questions.md), [Terraform](../1
 Medical: `Medical-RAG-Chatbot/docs/aws/questions.md`. Câu nào trùng với một bộ stage thì ở đây chỉ trả lời ở mức ranh
 giới và trỏ sang bộ đó.
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Phía Medical **đã dựng và đã chạy**; phía Anime **mới thiết kế,
-chưa dựng**. Câu trả lời tốt nói phía Medical bằng kinh nghiệm, phía Anime bằng thiết kế, và không trộn hai thì với nhau.
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Phía Medical **đã dựng và đã chạy**. Phía Anime, tính tới
+**2026-09-23**, đã dựng tới stage 4: cụm, cây GitOps và pipeline CI/CD đang chạy trên AWS, criteria #1, #3, #4, #5, #6
+đã đóng có bằng chứng; canary, cảnh báo SLO, autoscaler và tracing thì **mới thiết kế**. Câu trả lời tốt nói đúng thì
+cho từng phần — quá khứ cho phần đã chạy, "tôi thiết kế" cho phần chưa — và không trộn hai thì với nhau. Trạng thái
+từng criterion đọc ở [`docs/evidence/`](../evidence/), không đọc ở câu này.
 
 ---
 
@@ -30,6 +33,12 @@ chưa dựng**. Câu trả lời tốt nói phía Medical bằng kinh nghiệm, 
 **A1.2** Tóm tắt những chỗ hai project chọn khác nhau.
 
 **A1.3** "Managed" rốt cuộc là chuyển cái gì sang AWS, và cái gì vẫn là của mình?
+
+**A1.4** Câu hỏi nào chỉ Medical trả lời được, còn Anime thì không?
+
+**A1.5** Câu hỏi nào chỉ Anime trả lời được, còn Medical thì không?
+
+**A1.6** Có chuyện gì mà cả hai project đều không chứng minh được không?
 
 ### A2. Control plane: kubeadm so với EKS
 

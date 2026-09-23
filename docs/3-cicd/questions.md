@@ -15,8 +15,9 @@ Bộ liên quan: [tổng quan project](../common/questions.md), [managed so vớ
 [Terraform](../1-terraform/questions.md), [GitOps](../2-gitops/questions.md). Ý tưởng của stage: [README](README.md) ·
 [concepts](concepts.md).
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Pipeline **mới thiết kế, chưa dựng**; chỉ phần build và
-test của app đã chạy local. Câu trả lời tốt tách rõ hai thứ đó: "tôi đã đo local" và "tôi thiết kế CI để…".
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Pipeline **đã chạy**: #3, #4, #5 đóng
+([evidence](../evidence/cicd.md)), riêng thời lượng pipeline chưa đo. Câu trả lời tốt tách rõ cái đã đo với cái
+còn *pending*, và không đoán con số chưa có.
 
 ---
 
