@@ -129,6 +129,21 @@ what the other sees.
 seconds — **1.36%**. That is the point of a canary stated as a number: the bad version reached a tenth of the
 traffic, failed a fifth of that, and was gone in under three minutes.
 
+**What Git and the cluster did afterwards — and why the disagreement is correct.** Immediately after the abort,
+the `anime-api` Application read **`Synced/Degraded`**. That pair is the right answer, not a fault: Git still
+said "run the version with `api_fault_rate = 0.2`", and the cluster had refused it. Argo CD did **not** heal the
+Degraded state, because healing would mean trying the rejected version again. The disagreement ended only when
+Git changed its mind — `api_fault_rate = "0"` applied through bootstrap — after which the pod template matched
+the stable version again, **no canary started at all**, the Rollout reported `back on the old stable`, and the
+Application returned to `Synced/Healthy`.
+
+This is the property worth stating plainly: a self-healing GitOps controller and an automatic rollback pull in
+opposite directions, and the design resolves it by letting the Rollout own the abort while Git owns the
+intent. The cluster is allowed to disagree with Git, visibly, until a human changes Git.
+
+**Back to real mode.** The stage ends with `api_llm_provider = "openai"` applied and `provider=openai` on the
+Rollout, since stage 6 measures the SLO against the real provider and the T it produced.
+
 **Time to abort, in its parts.** 167 s total: about 20 s for the canary ReplicaSet to have a pod serving, a
 2-minute pause at the 10% step while the analysis probes every 30 s, then the second failing measurement, since
 `failureLimit` is 1 and one failure is not enough. Measured from the cluster — the ReplicaSet's creation
