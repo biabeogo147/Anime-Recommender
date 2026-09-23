@@ -137,8 +137,9 @@ make -s prom Q='sum(prometheus_rule_evaluation_failures_total{rule_group=~".*slo
 ```
 
 Expected: the PrometheusRule exists; `6` rule groups (recordings, meta recordings and alerts, for each objective);
-`20` rules (16 recording plus 4 alert, as counted in 0.3); `0` evaluation failures. An empty answer means the rules
-were not loaded: see troubleshooting.
+**`34`** rules — the 30 recording plus 4 alert counted in 0.3, and the two counts must agree: a file with 34 rules
+and a Prometheus that evaluates fewer means part of it was not loaded. `0` evaluation failures. An empty answer
+means the rules were not loaded at all: see troubleshooting.
 
 **2.2 — Alertmanager has the routes, and can read the webhook.**
 
@@ -231,8 +232,11 @@ make -s rollout-status
 Expected: `Plan: 0 to add, 1 to change`, `patched`, then `phase=Healthy` with `stable` equal to `latest`, and a hash
 different from `alert.clean-hash`. The file `alert.fault` holds the moment the faulty version had all traffic.
 
-**3.3 — wait for the page.** By the arithmetic, it comes in about 4 minutes on a one-hour store (the 6h/30m pair;
-about 8 if the 1h/5m pair wins), plus scrape, evaluation and grouping.
+**3.3 — wait for the page.** By the arithmetic it comes in about **9 minutes**, from the 1h/5m pair, plus scrape,
+evaluation and grouping. The 6h/30m pair cannot win on a store that already holds hours of clean traffic: its 6h
+window has a denominator large enough that a 50% fault needs about twenty minutes to push it past 5.6, and at the
+moment the page fired it stood at 5.30 (measured 2026-09-23). Read the pair from the burn rates in 3.4, not from
+the elapsed time.
 The ticket arrives first — its pairs cross within a couple of minutes — and is not the page.
 
 ```bash
@@ -265,7 +269,10 @@ first() {
   [ -n "$t" ] && date -u -d "@${t%.*}" +%FT%TZ || echo "(none)"
 }
 SLO='sloth_slo="requests-availability"'
-br() { echo "(slo:sli_error:ratio_rate$1{$SLO} / on(sloth_id) group_left slo:error_budget:ratio{$SLO})"; }
+# max without (sloth_window) is what the alert itself does, and it is not optional here: the recording rules carry
+# sloth_window, so `rate5m{...,sloth_window="5m"} and rate1h{...,sloth_window="1h"}` matches on every label including
+# that one, never overlaps, and both pairs report (none) however true they were (measured 2026-09-23).
+br() { echo "(max without (sloth_window) (slo:sli_error:ratio_rate$1{$SLO}) / on(sloth_id) group_left slo:error_budget:ratio{$SLO})"; }
 {
 echo "fault at all traffic:              $F0"
 echo "first failed request scraped:      $(first 'sum(increase(anime_http_requests_total{route="/recommend",status=~"5.."}[1m]))')"
@@ -292,7 +299,9 @@ Read the output:
 - **The timeline** is the time to alert in its parts, at 15-second resolution:
   - fault → first failed request scraped: the scrape;
   - → 5-minute ratio recorded: the recording rules;
-  - → a pair true, and the alert firing: the window arithmetic and the evaluation;
+  - → a pair true, and the alert firing: the window arithmetic and the evaluation. If both pair lines read `(none)`
+    while the alert did fire, the burn rates below still say which pair was true: compare each window against its
+    factor;
   - → the Discord message (3.3): Alertmanager's 30-second `group_wait`, and delivery.
 
   Alertmanager's own send counter cannot say which message was the page: both routes use the same integration, and

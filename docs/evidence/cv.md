@@ -11,7 +11,7 @@ Every number in the CV's Anime entry, with the file it came from and the mode it
 | `[INFLIGHT-KNEE]` | M2 | **not reproducible** — 170.5 and 117.5; the threshold comes from the 40-thread pool instead | fake, 2 replicas | `ramp-inflight.txt`; see [load](load.md#what-the-two-runs-do-not-establish-and-why-a-third-was-not-run) |
 | `[T-ABORT]` | M3 | **167 s** | fake, 20 RPS | `rollback-time.txt` (delivery 4.2), 2026-09-23 |
 | `[AFFECTED-PCT]` | M3 | **1.36%** | fake, 20 RPS | `rollback-affected.txt` (delivery 4.3), 2026-09-23 |
-| `[T-PAGE]` | M4 | *pending* | fake, 20 RPS, short drill | Discord message time − `alert.fault` (slo 3.3) |
+| `[T-PAGE]` | M4 | **9 m 30 s** (bounded 9:30–9:36) | fake, 20 RPS, short drill | Discord message time − `alert.fault` (slo 3.3), 2026-09-23; Discord shows minutes, so the bound is in [slo](slo.md) |
 | `[PODS-MAX]` | M5 | *pending* | fake, ramp | `scaling-desired.txt`, `scaling-ready.txt` |
 | `[NODES-MAX]` | M5 | *pending* | fake, ramp | `scaling-nodes.txt` |
 | `[ERR-SCALEIN]` | M5 | *pending* | fake, RPS=5, 30-min return | `scaling-errors-scalein.txt` (k6 `failed`) |
