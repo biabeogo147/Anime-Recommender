@@ -39,6 +39,14 @@ request, and merge it once `ci-ok` is green (`main` takes changes only through a
 the chart refuses to render the ScaledObject.
 - `scaling.inFlightTarget`: below the knee's in-flight per pod, so scaling starts before the knee (Scaling A3.2).
   The rule used is about **70%** of it, rounded down. It is written in the evidence with the knee value.
+
+  **Changed on 2026-09-23.** The knee's own in-flight reading did not reproduce — 170.5 against 117.5 across two
+  ramps, because the knee is found on a 2-minute rate window while in-flight is an instantaneous gauge, sampled on
+  a 30-second grid across a near-vertical rise (`docs/evidence/load.md`). The 70% rule is therefore applied to the
+  limit that reading stood in for: `/recommend` runs its model call in a 40-thread pool, one request per thread, so
+  in-flight above 40 per pod **is** the queue forming. 70% of 40 is 28, and the value used is **30** — 75% of the
+  limit, which the ramps corroborate: the last flat point sat at 46.5 in flight per pod with p95 still at 1.46 s.
+  Quote the limit and the ratio in the evidence, not a knee figure that does not reproduce.
 - `resources.requests`: CPU and memory at the knee, rounded up a little. They are not inflated to make nodes appear.
   If the memory request comes out above 1 Gi, `limits.memory` is raised with it; a request above its limit is
   refused.
