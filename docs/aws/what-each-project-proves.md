@@ -47,7 +47,8 @@ Both designs say this themselves, and split the subject deliberately so neither 
 | A latency objective taken from real traffic, not chosen | Anime | #6 | **measured** | `A: docs/evidence/load.md` |
 | The capacity of a known deployment | Anime | #7 | **planned** — the run that gives it has not produced a valid number yet | `A: docs/evidence/load.md` |
 | A GitOps tree that converges, and HTTPS and VPN-only admin UIs | Anime | #2, #15, #16 | **run, not evidenced** — exercised on the cluster in stage 2; no evidence file written | — |
-| A release that judges itself and rolls itself back | Anime | #8, #9 | **planned** — stage 5 | `A: docs/evidence/delivery.md` (not yet) |
+| A release that judges itself | Anime | #8 | **measured** | `A: docs/evidence/delivery.md` |
+| A release that rolls itself back | Anime | #9 | **measured** | `A: docs/evidence/delivery.md` |
 | An alert that fires on a burning error budget | Anime | #10 | **planned** — stage 6 | `A: docs/evidence/slo.md` (not yet) |
 | Scaling on the signal that saturates first | Anime | #14 | **planned** — stage 7 | `A: docs/evidence/scaling.md` (not yet) |
 | Cost and latency per request, for an LLM call | Anime | #11, #12 | **planned** — stage 8 | `A: docs/evidence/tracing.md` (not yet) |

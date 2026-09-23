@@ -50,7 +50,7 @@ spec:
     # Latency: at least 95% of /recommend requests finish within T.
     - name: requests-latency
       objective: 95
-      description: "/recommend answers within T, the gemini-mode p95 measured in stage 4."
+      description: "/recommend answers within T = 8 s, the real-mode p95 measured in stage 4 on openai gpt-4o-mini."
       sli:
         events:
           # "Slow" is everything outside the bucket le=T: the histogram's count minus that bucket. T is NOT chosen here.
@@ -60,7 +60,7 @@ spec:
           errorQuery: >-
             sum(rate(anime_http_request_duration_seconds_count{route="/recommend"}[{{.window}}]))
             -
-            sum(rate(anime_http_request_duration_seconds_bucket{route="/recommend",le="PIN_ME_T"}[{{.window}}]))
+            sum(rate(anime_http_request_duration_seconds_bucket{route="/recommend",le="8.0"}[{{.window}}]))
           totalQuery: sum(rate(anime_http_request_duration_seconds_count{route="/recommend"}[{{.window}}]))
       alerting:
         name: AnimeApiLatencyBudgetBurn

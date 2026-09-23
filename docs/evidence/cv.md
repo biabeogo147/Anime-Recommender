@@ -9,8 +9,8 @@ Every number in the CV's Anime entry, with the file it came from and the mode it
 | `[N-BASELINE]` | M1 | **230** | real: openai `gpt-4o-mini` | `t-count.txt` |
 | `[KNEE-RPS]` | M2 | **88–89 req/s**, ceiling **93.9** | fake, 2 replicas | `ramp-rate.txt`, `ramp-p95.txt` (load 3.4), two runs |
 | `[INFLIGHT-KNEE]` | M2 | **not reproducible** — 170.5 and 117.5; the threshold comes from the 40-thread pool instead | fake, 2 replicas | `ramp-inflight.txt`; see [load](load.md#what-the-two-runs-do-not-establish-and-why-a-third-was-not-run) |
-| `[T-ABORT]` | M3 | *pending* | fake, 20 RPS | `rollback-time.txt` (delivery 4.2) |
-| `[AFFECTED-PCT]` | M3 | *pending* | fake, 20 RPS | `rollback-affected.txt` (delivery 4.3) |
+| `[T-ABORT]` | M3 | **167 s** | fake, 20 RPS | `rollback-time.txt` (delivery 4.2), 2026-09-23 |
+| `[AFFECTED-PCT]` | M3 | **1.36%** | fake, 20 RPS | `rollback-affected.txt` (delivery 4.3), 2026-09-23 |
 | `[T-PAGE]` | M4 | *pending* | fake, 20 RPS, short drill | Discord message time − `alert.fault` (slo 3.3) |
 | `[PODS-MAX]` | M5 | *pending* | fake, ramp | `scaling-desired.txt`, `scaling-ready.txt` |
 | `[NODES-MAX]` | M5 | *pending* | fake, ramp | `scaling-nodes.txt` |
