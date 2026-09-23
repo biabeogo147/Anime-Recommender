@@ -38,6 +38,12 @@ kubectl -n anime get rollout anime-api -o jsonpath='provider={.spec.template.spe
 
 Expected: both keys with a length, near 40 each; the endpoint of your region; `provider=openai`.
 
+**Read the region from the browser, not from memory.** Open the Langfuse project and look at the address bar:
+`cloud.langfuse.com` is EU, `us.cloud.langfuse.com` is US. They are separate hosts with separate data and
+separate keys, so a key from one is refused by the other. The same line drives both the collector's export and
+`make langfuse-obs`, so the wrong region makes the export fail silently while only the read shows a **401** —
+`Invalid credentials. Confirm that you've configured the correct host` (measured 2026-09-23, with valid keys).
+
 ---
 
 ## 1. Switch the stage on — ops
@@ -133,7 +139,10 @@ make -s langfuse-obs ID=$ID | tee $E/trace-real-langfuse.txt
 
 Expected: `langfuse http 200`, then observations for the same spans. The `chat` observation has type `GENERATION`,
 the model, and non-zero input and output usage. `observations: 0` right away can be ingestion's delay: wait two
-minutes and rerun. `401` is the keys or the region, never an absence. A persistent `0` is the false pass to rule out:
+minutes and rerun. `401` is the keys or the region, never an absence — and the message says which: *"Confirm that you've configured
+the correct host"* points at the region rather than the key. Check the prefixes without printing the keys:
+`LANGFUSE_PUBLIC_KEY` starts `pk-lf-` and `LANGFUSE_SECRET_KEY` starts `sk-lf-`; if they are the other way round,
+they were stored swapped. Otherwise it is the region (section 0). A persistent `0` is the false pass to rule out:
 see troubleshooting.
 
 **2.4 — a fake-mode request is in Tempo and not in Langfuse.** Put the api in fake mode with **only the first block**

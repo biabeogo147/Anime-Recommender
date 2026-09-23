@@ -12,9 +12,9 @@ Every number in the CV's Anime entry, with the file it came from and the mode it
 | `[T-ABORT]` | M3 | **167 s** | fake, 20 RPS | `rollback-time.txt` (delivery 4.2), 2026-09-23 |
 | `[AFFECTED-PCT]` | M3 | **1.36%** | fake, 20 RPS | `rollback-affected.txt` (delivery 4.3), 2026-09-23 |
 | `[T-PAGE]` | M4 | **9 m 30 s** (bounded 9:30–9:36) | fake, 20 RPS, short drill | Discord message time − `alert.fault` (slo 3.3), 2026-09-23; Discord shows minutes, so the bound is in [slo](slo.md) |
-| `[PODS-MAX]` | M5 | *pending* | fake, ramp | `scaling-desired.txt`, `scaling-ready.txt` |
-| `[NODES-MAX]` | M5 | *pending* | fake, ramp | `scaling-nodes.txt` |
-| `[ERR-SCALEIN]` | M5 | *pending* | fake, RPS=5, 30-min return | `scaling-errors-scalein.txt` (k6 `failed`) |
+| `[PODS-MAX]` | M5 | **8** | fake, ramp to 267 req/s | `scaling-desired.txt`, `scaling-ready.txt`, 2026-09-23 |
+| `[NODES-MAX]` | M5 | **3** | fake, ramp to 267 req/s | `scaling-nodes.txt`, 2026-09-23 |
+| `[ERR-SCALEIN]` | M5 | **0** of 4,935 | fake, RPS=5 return | k6 `failed`, 2026-09-23 |
 | `[COST-PER-1K]` | M6 | *pending* | real: openai `gpt-4o-mini` | `cost-per-1000.txt`, `cost-pricing-date.txt` (tracing 3.2) |
 | `[N-DRILL]` | M7 | *pending* | fake, 20 RPS, 5 min | `m7-counts.txt` |
 | `[LF-LEAK]` | M7 | *pending* | fake | `m7-counts.txt` (`langfuse-count`) |
@@ -30,4 +30,6 @@ Every number in the CV's Anime entry, with the file it came from and the mode it
 
 - **M4:** which window pair fired first, the 1h/5m pair's own crossing time, each window's burn rate at firing, the
   store's age, and the error ratio at firing. *Pending.*
-- **M5:** the node prediction from scaling 2.4, and whether it held. *Pending.*
+- **M5:** the node prediction from scaling 2.4, and whether it held. **It held**: 7 replicas fit two nodes, the
+  8th went `Pending` with `Insufficient cpu`, and the Cluster Autoscaler added a third node 40 s later
+  ([scaling](scaling.md#the-prediction-written-before-the-run)).

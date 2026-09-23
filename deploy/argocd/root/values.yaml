@@ -47,7 +47,11 @@ network:
 domain: anime.recruitai.io.vn
 region: ap-southeast-1
 
-# Where the collector sends real-model traces (stage 8). Langfuse Cloud's EU region; its US region is
-# https://us.cloud.langfuse.com/api/public/otel. It must be the region the project and its keys (anime/langfuse) are in.
+# Where the collector sends real-model traces (stage 8). Langfuse Cloud keeps its regions on separate hosts with
+# separate data and separate keys, so a key from one is rejected by the other: EU is https://cloud.langfuse.com, US is
+# https://us.cloud.langfuse.com, HIPAA is https://hipaa.cloud.langfuse.com. This must be the region the project and its
+# keys (anime/langfuse) are in - read it from the address bar when the project is open in a browser.
+# `make langfuse-obs` derives its API host from THIS line too, so a wrong region fails both the export and the read,
+# and the read's 401 is the visible half (measured 2026-09-23: EU here, project in US).
 langfuse:
-  otlpEndpoint: https://cloud.langfuse.com/api/public/otel
+  otlpEndpoint: https://us.cloud.langfuse.com/api/public/otel
