@@ -55,6 +55,14 @@ exists.
 **Valid only if** dropped iterations stayed at 0 up to the knee, and the workstation was not saturated (3.4,
 reading 3). Otherwise the number describes the generator, and the bullet's first clause is dropped.
 
+**Measured 2026-09-23, and the second reading did not survive.** Two runs put the ceiling at the same
+93.9 req/s and the capacity at 88–89, but `[INFLIGHT-KNEE]` came out 170.5 and 117.5 — 45% apart, because the
+knee is detected on a two-minute rate window while in-flight is an instantaneous gauge, sampled every 30 s
+across a near-vertical rise. A third run would sample the same rise the same way. The autoscaler's threshold is
+therefore taken from the pod's 40-thread concurrency limit, which the runs corroborate, and the reasoning is in
+[load](load.md#the-keda-threshold-this-hands-to-stage-7). When quoting M2, quote the ceiling and the capacity,
+never the in-flight figure.
+
 ## M3 — A canary that aborts itself
 
 **At** [delivery guide 4.2–4.3](../5-delivery/guide.md), in fake mode, with k6 at 20 RPS.

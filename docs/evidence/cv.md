@@ -7,8 +7,8 @@ Every number in the CV's Anime entry, with the file it came from and the mode it
 |---|---|---|---|---|
 | `[T-SLO]` | M1 | **8 s** | real: openai `gpt-4o-mini` | `t-value.txt`, from `t-buckets.txt` (load 2.2), 2026-09-23 |
 | `[N-BASELINE]` | M1 | **230** | real: openai `gpt-4o-mini` | `t-count.txt` |
-| `[KNEE-RPS]` | M2 | *pending* | fake, 2 replicas | `ramp-rate.txt`, `ramp-p95.txt` (load 3.4) |
-| `[INFLIGHT-KNEE]` | M2 | *pending* | fake, 2 replicas | `ramp-inflight.txt` |
+| `[KNEE-RPS]` | M2 | **88–89 req/s**, ceiling **93.9** | fake, 2 replicas | `ramp-rate.txt`, `ramp-p95.txt` (load 3.4), two runs |
+| `[INFLIGHT-KNEE]` | M2 | **not reproducible** — 170.5 and 117.5; the threshold comes from the 40-thread pool instead | fake, 2 replicas | `ramp-inflight.txt`; see [load](load.md#what-the-two-runs-do-not-establish-and-why-a-third-was-not-run) |
 | `[T-ABORT]` | M3 | *pending* | fake, 20 RPS | `rollback-time.txt` (delivery 4.2) |
 | `[AFFECTED-PCT]` | M3 | *pending* | fake, 20 RPS | `rollback-affected.txt` (delivery 4.3) |
 | `[T-PAGE]` | M4 | *pending* | fake, 20 RPS, short drill | Discord message time − `alert.fault` (slo 3.3) |

@@ -41,9 +41,13 @@ analysis:
 scaling:
   minReplicas: 2
   maxReplicas: 8
-  # Requests in flight per pod that the HPA aims for: set below stage 4's in-flight per pod at the knee. The chart
-  # refuses to render the ScaledObject while this is the placeholder (docs/7-scaling/guide.md, section 0).
-  inFlightTarget: MEASURE_IN_STAGE_4
+  # Requests in flight per pod that the HPA aims for. Stage 4 measured the knee's own in-flight figure twice and it
+  # did not reproduce (170.5 against 117.5: a knee found on a 2m rate window, read against an instantaneous gauge,
+  # on a 30s grid across a vertical rise). So this comes from the limit that figure stood in for: /recommend runs
+  # the model call in a 40-thread pool, one request per thread, so in-flight above 40 per pod IS the queue forming.
+  # 30 leaves the autoscaler the one to two minutes a new pod needs. Stage 7 tests it: if p95 reaches T before
+  # replicas grow, 30 is still too high (docs/evidence/load.md).
+  inFlightTarget: 30
   scaleDownWindowSeconds: 300 # the HPA's scale-down stabilisation window, stated rather than defaulted
 
 # Tracing (stage 8): whether spans carry the prompt and completion (src/anime/telemetry.py, capture_content).

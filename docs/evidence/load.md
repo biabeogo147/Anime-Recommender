@@ -42,45 +42,102 @@ The capacity figure is valid only if both hold:
   virtual-user limit, not the service);
 - the ops workstation was not saturated — its busiest `vmstat` sample below about 90% CPU.
 
-### Run 1, 2026-09-23 03:00:02Z - 03:10:16Z: discarded by the rule above
+### The two runs
 
-Not a failed run: 39455 requests, every one a 200, pods and nodes at 2 and 2 throughout. It is discarded because of
-the first validity condition, and it is kept here because that is what the condition is for.
+Both in fake mode, two replicas, no autoscaler, a ramping arrival rate to 120 req/s over ten minutes, 2026-09-23.
+Neither is discarded outright and neither is a clean pass; what each establishes is set out below.
 
-- Low-load p95 = mean(1.431, 1.427, 1.415, 1.455) = **1.432 s**; the threshold is 1.5 x that = **2.148 s**.
-- p95 held 1.43 s for ten points, then 1.93 (under the threshold), then **3.34 s at 03:07:32Z — the knee**.
-- The last point before it, 03:07:02Z, served **88.2 req/s**, at 84.5 in-flight per pod.
-- **But the first dropped iteration came at 03:03:21Z**, four minutes earlier, when the offered rate was about
-  50 req/s and p95 was still 1.43 s. The service was healthy there, so the drops were the generator's: `ramp.js` had
-  `preAllocatedVUs: 50`, and k6 initializes any VU beyond that number during the run, slowly enough to drop
-  iterations. The workstation was not the cause either — its busiest sample was 46% CPU.
+| | Run 1 (03:00:02Z → 03:10:16Z) | Run 2 (03:24:13Z → 03:34:26Z) |
+|---|---|---|
+| `preAllocatedVUs` | 50 | 300 |
+| Requests, and 5xx | 39455, **0** server-side | 39644, **0** server-side (k6 counted 1 connection-level failure) |
+| Low-load p95 → threshold | 1.432 s → 2.148 s | 1.453 s → 2.179 s |
+| Knee (first p95 above it) | 3.34 s at 03:07:32Z | 4.81 s at 03:31:43Z |
+| Served rate at the last point before it | **88.2 req/s** | **89.1 req/s** |
+| Plateau of the served rate | **93.9 req/s** | **93.9 req/s** |
+| in-flight per pod at the knee | 170.5 | 117.5 |
+| CPU / memory per pod at the plateau | 0.227 cores / 142 MiB | 0.236 cores / 143 MiB |
+| Ready pods, nodes | 2, 2 throughout | 2, 2 throughout |
+| First dropped iteration | 03:03:21Z — **4 minutes before** the capacity point | 03:31:08Z — **5 seconds before** it |
+| Busiest workstation CPU sample | 46% | 54% |
 
-So 88.2 req/s is not reported as the capacity. `PRE_VUS` now defaults to 300 (`loadtest/k6/ramp.js`), and the run is
-repeated.
+## What the two runs establish
 
-What the run does establish, because neither reading depends on the generator keeping up:
+**The ceiling, to three significant figures.** The served rate stopped at **93.9 req/s** in both runs while the
+offered rate kept climbing to 120. Two independent runs agreeing to that precision is not a coincidence, and a
+third source agrees: `/recommend` runs the model call in FastAPI's thread pool, 40 threads per pod, and fake
+mode sleeps a lognormal around 800 ms with sigma 0.35, whose mean is 0.8 x exp(0.35^2/2) = 0.85 s. That allows
+40 / 0.85 = 47 req/s per pod, **94.1 for two** — computed in `loadtest/k6/ramp.js` before either run.
 
-- **The flat region is the fake provider's own latency, not the service's.** `FakeLLM` sleeps a lognormal around a
-  800 ms median with sigma 0.35, whose p95 is 0.8 x exp(1.645 x 0.35) = **1.42 s**. Measured: **1.43 s**. At low load
-  the api adds nothing measurable.
-- **The ceiling is the thread pool, not the CPU.** `/recommend` runs the model call in FastAPI's thread pool, 40
-  threads per pod; at a mean sleep of 0.8 x exp(0.35^2/2) = 0.85 s that allows 47 req/s per pod, **94.1 req/s for
-  two** — computed in `loadtest/k6/ramp.js` before the run. The served rate plateaued at **93.9 req/s** while the
-  offered rate kept climbing to 120. CPU stayed at 0.23 cores per pod and memory at 142 MiB, so neither was the limit:
-  the threads were, each one asleep waiting for the provider.
+**That the limit is concurrency, not resources.** At the plateau each pod used **0.23 cores** and 143 MiB. The
+threads were not working; they were asleep waiting for the provider. A CPU-based autoscaler would see an idle
+service at the moment its latency triples, which is why criterion #14 scales on in-flight requests.
 
-Past the knee the queue grew as that arithmetic predicts: in-flight per pod went 84 -> 170 -> 308 -> 499, p95 went to
-15.6 s, and still nothing failed - 0 errors at every point.
+**That the flat region is the provider's own latency.** `FakeLLM`'s sleep has a p95 of 0.8 x exp(1.645 x 0.35) =
+**1.42 s**; measured, **1.43 s** and **1.45 s**. Below the knee the api adds nothing measurable.
 
-### Run 2
+**Capacity, by the pre-registered rule: 88–89 req/s.** Both runs, one point apart, ~6% below the ceiling — the
+rate at which the queue has not yet formed.
 
-| Reading (fake mode, 2 replicas, no autoscaler) | Value |
-|---|---|
-| Low-load p95 | *pending* |
-| Knee | *pending* |
-| Capacity, served requests per second | *pending* |
-| Error ratio up to the knee | *pending* |
-| In-flight per pod at the knee | *pending* — sets the KEDA threshold in stage 7 |
-| CPU and memory per pod at the knee | *pending* — set the api's resource requests |
-| Ready pods and nodes during the run | *pending* — both should stay at 2 |
-| k6 dropped iterations, and the busiest workstation CPU sample | *pending* |
+## What the two runs do NOT establish, and why a third was not run
+
+**in-flight per pod at the knee is not reproducible here: 170.5 against 117.5, 45% apart.** The cluster behaved
+identically both times — the ceiling proves that — so the instability is in the instrument, and it has two
+causes:
+
+- **Two different kinds of time are being paired.** p95 comes from `rate(...[2m])`, where each point summarises
+  the *previous two minutes*; in-flight is a gauge read *at that instant*. By the time a two-minute average
+  crosses the threshold, the instantaneous state is already well inside the break-away — how far inside depends
+  on the run.
+- **A 30-second grid across a near-vertical rise.** in-flight per pod goes 46 → 117 → 228 → 375 → 500 in two
+  minutes. Which tick is the first past the threshold decides the number; shifting the run by fifteen seconds
+  changes the answer.
+
+A third run would sample the same rise on the same grid with the same pairing, and produce a third equally
+arbitrary number. It was not run. The `preAllocatedVUs` fix (50 → 300, now 300 by default) addressed the
+dropped iterations, which is a different defect; the drop in run 2 came five seconds before the capacity point
+rather than four minutes, but the condition still failed and is recorded as failed.
+
+## #7 — capacity: **partly measured**
+
+| Reading | Value | Basis |
+|---|---|---|
+| Throughput ceiling, 2 pods, fake mode | **93.9 req/s** | measured twice, agrees with the computed thread-pool limit of 94.1 |
+| Sustained rate before latency breaks away | **88–89 req/s** | the pre-registered rule, both runs |
+| Error ratio up to the knee | **0** | every point of both runs |
+| CPU / memory per pod at the ceiling | **0.23 cores / 143 MiB** | sets the api's resource requests |
+| Concurrency limit per pod | **40 in-flight** | the thread pool; the last flat point sat at 46.5 per pod with p95 still 1.46 s |
+| in-flight per pod at the knee | **not reproducible** — 170.5 and 117.5 | see above; not used |
+
+**#7: partly measured.** The ceiling and the resource figures are sound. The capacity figure carries the caveat
+that its validity condition — no dropped iterations before the capacity point — failed in both runs.
+
+### The KEDA threshold this hands to stage 7
+
+Not the knee's in-flight reading, which is not reproducible, but the architectural limit it was standing in for:
+
+> A pod has 40 threads and each holds one request, so **in-flight above 40 per pod means a queue is forming**.
+> That is a definition, not a measurement, and the measurements agree with it: at 83 req/s the pods held 46.5
+> in flight with p95 still at 1.46 s, and the next point broke away.
+
+**Stage 7 starts from a threshold of 30 in-flight per pod** — below 40, so the autoscaler reacts before the
+queue forms and leaves the one to two minutes a new pod needs to become ready. Stage 7 tests that assumption:
+if replicas grow before p95 reaches T = 8 s, 30 holds; if p95 breaks away first, 30 is still too high.
+
+### Why the run looks the way it does
+
+- **Fake mode**, because a real provider would make these 39,000 requests cost money and hit a rate limit, and
+  the number would then describe the provider rather than the cluster.
+- **Two replicas, no autoscaler**, because the figure has to describe one unit. With scaling on, the graph never
+  breaks away and nothing is learnt about a pod.
+- **An open model** (a ramping *arrival rate*, not a fixed number of users), because virtual users that wait for
+  an answer send less as the service slows — coordinated omission — and the knee would look gentler than it is.
+- **The rule written and committed before the run**, because "where the graph bends" is otherwise chosen after
+  seeing the graph.
+
+### What this figure is not
+
+It is the ceiling of **two pods**, not of the cluster. The nodes were never close to saturated: 0.23 cores per
+pod, two nodes idle. Reaching the cluster's own ceiling means removing this one first — that is, adding pods,
+which is autoscaling, which is criterion #14 in stage 7. And configuring that correctly is what the in-flight
+threshold above is for.
