@@ -62,8 +62,12 @@ echo "T=$T"; grep -c "le=\"$T\"" $G; grep -c 'le="PIN_ME_T"' $G
 Expected:
 - `SLO rules match the spec`;
 - `kind: PrometheusRule` and `  name: anime-api`;
-- `16` recording rules (per objective, eight windows and eight meta rules) and `4` alert rules (page and ticket for
-  each objective). Write both down, for 2.1;
+- `30` recording rules and `4` alert rules. Per objective that is **8** SLI recordings — one per window, `5m` `30m`
+  `1h` `2h` `6h` `1d` `3d` `4w` — and **7** meta recordings: `slo:objective:ratio`, `slo:error_budget:ratio`,
+  `slo:time_period:days`, `slo:current_burn_rate:ratio`, `slo:period_burn_rate:ratio`,
+  `slo:period_error_budget_remaining:ratio` and `sloth_slo_info`. Two objectives, so 2 x 15 = 30, and 2 x 2 = 4
+  alerts (page and ticket each). Counted from Sloth **v0.16.0**; a different version may emit a different number of
+  meta rules, so compare against the header of the generated file. Write both down, for 2.1;
 - the 28-day factors, printed as full floats, four of each: `(13.44 *`, `(5.6000000000000005 *`,
   `(2.8000000000000003 *` and `(0.9333333333333333 *`. The 30-day set (`14.4`, `6`, `3`, `1`) means the period flag
   did not take (design §4.3): stop and report it;
