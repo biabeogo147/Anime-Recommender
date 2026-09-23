@@ -2,7 +2,7 @@ stages: []
 
 image:
   repository: "" # <registry>/anime-ui, from the root's pins
-  digest: sha256:0fc90afb27909471dc172f0f6418f6ec0c3647aa215796de8776ebc1dab61a6d # from `make image` until CI (stage 3) writes it
+  digest: sha256:4599be243f20b5f85cb27711f5452dfaaae101bcebbd9eca8a2a01ddef1eb5d5 # from `make image` until CI (stage 3) writes it
 
 replicas: 2 # preferably on the two different nodes, like the api
 
