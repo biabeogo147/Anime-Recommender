@@ -89,14 +89,48 @@ identifies one build, not the content of a commit. It is why the signature is ov
 
 ## #9 — the rollback drill
 
-*Pending.* It needs a version that is bad on purpose — the same fake mode with `api_fault_rate = "0.2"` — and it
-is only meaningful if the canary is shown to have really failed requests: a canary whose error count is zero
-makes the drill worthless whatever the Rollout did (design §6, row 9).
+Run 2026-09-23, immediately after #8, on the same traffic. The bad version is the same fake mode with
+`api_fault_rate = "0.2"`, so one request in five fails inside the api itself — the only difference from the
+version it is compared against.
 
 | Reading | Value |
 |---|---|
-| Time from rollout start to abort | *pending* — measured from the canary ReplicaSet's creation to the failing measurement's `finishedAt`, not from the watching loop |
-| The failing measurement, and its metric | *pending* |
-| Requests the canary actually failed | *pending* |
-| Requests served by the bad version before the abort | *pending* |
-| Whether Git and the cluster disagreed afterwards, and until when | *pending* |
+| Canary ReplicaSet created | `08:18:13Z` |
+| Failing measurement finished — the abort | `08:21:00Z` |
+| **Rollout start → abort** | **167 s** |
+| Bad version | `594bfd86bf`; stable stayed `586cd55b4f` throughout |
+| AnalysisRun | `anime-api-594bfd86bf-6-2`, **`Failed`** — `success-rate assessed Failed due to failed (2) > failureLimit (1)` |
+| Requests the canary served | **250.9** |
+| Requests the canary **failed** | **45.0** — 17.9% of its own traffic, against the 20% configured |
+| Share of **all** requests that failed while the canary was live | **1.36%** |
+
+**The measurements.**
+
+| Metric | Values | Gate | Verdict |
+|---|---|---|---|
+| `canary-requests` | 230.2, 221.3 | ≥ 20 | Successful |
+| `latency-ratio` | 1.042, 1.030 | ≤ 1.2 | **Successful** |
+| `success-rate` | **0.813, 0.819** | ≥ 0.99 | **Failed** ×2 |
+
+**#9: pass**, and on all four counts that make it mean something:
+
+- the Rollout aborted **by itself**, with no human action;
+- the canary's error count is **above zero** (45.0). An abort with a zero error count would prove nothing about
+  the gate, whatever the Rollout did (design §6, row 9);
+- the AnalysisRun that failed is the one for the bad hash (`canary-hash=594bfd86bf`), not some other run;
+- `stable` never moved off `586cd55b4f`, so traffic returned to the good version.
+
+**The detail worth keeping: the bad version was not slow.** `latency-ratio` measured 1.042 and 1.030 and passed
+its gate at both probes. Only `success-rate` caught it. A release judged on latency alone would have promoted
+this version to 100%. Two gates that fail for different reasons is not redundancy here — each one is blind to
+what the other sees.
+
+**The cost of the drill, in requests.** 45 failed requests out of about 3,300 served during the canary's 167
+seconds — **1.36%**. That is the point of a canary stated as a number: the bad version reached a tenth of the
+traffic, failed a fifth of that, and was gone in under three minutes.
+
+**Time to abort, in its parts.** 167 s total: about 20 s for the canary ReplicaSet to have a pod serving, a
+2-minute pause at the 10% step while the analysis probes every 30 s, then the second failing measurement, since
+`failureLimit` is 1 and one failure is not enough. Measured from the cluster — the ReplicaSet's creation
+timestamp and the measurement's `finishedAt` — not from the loop that watched, which only notices an abort after
+it has happened.
