@@ -17,9 +17,9 @@ Bộ liên quan: [tổng quan project](../common/questions.md), [managed so vớ
 [progressive delivery](../5-delivery/questions.md). Ý tưởng của stage: [README](README.md) ·
 [concepts](concepts.md).
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **mới thiết kế, chưa dựng**: câu trả lời tốt
-nói "tôi thiết kế", "tôi chọn", không bao giờ nói "tôi đã chạy". Câu nào bắt bạn phải mở design mới trả lời được
-thì đó là câu cần đọc lại.
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **đã chạy trên cụm nhưng chưa viết evidence**:
+kể việc đã làm được, nhưng #2, #15, #16 chưa có file bằng chứng nên đừng đọc ra con số. Câu nào bắt bạn phải mở
+design mới trả lời được thì đó là câu cần đọc lại.
 
 ---
 

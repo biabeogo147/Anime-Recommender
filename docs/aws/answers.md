@@ -14,12 +14,12 @@ Thuật ngữ dùng thống nhất trong bộ này: **self-managed** cho cụm k
 AWS thay thế một thứ mình tự vận hành; **gánh vận hành** cho việc phải làm đi làm lại để một thứ tiếp tục chạy; **role**
 cho IAM role.
 
-**Số liệu đã có** — của Medical, từ evidence của Medical, được phép nói:
+**Số liệu đã có** — của Medical, từ `Medical-RAG-Chatbot/docs/evidence/`, được phép nói:
 
 | Số | Giá trị | Dùng ở |
 |---|---|---|
-| Dựng lại toàn bộ nền tảng Medical từ stack rỗng | 21 m 47 s (17 Application, 8 sync wave) | A2.1 |
-| Điểm trễ mục tiêu của Anime (T), từ 230 request thật | 8 s | Load A1.1 |
+| Dựng lại toàn bộ nền tảng Medical từ stack rỗng | 21 m 47 s, 17 Application | A2.1 |
+| RTO khôi phục etcd của Medical | 7 m 02 s | A2.1 |
 | Chi phí Medical khi chạy | khoảng 0.53 USD/giờ | A2.6 |
 
 **Còn phải điền:**
@@ -55,8 +55,8 @@ quyền đúng, và chứng minh nó chạy. Một policy IAM quá rộng trên 
 
 **A1.4** **Ý chính:** "Những câu cần một control plane của chính mình. *Dựng lại cụm từ đầu* — kubeadm trên ba EC2,
 API server sau NLB nội bộ, chạy Ansible lần hai thì `changed=0`. *Khôi phục khi mất state* — snapshot etcd theo lịch
-lên S3, và một drill khôi phục đo được RTO 7 phút 02 giây. *Nâng cấp Kubernetes* — một playbook đi từng node. *Chặn
-image chưa ký ở admission* — Kyverno từ chối trong prod, tức không chỉ ký mà còn ép. *Vận hành chứng chỉ* —
+lên S3, và một drill khôi phục đo được RTO 7 phút 02 giây. *Nâng cấp Kubernetes* — một playbook đi từng node; nói thẳng là drill mới đi đường patch, minor upgrade chưa chạy. *Chặn
+image chưa ký ở admission* — Kyverno từ chối trong prod, tức không chỉ ký mà còn chặn. *Vận hành chứng chỉ* —
 cert-manager với wildcard Let's Encrypt qua DNS-01. Trên EKS không có cái nào trong số đó để mà làm: không có control
 plane để dựng, không có etcd để snapshot, chứng chỉ do ACM cấp và gia hạn."
 
@@ -67,7 +67,8 @@ của Anime là Git cộng dựng lại, và đó là phép đo M8 chứ không 
 
 **A1.5** **Ý chính:** "Những câu cần một service đáng đo, và một cụm do người khác giữ cho sống. *Hứa gì với người
 dùng* — mức trễ mục tiêu đọc phía server từ traffic thật, đặt đúng biên histogram có thật, rồi viết SLO theo nó.
-*Khi nào thì scale* — theo số request đang bay chứ không theo CPU, với ngưỡng lấy từ điểm service thật sự bão hoà.
+*Khi nào thì scale* — theo số request đang xử lý (in-flight) chứ không theo CPU, với ngưỡng lấy từ điểm service
+thật sự bão hoà.
 *Release có an toàn không* — canary đi 10 → 50 → 100 dựa trên số đo, bản lỗi tự huỷ, không có người bấm nút. *Một
 request tốn bao nhiêu* — span `gen_ai.*`, số token và ước tính tiền. Medical không có SLO, không có autoscaler,
 không có trace, nên chưa bao giờ cần tới những con số này."
@@ -76,8 +77,10 @@ không có trace, nên chưa bao giờ cần tới những con số này."
 IngressGroup cho bốn giao diện, readiness gate, external-dns viết tên, ACM gắn vào listener, mỗi controller một IAM
 role qua Pod Identity. Cụm self-managed không có gì trong đó.
 
-**Mẹo:** ở đây nên kể kèm một lỗi thật đã gặp — ví dụ CA của webhook không khớp Secret vì chart sinh CA mới mỗi lần
-render. Nó chứng minh mình đã vận hành thật, chứ không chỉ đọc tài liệu.
+**Mẹo:** ở đây nên kể kèm một lỗi thật đã gặp — CA của webhook không khớp Secret vì chart sinh CA mới mỗi lần
+render, gặp **hai lần trên hai cụm khác nhau** ([design §3](../eks-sre-llmops-design.md), "twice measured"; cách
+kiểm và sửa ở [2-gitops 2.3](../2-gitops/guide.md)). Nó chứng minh mình đã vận hành thật, chứ không chỉ đọc tài
+liệu. Chỉ kể những sự cố có chỗ ghi lại như vậy.
 
 **A1.6** **Ý chính:** "Có, và tôi biết chúng là gì. Không multi-region, và ngoài etcd thì không có DR. Không service
 mesh. Không traffic người dùng thật — mọi tải đều do k6 sinh ra, và cụm bị xoá giữa các phiên. Không on-call: cảnh
@@ -85,8 +88,9 @@ báo đi vào webhook chat, không có ca trực, không có dead-man's switch. 
 Và không có xác thực trước các giao diện nội bộ — VPN là cổng duy nhất."
 
 *Nếu được hỏi thêm:* phần lớn những thứ đó được ghi thẳng là **non-goal** trong design, kèm lý do: một người vận
-hành, ngân sách khoảng 0.53 USD/giờ khi cụm chạy, và cụm bị xoá khi không dùng. Vault chẳng hạn bị loại có ghi lý do:
-thêm một hệ thống có trạng thái phải tự vận hành và unseal.
+hành, ngân sách vài chục xu mỗi giờ khi cụm chạy, và cụm bị xoá khi không dùng. Bên Medical còn ghi rõ lý do loại
+Vault — thêm một hệ thống có trạng thái phải tự vận hành và unseal — nên nếu bị hỏi về secret engine thì lấy câu đó,
+và nói rõ đó là quyết định của Medical.
 
 **Mẹo:** đây là câu dễ ghi điểm nhất trong ba câu. Trả lời được ngay, gọn, không vòng vo, cho thấy mình biết ranh
 giới của chính mình. Danh sách đầy đủ ở [what each project proves](what-each-project-proves.md#what-neither-project-proves).
@@ -101,7 +105,8 @@ phần đó; tôi không đăng nhập vào máy control plane nào và không v
 tôi."
 
 *Nếu được hỏi thêm:* RTO khôi phục etcd của Medical là 7 phút 02 giây (`Medical-RAG-Chatbot/docs/evidence/drills.md`);
-thời gian dựng lại EKS `[điền: thời gian dựng lại]` — phép đo M8, chưa chạy.
+thời gian dựng lại EKS `[điền: thời gian dựng lại]` — phép đo M8, chưa chạy. Nâng cấp Kubernetes thì nói cho đúng: drill
+mới đi đường **patch**, còn minor upgrade như criterion #14 yêu cầu thì chưa chạy (`drills.md`).
 
 **A2.2** **Ý chính:** "Truy cập trực tiếp vào etcd — không có snapshot nào để lấy, nên khôi phục trên EKS nghĩa
 là dựng lại từ Terraform và Git. Cờ của API server, admission plugin, audit policy. Metric của etcd. Chứng chỉ

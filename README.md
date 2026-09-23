@@ -21,7 +21,9 @@ and not yet built**. The pictures and tables that follow describe the target, an
   hand with kubeadm and answers *can you run Kubernetes*. This one takes the cluster as given and answers
   *can you run a service on it* — which is a different job with different evidence.
 - **Nothing is claimed here that was not measured.** Every number below links to the
-  measurement that produced it, and everything still unbuilt says so.
+  measurement that produced it; what is built but not yet evidenced says so, and so does what is only designed.
+  Which capability sits where is in
+  [what each project proves](docs/aws/what-each-project-proves.md#the-capability-matrix).
 - **Failure is a first-class mode, not an accident.** A `fake` provider gives deterministic latency and a
   settable error rate, so a rollback drill and a load test cost nothing and repeat exactly.
 

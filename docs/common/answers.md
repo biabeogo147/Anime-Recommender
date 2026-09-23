@@ -83,7 +83,8 @@ MB — cộng lại 1.18 GB, giảm khoảng 82%. Index 269 anime embed trong 8.
 số mong đợi là 270. Token Hugging Face không xuất hiện lần nào trong history hay trong image xuất ra. Hai request
 `/recommend` thật, qua Gemini, mất 3.0 và 2.7 giây tính cả embedding, ước tính khoảng 0.0025 USD cho cả hai. Một
 fault drill 20% cho đúng 80 request 200 và 20 request 503, ba counter khớp nhau. 17 test pass, container chạy UID
-10001. Mới thiết kế: toàn bộ hạ tầng. Trong mười sáu tiêu chí, chỉ tiêu chí về kích thước image là đã có số."
+10001. Trên AWS, tính tới 2026-09-23: hạ tầng, GitOps và CI/CD đã dựng và chạy — năm tiêu chí đã có số, trong đó
+T = 8 giây từ 230 request thật. Còn lại canary, SLO, autoscaling và tracing thì mới thiết kế."
 
 *Nếu được hỏi thêm:* phase app còn nợ vài việc tôi đã ghi rõ: lỗi Hugging Face lúc query đang thành 500 chưa phân
 loại, ba endpoint health và metrics phải thành async, bucket histogram phải mịn hơn — cả ba làm trước stage Load.

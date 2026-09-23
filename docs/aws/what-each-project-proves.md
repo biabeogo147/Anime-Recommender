@@ -28,75 +28,63 @@ Both designs say this themselves, and split the subject deliberately so neither 
 
 ## The capability matrix
 
-| Capability | Project | Criterion | Where the measurement lives |
-|---|---|---|---|
-| Infrastructure from empty, then a re-plan with no changes | both | #1 each | `A: docs/evidence/terraform.md` · `M: docs/evidence/terraform.md` |
-| Building a control plane, and a second run that changes nothing | Medical | #2 | `M: docs/evidence/ansible.md` |
-| Surviving the loss of a control-plane node | Medical | #3 | `M: docs/evidence/ansible.md` |
-| etcd backup, and a timed restore | Medical | #12 | `M: docs/evidence/drills.md` |
-| A Kubernetes upgrade run as a procedure | Medical | #14 | `M: docs/evidence/drills.md` |
-| CI a team hosts itself | Medical | #8 | `M: docs/evidence/jenkins.md` |
-| Signing with a key you own, and refusing unsigned images at admission | Medical | #9, #13 | `M: docs/evidence/jenkins.md`, `drills.md` |
-| Certificates issued and renewed by something you operate | Medical | #4, #5 | `M: docs/evidence/gitops.md` |
-| Promotion between environments, gated by a person | Medical | #10 | `M: docs/evidence/jenkins.md` |
-| CI on a hosted runner, federated into AWS with no stored key | Anime | #3 | `A: docs/evidence/cicd.md` |
-| A check that can say no, proven by making it fail | Anime | #5 | `A: docs/evidence/cicd.md` |
-| A latency objective taken from real traffic, not chosen | Anime | #6 | `A: docs/evidence/load.md` |
-| The capacity of a known deployment, measured | Anime | #7 | `A: docs/evidence/load.md` |
-| A release that judges itself and rolls itself back | Anime | #8, #9 | `A: docs/evidence/delivery.md` |
-| An alert that fires on a burning error budget, not on a symptom | Anime | #10 | `A: docs/evidence/slo.md` |
-| Scaling on the signal that saturates first | Anime | #14 | `A: docs/evidence/scaling.md` |
-| Knowing what one request costs, and where its time went | Anime | #11, #12 | `A: docs/evidence/tracing.md` |
-| A GitOps tree that converges from nothing | both | A #2 · M #5 | `A: docs/evidence/gitops.md` · `M: docs/evidence/gitops.md` |
-| Internal interfaces reachable only through a VPN | both | A #16 · M #4 | `A: docs/evidence/gitops.md` · `M: docs/evidence/gitops.md` |
+| Capability | Project | Criterion | Status | Where the measurement lives |
+|---|---|---|---|---|
+| Infrastructure from empty, then a re-plan with no changes | both | A #1 · M #1 | **measured** both | `A: docs/evidence/terraform.md` · `M: docs/evidence/terraform.md` |
+| Building a control plane, and a second run that changes nothing | Medical | #2 | **measured** | `M: docs/evidence/ansible.md` |
+| Surviving the loss of a control-plane node | Medical | #3 | **measured** | `M: docs/evidence/ansible.md` |
+| etcd backup, and a timed restore | Medical | #12 | **measured** | `M: docs/evidence/drills.md` |
+| A Kubernetes upgrade run as a procedure | Medical | #14 | **partly** — the patch path only; the minor upgrade #14 asks for has not run | `M: docs/evidence/drills.md` |
+| CI a team hosts itself | Medical | #8 | **measured** | `M: docs/evidence/jenkins.md` |
+| Signing with a key you own, and refusing unsigned images at admission | Medical | #9, #13 | **measured** | `M: docs/evidence/jenkins.md`, `drills.md` |
+| Certificates issued and renewed by something you operate | Medical | — (no criterion of its own) | **partly** — configured and in use; the capture is listed as still to record | `M: docs/evidence/gitops.md` |
+| Promotion between environments, gated by a person | Medical | #10 | **measured** | `M: docs/evidence/jenkins.md` |
+| A GitOps tree that converges from nothing | Medical | #5 | **measured**, inside the rebuild drill | `M: docs/evidence/drills.md` |
+| Internal interfaces reachable only through a VPN | Medical | #4 | **planned** — `gitops.md` lists the captures as still to record | `M: docs/evidence/gitops.md` |
+| A commit reaching the cluster as a signed digest | Anime | #3 | **measured** | `A: docs/evidence/cicd.md` |
+| One image split in two, and both measured | Anime | #4 | **measured** | `A: docs/evidence/cicd.md` |
+| A check that can say no, proven by making it fail | Anime | #5 | **measured** | `A: docs/evidence/cicd.md` |
+| A latency objective taken from real traffic, not chosen | Anime | #6 | **measured** | `A: docs/evidence/load.md` |
+| The capacity of a known deployment | Anime | #7 | **planned** — the run that gives it has not produced a valid number yet | `A: docs/evidence/load.md` |
+| A GitOps tree that converges, and HTTPS and VPN-only admin UIs | Anime | #2, #15, #16 | **run, not evidenced** — exercised on the cluster in stage 2; no evidence file written | — |
+| A release that judges itself and rolls itself back | Anime | #8, #9 | **planned** — stage 5 | `A: docs/evidence/delivery.md` (not yet) |
+| An alert that fires on a burning error budget | Anime | #10 | **planned** — stage 6 | `A: docs/evidence/slo.md` (not yet) |
+| Scaling on the signal that saturates first | Anime | #14 | **planned** — stage 7 | `A: docs/evidence/scaling.md` (not yet) |
+| Cost and latency per request, for an LLM call | Anime | #11, #12 | **planned** — stage 8 | `A: docs/evidence/tracing.md` (not yet) |
 
-`A:` is this repository, `M:` is Medical-RAG-Chatbot. A path that does not exist yet means the stage that fills
-it has not run — see [status](#status-what-is-built-and-what-is-designed) before claiming that row.
+`A:` is this repository, `M:` is Medical-RAG-Chatbot. **Read the status column, not the path**: a file can exist
+and still not hold the criterion — Anime's `load.md` holds #6 while #7 inside it is pending, and Medical's
+`gitops.md` names captures it has not taken. Only a row marked **measured** may be spoken in the past tense.
+Statuses are as of 2026-09-23; the evidence files are the live version.
 
 ## Only Medical proves it
 
-Every item here needs something EKS takes away.
+Every item needs something EKS takes away: a control plane to build and rebuild, an etcd to snapshot and
+restore, an upgrade to run node by node, a CI system to host, a signature to *enforce* at admission, certificates
+to operate, and NetworkPolicy that is actually enforced. The itemised list, with why Anime has no counterpart
+for each, is in [Only in Medical](compare-by-stage.md#only-in-medical).
 
-- **That a control plane can be built and rebuilt.** kubeadm on three EC2 instances, an HA API server behind an
-  internal NLB, and a second Ansible run that changes nothing. On EKS there is no control plane to build.
-- **That etcd can be restored.** Snapshots to S3 on a schedule, and a restore drill timed end to end. EKS gives
-  no etcd access at all, so Anime has nothing to snapshot and no restore to practise — its recovery path is Git
-  plus a rebuild.
-- **That a cluster can be upgraded deliberately.** A playbook, node by node, gated on compatibility. On EKS, AWS
-  upgrades the control plane; what is left is the node group and the add-ons.
-- **That CI can be hosted rather than rented.** Jenkins inside the cluster, with its own agents, its own
-  credentials and its own failure modes — reachable only through the VPN, which is why it polls instead of being
-  called by a webhook.
-- **That a signature can be enforced, not just produced.** Cosign with an AWS KMS key, and Kyverno refusing
-  unsigned images in prod. Anime signs keylessly but verifies by hand once: enforcement is a stated non-goal
-  there, written down rather than quietly skipped.
-- **That certificates can be operated.** cert-manager, a Let's Encrypt wildcard by DNS-01, and a bought
-  certificate for one host. Anime's certificates come from ACM, which AWS issues and renews.
-- **Network policy that is actually enforced.** Calico, including blocking the metadata address. With the VPC
-  CNI, Anime has none unless it is switched on separately.
-- **IRSA assembled by hand**, including hosting the OIDC issuer, against Anime's EKS Pod Identity.
+The distinction worth making out loud: **Anime does not skip these — EKS removes the object**. There is no
+control plane to build, no etcd to snapshot, and ACM issues and renews the certificates. The one real gap is
+admission: Anime signs keylessly and verifies by hand once, and its design names enforcement a non-goal rather
+than passing over it.
 
 ## Only Anime proves it
 
-Every item here needs a service worth measuring, and a cluster someone else keeps alive.
+Every item needs a service worth measuring and a cluster someone else keeps alive: a latency target read from
+real traffic, a canary that judges itself, scaling on in-flight requests rather than CPU, a measured capacity,
+and per-request tokens and cost. The itemised list, with why Medical needs none of them, is in
+[Only in Anime](compare-by-stage.md#only-in-anime).
 
-- **That a promise to users can be a number.** A latency target read server-side from real traffic, at a
-  histogram boundary that exists, and an SLO written against it. Medical has no SLO, so it never needed the
-  number.
-- **That a release can judge itself.** A canary walking 10 → 50 → 100 on measurements, and a bad version
-  aborting without a human. Medical promotes by a pull request that a person merges — which is a different,
-  equally defensible answer, and the contrast is the interesting part.
-- **That scaling can follow the right signal.** In-flight requests rather than CPU, with the threshold taken
-  from where the service actually saturates. In this service CPU stays low while the thread pool saturates, so
-  CPU-based scaling would react late or not at all.
-- **That capacity is a figure, not an adjective.** A ramping arrival rate against a known replica count, with
-  the break-away rule written down before the run.
-- **That an LLM's cost and latency can be seen per request.** OpenTelemetry `gen_ai.*` spans, token counts and
-  a dollar estimate. Medical exposes metrics and has no traces, no token accounting and no cost.
-- **That managed services have to be wired, not just switched on.** An ALB built from an Ingress, one
-  IngressGroup for four interfaces, readiness gates, external-dns writing the names, ACM on the listener, and
-  one IAM role per controller's ServiceAccount. None of this exists in a self-managed cluster — and none of it
-  is free of failure modes, which is the honest half of the story.
+Two things that list does not say, and that an interview will reach for:
+
+- **Why CPU is the wrong signal here.** Under load this service's CPU stays near a fifth of a core per pod while
+  its thread pool saturates — the threads are asleep waiting on the provider. A CPU-based autoscaler would react
+  late or never, which is why the threshold comes from in-flight requests (#7 feeds #14).
+- **That managed services must be wired, not switched on.** An ALB built from an Ingress, one IngressGroup for
+  four interfaces, readiness gates, external-dns writing the names, ACM on the listener, and one IAM role per
+  controller's ServiceAccount — each with its own failure modes, several of which this repo has hit and
+  recorded ([design §3](../eks-sre-llmops-design.md)).
 
 ## Both prove it — say it once
 

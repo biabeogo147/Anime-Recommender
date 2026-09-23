@@ -16,9 +16,9 @@ Bộ liên quan: [tổng quan project](../common/questions.md), [managed so vớ
 [GitOps](../2-gitops/questions.md), [CI/CD](../3-cicd/questions.md). Ý tưởng của stage: [README](README.md) ·
 [concepts](concepts.md).
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **mới thiết kế, chưa dựng**: câu trả lời tốt
-nói "tôi thiết kế", "tôi chọn", không bao giờ nói "tôi đã chạy". Câu nào bắt bạn phải mở design mới trả lời được
-thì đó là câu cần đọc lại.
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **đã dựng và đã chạy** — criterion #1 đóng
+([evidence](../evidence/terraform.md)) — nên nói "tôi đã chạy" được, miễn là con số lấy từ evidence chứ không từ trí
+nhớ. Câu nào bắt bạn phải mở design mới trả lời được thì đó là câu cần đọc lại.
 
 ---
 

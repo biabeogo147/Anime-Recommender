@@ -31,19 +31,10 @@ upgrade path and the CI system are all things it owns and can be asked about. An
 service on Kubernetes?"**: the control plane is someone else's, so the work moves up a level, to what the
 service promises, how it is released, when it scales, and what a request costs.
 
-Neither claim is worth making without the measurement behind it. The table below names the capability and the
-file that holds its evidence — **never the value**, which is read from that file, so that a figure re-measured
-in a drill cannot leave a stale copy here:
-
-| Capability | Project | Criterion | Where the measurement lives |
-|---|---|---|---|
-| Building, and rebuilding, a control plane | Medical | #2, #3 | `Medical-RAG-Chatbot/docs/evidence/ansible.md` |
-| etcd backup, and a timed restore | Medical | #12 | `Medical-RAG-Chatbot/docs/evidence/drills.md` |
-| Signing with a key you own, and refusing unsigned images | Medical | #9, #13 | `Medical-RAG-Chatbot/docs/evidence/jenkins.md`, `drills.md` |
-| A latency objective taken from real traffic | Anime | #6 | [`docs/evidence/load.md`](../evidence/load.md) |
-| A release that judges itself and rolls itself back | Anime | #8, #9 | `docs/evidence/delivery.md` |
-| Scaling on the signal that saturates first | Anime | #14 | `docs/evidence/scaling.md` |
-| Cost and latency per request, for an LLM call | Anime | #11, #12 | `docs/evidence/tracing.md` |
+Neither claim is worth making without the measurement behind it, and the measurements are not restated here:
+one table holds them, in [what each project proves](what-each-project-proves.md), where each capability carries
+its criterion number, its **status** and the path to its evidence — never the value, which is read from that
+path, so a figure re-measured in a drill cannot leave a stale copy behind.
 
 The itemised version of both columns, the shared ground, and what **neither** project proves are in
 [what each project proves](what-each-project-proves.md); the stage-level lists are in

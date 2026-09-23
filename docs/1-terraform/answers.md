@@ -4,8 +4,8 @@
 ngôi thứ nhất, thường là đủ. *Nếu được hỏi thêm* dùng khi người phỏng vấn đào sâu. Dòng **Mẹo** là lời nhắc cho
 bạn, không nói ra. Tham chiếu dạng `GitOps A2.3` trỏ tới bộ tương ứng.
 
-Stage này **mới thiết kế, chưa dựng**. Mọi câu ở thì hiện tại bên dưới nói về thiết kế, và câu đầu tiên của A1.1
-nói rõ điều đó một lần. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
+Stage này **đã dựng và đã chạy**: criterion #1 đóng ngày 2026-09-22 ([evidence](../evidence/terraform.md)). Nói ở
+thì quá khứ được, nhưng chỉ với những gì evidence ghi. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
 chưa đo. Ghi chú **[kiểm chứng]** là hành vi của công cụ cần xác nhận trước khi nói chắc. Số thập phân viết bằng
 dấu chấm.
 
@@ -28,7 +28,7 @@ port-forward qua SSM; **phép kiểm** cho một check; **huỷ** cho `destroy`.
 
 ### A1. Tổng quan
 
-**A1.1** **Ý chính:** "Stage này tôi mới thiết kế, chưa dựng. Nó dựng tài khoản AWS để mọi stage sau có chỗ
+**A1.1** **Ý chính:** "Stage này tôi đã dựng và chạy trên AWS, criterion #1 đóng. Nó dựng tài khoản AWS để mọi stage sau có chỗ
 đứng. Tôi chia Terraform theo vòng đời: thứ phải sống qua mỗi lần teardown — registry, secret, vai trò của CI,
 chứng chỉ — nằm một stack; mạng, cụm EKS, node Spot và gateway VPN nằm stack kia, bị huỷ mỗi tối. API server của EKS
 không có địa chỉ public nào: tôi vào nó qua một tunnel SSM, và máy đích của tunnel chính là gateway WireGuard mà

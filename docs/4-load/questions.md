@@ -16,8 +16,8 @@ Bộ liên quan: [tổng quan project](../common/questions.md), [SLO](../6-slo/q
 [scaling](../7-scaling/questions.md), [progressive delivery](../5-delivery/questions.md). Ý tưởng của stage:
 [README](README.md) · [concepts](concepts.md).
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **mới thiết kế, chưa chạy**: T và capacity đều
-chưa đo. Câu trả lời tốt nói rõ phương pháp và lý do, và không bao giờ đoán trước kết quả.
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **đang chạy dở**: T đã đo, capacity chưa. Câu
+trả lời tốt nói rõ phương pháp và lý do, nói T bằng số, và nói capacity là chưa có chứ không đoán.
 
 ---
 

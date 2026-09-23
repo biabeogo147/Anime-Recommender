@@ -56,6 +56,11 @@ projects split the subject deliberately so that neither repeats the other:
 
 The application layer is **done and measured**; nothing is deployed anywhere.
 
+**Changed in stage 1-4 (2026-09-23).** That sentence is the baseline of 2026-09-21 and is kept as written, the
+way this document keeps everything else. It is no longer the present: the cluster, the GitOps tree and the
+pipeline are deployed, and criteria #1, #3, #4, #5 and #6 are closed. Current status is read from
+[`docs/evidence/`](evidence/), never from this section.
+
 **What exists in the repository today**
 
 | Path | What it is |
