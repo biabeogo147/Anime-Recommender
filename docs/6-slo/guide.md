@@ -137,8 +137,9 @@ make -s prom Q='sum(prometheus_rule_evaluation_failures_total{rule_group=~".*slo
 ```
 
 Expected: the PrometheusRule exists; `6` rule groups (recordings, meta recordings and alerts, for each objective);
-`20` rules (16 recording plus 4 alert, as counted in 0.3); `0` evaluation failures. An empty answer means the rules
-were not loaded: see troubleshooting.
+**`34`** rules — the 30 recording plus 4 alert counted in 0.3, and the two counts must agree: a file with 34 rules
+and a Prometheus that evaluates fewer means part of it was not loaded. `0` evaluation failures. An empty answer
+means the rules were not loaded at all: see troubleshooting.
 
 **2.2 — Alertmanager has the routes, and can read the webhook.**
 
