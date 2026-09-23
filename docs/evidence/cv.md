@@ -15,9 +15,9 @@ Every number in the CV's Anime entry, with the file it came from and the mode it
 | `[PODS-MAX]` | M5 | **8** | fake, ramp to 267 req/s | `scaling-desired.txt`, `scaling-ready.txt`, 2026-09-23 |
 | `[NODES-MAX]` | M5 | **3** | fake, ramp to 267 req/s | `scaling-nodes.txt`, 2026-09-23 |
 | `[ERR-SCALEIN]` | M5 | **0** of 4,935 | fake, RPS=5 return | k6 `failed`, 2026-09-23 |
-| `[COST-PER-1K]` | M6 | *pending* | real: openai `gpt-4o-mini` | `cost-per-1000.txt`, `cost-pricing-date.txt` (tracing 3.2) |
-| `[N-DRILL]` | M7 | *pending* | fake, 20 RPS, 5 min | `m7-counts.txt` |
-| `[LF-LEAK]` | M7 | *pending* | fake | `m7-counts.txt` (`langfuse-count`) |
+| `[COST-PER-1K]` | M6 | **$0.4186** | real: openai `gpt-4o-mini` | `cost-per-1000.txt`, prices read 2026-09-22 (tracing 3.2) |
+| `[N-DRILL]` | M7 | **6,343** | fake, 20 RPS, 5 min | `m7-counts.txt`, 2026-09-23 |
+| `[LF-LEAK]` | M7 | **0** distinct traces | fake | `m7-counts.txt` (`langfuse-count`), 2026-09-23 |
 | `[T-REBUILD]` | M8 | *pending* | — | `m8.txt` |
 | `[N-APPS]` | M8 | *pending* | — | `m8.txt` |
 

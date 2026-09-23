@@ -51,7 +51,7 @@ Both designs say this themselves, and split the subject deliberately so neither 
 | A release that rolls itself back | Anime | #9 | **measured** | `A: docs/evidence/delivery.md` |
 | An alert that fires on a burning error budget | Anime | #10 | **measured** | `A: docs/evidence/slo.md` |
 | Scaling on the signal that saturates first | Anime | #14 | **measured** | `A: docs/evidence/scaling.md` |
-| Cost and latency per request, for an LLM call | Anime | #11, #12 | **planned** — stage 8 | `A: docs/evidence/tracing.md` (not yet) |
+| Cost and latency per request, for an LLM call | Anime | #11, #12 | **measured** | `A: docs/evidence/tracing.md` |
 
 `A:` is this repository, `M:` is Medical-RAG-Chatbot. **Read the status column, not the path**: a file can exist
 and still not hold the criterion — Anime's `load.md` holds #6 while #7 inside it is pending, and Medical's
