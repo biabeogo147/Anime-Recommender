@@ -180,7 +180,9 @@ grep '^enabled_stages' infra/terraform/bootstrap/terraform.tfvars
 If the cluster is up, tear it down first with `make down`, the tunnel open, as at the end of every session
 (terraform guide). Then `make -s ready` must fail: nothing is left to answer.
 
-**The clock.** It starts before `make plan` and stops when every Application is Synced+Healthy. The `make tunnel`
+**The clock.** It starts before `make plan` and stops when every Application is Synced+Healthy. If the load balancer
+controller's webhook CA and its Secret come from two renders, wave 0 stalls until [gitops 2.3](../2-gitops/guide.md#2-switch-the-stage-on--ops)
+repairs them; that repair is part of the rebuild and stays inside the measured time. The `make tunnel`
 step in window 2 is inside the measured time, on purpose: it is part of a real rebuild.
 
 ```bash
