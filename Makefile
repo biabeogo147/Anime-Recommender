@@ -272,9 +272,21 @@ langfuse-obs:
 	  "$$lf/api/public/v2/observations?traceId=$(ID)&fromStartTime=$$(date -u -d '-1 day' +%FT%TZ)")
 	echo "langfuse http $$code"
 	if [ "$$code" = 200 ]; then
-	  jq -r '"observations: \(.data | length)",
-	    (.data[] | "  \(.name)  type=\(.type)  model=\(.providedModelName // .model // "-")  usage=\(.usageDetails // .usage // {} | tostring)")' \
-	    /tmp/langfuse-obs.json
+	  jq -r '"observations: \(.data | length)", (.data[] | "  \(.name)  type=\(.type)")' /tmp/langfuse-obs.json
+	  # The list endpoint returns a SUMMARY: model and usage come back null there even when Langfuse holds them (the
+	  # web UI showed the model, 1,418 tokens and a cost for a trace whose list rows were empty, 2026-09-23). Each
+	  # GENERATION is therefore fetched by id, where the detail lives. Field names differ between Langfuse versions,
+	  # so several are tried and the object's keys are printed when none match - an absence that is not one is worse
+	  # than no answer.
+	  for oid in $$(jq -r '.data[] | select(.type == "GENERATION") | .id' /tmp/langfuse-obs.json); do
+	    curl -s -u "$$auth" "$$lf/api/public/observations/$$oid" > /tmp/langfuse-gen.json
+	    jq -r 'def pick(a;b;c): (a // b // c);
+	      "  generation \(.name)",
+	      "    model: \(pick(.model; .providedModelName; .modelId) // (\"NOT FOUND, keys: \" + ([keys_unsorted[]] | join(\",\"))))",
+	      "    usage: \(pick(.usage; .usageDetails; .usageMetadata) // {} | tostring)",
+	      "    cost:  \(pick(.calculatedTotalCost; .totalPrice; .costDetails) // \"-\" | tostring)"' \
+	      /tmp/langfuse-gen.json
+	  done
 	else cat /tmp/langfuse-obs.json; echo; fi
 
 # How many traces reached Langfuse in a time window (M7 in docs/evidence/guide-measurements.md): after a fake-mode run

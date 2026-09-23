@@ -136,9 +136,16 @@ sed -i 's/^api_llm_provider .*/api_llm_provider          = "fake"/' infra/terraf
 make bootstrap-plan && make bootstrap
 kubectl -n argocd annotate application root argocd.argoproj.io/refresh=hard --overwrite
 ok=; for i in $(seq 40); do make -s rollout-status | grep -qE 'phase=(Paused|Progressing)' && { ok=1; break; }; sleep 15; done
-# promote-full only once the new version has really started: on a Healthy Rollout it would be left pending.
-[ -n "$ok" ] && make -s promote-full || echo "NO NEW VERSION STARTED: promote-full not run, see troubleshooting"
-for i in $(seq 40); do make -s rollout-status | grep -q 'phase=Healthy' && break; sleep 15; done
+# promote-full only once the new version has really started: on a Healthy Rollout it would be left pending. And it may
+# be needed more than once: promoting past one pause lets the NEXT step run its own analysis, inconclusive again
+# because a mode switch has no traffic, so the Rollout pauses again (seen three times, 2026-09-23). Promote until
+# Healthy rather than once, and read `stable = latest` as the proof: `provider=fake` only says the spec changed.
+[ -n "$ok" ] || echo "NO NEW VERSION STARTED: promote-full not run, see troubleshooting"
+[ -n "$ok" ] && for i in $(seq 12); do
+  make -s rollout-status | grep -q 'phase=Healthy' && break
+  make -s promote-full >/dev/null 2>&1
+  sleep 20
+done
 make -s rollout-status
 kubectl -n anime get rollout anime-api -o jsonpath='provider={.spec.template.spec.containers[0].env[?(@.name=="LLM_PROVIDER")].value}{"\n"}'
 ```
@@ -356,9 +363,16 @@ sed -i 's/^api_llm_provider .*/api_llm_provider          = "openai"/' infra/terr
 make bootstrap-plan && make bootstrap
 kubectl -n argocd annotate application root argocd.argoproj.io/refresh=hard --overwrite
 ok=; for i in $(seq 40); do make -s rollout-status | grep -qE 'phase=(Paused|Progressing)' && { ok=1; break; }; sleep 15; done
-# promote-full only once the new version has really started: on a Healthy Rollout it would be left pending.
-[ -n "$ok" ] && make -s promote-full || echo "NO NEW VERSION STARTED: promote-full not run, see troubleshooting"
-for i in $(seq 40); do make -s rollout-status | grep -q 'phase=Healthy' && break; sleep 15; done
+# promote-full only once the new version has really started: on a Healthy Rollout it would be left pending. And it may
+# be needed more than once: promoting past one pause lets the NEXT step run its own analysis, inconclusive again
+# because a mode switch has no traffic, so the Rollout pauses again (seen three times, 2026-09-23). Promote until
+# Healthy rather than once, and read `stable = latest` as the proof: `provider=fake` only says the spec changed.
+[ -n "$ok" ] || echo "NO NEW VERSION STARTED: promote-full not run, see troubleshooting"
+[ -n "$ok" ] && for i in $(seq 12); do
+  make -s rollout-status | grep -q 'phase=Healthy' && break
+  make -s promote-full >/dev/null 2>&1
+  sleep 20
+done
 kubectl -n anime get rollout anime-api -o jsonpath='provider={.spec.template.spec.containers[0].env[?(@.name=="LLM_PROVIDER")].value}{"\n"}'
 ```
 
