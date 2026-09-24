@@ -4,28 +4,38 @@
 ngôi thứ nhất, thường là đủ. *Nếu được hỏi thêm* dùng khi người phỏng vấn đào sâu. Dòng **Mẹo** là lời nhắc cho
 bạn, không nói ra. Tham chiếu dạng `CI/CD A8.2` trỏ tới bộ tương ứng.
 
-Stage này **đang chạy dở**: T đã đo (criterion #6, [evidence](../evidence/load.md)), capacity thì **chưa** — lần ramp
-đầu bị chính quy tắc của nó loại bỏ. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
+Stage này **đã chạy xong**: criterion #6 (T) **pass**, criterion #7 (capacity) **partly measured** — trần thì vững,
+còn con số capacity có điều kiện hợp lệ trượt ở cả hai lần ramp ([evidence](../evidence/load.md)). Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
 chưa đo. Ghi chú **[kiểm chứng]** là hành vi của công cụ cần xác nhận trước khi nói chắc. Số thập phân viết bằng
 dấu chấm.
 
-Thuật ngữ dùng thống nhất trong bộ này: **baseline** cho lần chạy ở chế độ Gemini để đọc T; **ramp** cho lần chạy
+Thuật ngữ dùng thống nhất trong bộ này: **baseline** cho lần chạy ở chế độ thật — OpenAI `gpt-4o-mini` — để đọc T; **ramp** cho lần chạy
 capacity ở chế độ fake; **điểm gãy** cho chỗ p95 bắt đầu tách khỏi p95 lúc tải thấp; **phép kiểm** cho một check.
 
-**Số liệu đã có** — đo local ở phase app ([`../evidence/local.md`](../evidence/local.md)), được phép nói:
+**Số liệu đã đo** ([`../evidence/load.md`](../evidence/load.md), 2026-09-23):
 
-| Số | Giá trị | Dùng ở |
+| Đọc được | Giá trị | Chế độ | Dùng ở |
+|---|---|---|---|
+| **T** | **8 s** | real, `gpt-4o-mini` | A2.1, A3.3 |
+| p95 phía server, nội suy | 7.07 s | real | A3.3, A3.8 |
+| p95 của k6 | 6.28 s | real | A3.8 |
+| Số request đếm phía server, số 5xx | 230 (k6 gửi 231), **0** | real | A1.3, A3.3 |
+| Tốc độ gửi của baseline | 10 request mỗi phút | real | A3.6 |
+| Hệ số xác định điểm gãy, viết trước khi chạy | **1.5 ×** p95 tải thấp | — | A4.1 |
+| p95 tải thấp → ngưỡng | 1.432 s → 2.148 s (lần 1); 1.453 s → 2.179 s (lần 2) | fake | A4.1 |
+| **Trần phục vụ, 2 pod** | **93.9 req/s**, cả hai lần chạy | fake | A1.3, A4.5 |
+| Giới hạn thread pool, tính trước khi chạy | 40 / 0.85 s = 47 mỗi pod, **94.1** cho hai | — | A4.5 |
+| CPU / RAM mỗi pod tại trần | 0.23 core / 143 MiB | fake | A4.5 |
+| p95 ở đỉnh ramp 120 req/s | 15.1 s (lần 1), **15.6 s** (lần 2) | fake | A4.5 |
+| CPU cao nhất của workstation | 46% và 54% — không bị bão hoà | — | A4.5 |
+| Hai request `/recommend` chế độ Gemini, local | 3.0 s và 2.7 s | real, local | A3.8 |
+
+**Hai con số bị loại, và phải nói là bị loại:**
+
+| Đọc được | Vấn đề | Dùng ở |
 |---|---|---|
-| Hai request `/recommend` ở chế độ Gemini, local | 3.0 s và 2.7 s | A3.8 |
-
-**Còn phải điền:**
-
-| Chỗ cần điền | Lấy từ | Dùng ở |
-|---|---|---|
-| p95 phía server, T sau khi làm tròn lên, p95 của k6, số mẫu, số request lỗi | Lần chạy baseline | A1.3, A3.3, A3.8 |
-| Tốc độ gửi của baseline | Lần chạy baseline | A3.6 |
-| Tốc độ gửi cao nhất trước điểm gãy, in-flight mỗi pod tại đó, CPU của workstation | Lần chạy ramp | A1.3, A4.5 |
-| Hệ số so với p95 lúc tải thấp dùng để xác định điểm gãy | Viết ra *trước* lần chạy ramp | A4.1 |
+| Capacity theo quy tắc đặt trước: **88.2** và **89.1 req/s** | Điều kiện hợp lệ — không có iteration bị bỏ trước điểm capacity — **trượt cả hai lần** (sớm 4 phút, rồi sớm 5 giây). Quote **trần 93.9**, không quote capacity | A4.1, A7.1 |
+| in-flight mỗi pod tại điểm gãy: **170.5** và **117.5** | Lệch 45%, **không tái lập**. Điểm gãy dò trên cửa sổ rate 2 phút, in-flight là gauge tức thời, lưới mẫu 30 s trên đoạn dốc gần thẳng đứng. Lần chạy thứ ba sẽ cho con số thứ ba cũng tuỳ ý như vậy, nên không chạy | A4.5, A7.1 |
 
 ---
 
@@ -33,14 +43,17 @@ capacity ở chế độ fake; **điểm gãy** cho chỗ p95 bắt đầu tách
 
 ### A1. Tổng quan
 
-**A1.1** **Ý chính:** "Stage này tôi đang chạy dở: T đã đo, capacity chưa. Nó đo hai con số mà các stage sau không tự bịa ra
-được. Một là T, ngưỡng latency của SLO, đọc từ histogram phía server trong một lần chạy thật với Gemini, ít nhất 200
-request. Hai là bản deploy nhỏ nhất — hai pod, chưa có autoscaler — gánh được bao nhiêu, đo bằng fake provider với tốc
-độ gửi tăng dần. Phần lớn công sức là ở chỗ: mỗi con số phải đo đúng thứ mà sau này nó sẽ phán xét."
+**A1.1** **Ý chính:** "Stage này tôi đã chạy xong: T pass, capacity đo được một nửa. Nó đo hai con số mà các stage
+sau không tự bịa ra được. Một là T, ngưỡng latency của SLO, đọc từ histogram phía server trong một lần chạy thật trên
+**OpenAI `gpt-4o-mini`** — 230 request, 0 lỗi, T = 8 giây. Hai là bản deploy nhỏ nhất — hai pod, chưa có autoscaler —
+gánh được bao nhiêu, đo bằng fake provider với tốc độ gửi tăng dần: trần 93.9 req/s, hai lần chạy khớp nhau. Phần lớn
+công sức là ở chỗ: mỗi con số phải đo đúng thứ mà sau này nó sẽ phán xét.
 
 *Nếu được hỏi thêm:* T ở A3.1, capacity ở A4.1, vì sao hai chế độ ở A5.1.
 
-**Mẹo:** câu đầu tiên đặt khung cho cả buổi. Nói rõ một lần là "thiết kế, chưa chạy", rồi trình bày tự nhiên.
+**Mẹo:** câu đầu tiên đặt khung cho cả buổi. Nói rõ một lần là "tôi đã chạy stage này; T pass, capacity thì đo
+được một nửa", rồi trình bày tự nhiên. Nói "một nửa" trước khi bị hỏi thì nó thành sự cẩn thận, nói sau thì thành
+lời bào chữa.
 
 **A1.2** **Ý chính:** "SLO cần một ngưỡng latency, autoscaler cần biết một pod gánh được bao nhiêu trước khi đuối.
 Chọn theo cảm giác thì mọi phép kiểm về sau thừa hưởng một phỏng đoán được gọi là ngưỡng. Và một phỏng đoán sai theo
@@ -50,8 +63,10 @@ hướng rộng thì không bao giờ báo động, nên không ai phát hiện.
 tốc độ gửi cao nhất mà hai pod chịu được trước điểm gãy, không có iteration nào bị bỏ. Kèm theo là số pod, số node và
 tỉ lệ lỗi theo thời gian."
 
-*Nếu được hỏi thêm:* kết quả `[điền: p95 phía server, T, p95 của k6, số mẫu, số lỗi]` và `[điền: tốc độ gửi cao nhất,
-in-flight mỗi pod, CPU workstation]`.
+*Nếu được hỏi thêm:* baseline cho p95 phía server nội suy **7.07 s**, nên **T = 8 s**; p95 của k6 **6.28 s**; 230
+request đếm phía server, **0** lỗi. Ramp cho **trần 93.9 req/s** ở cả hai lần, CPU workstation cao nhất 46% và 54% nên
+máy phát tải không phải là giới hạn; còn in-flight mỗi pod tại điểm gãy ra 170.5 rồi 117.5 — không tái lập, nên không
+dùng.
 
 ### A2. Dữ liệu có tồn tại không
 
@@ -99,8 +114,9 @@ metric riêng, và với keep-alive chúng chỉ xảy ra một lần mỗi kế
 nên sau khi làm tròn nó hiếm khi đổi T. Tôi vẫn giữ quy tắc vì nó đúng, và vì bản ghi nên nói nó quan trọng tới đâu
 thay vì giả định."
 
-*Nếu được hỏi thêm:* p95 của k6 được ghi cạnh T như con số một client gọi thẳng api phải chờ:
-`[điền: p95 phía server và p95 của k6]`.
+*Nếu được hỏi thêm:* p95 của k6 được ghi cạnh T như con số một client gọi thẳng api phải chờ: **7.07 s** phía
+server và **6.28 s** ở k6. Chiều lệch không phải vì server chậm hơn — 6.28 s là order statistic của k6, còn 7.07 s là
+nội suy qua một bucket rộng 2 giây; chỉ mép bucket được dùng.
 
 **Mẹo:** tự nói ra là chênh lệch nhỏ. Người nghe sẽ tin quy tắc hơn khi bạn không phóng đại lợi ích của nó.
 
@@ -128,12 +144,12 @@ hai trăm thì có mười. Khi các giá trị gần đó nằm vắt qua một
 rơi vào bucket nào. Baseline gọi model thật và bị giới hạn tốc độ, nên nó chạy chậm và rất dễ muốn dừng sớm. Thời
 lượng đi theo số lượng, không phải ngược lại."
 
-*Nếu được hỏi thêm:* baseline gửi ở tốc độ mà tier miễn phí cho phép: `[điền: tốc độ gửi của baseline]`.
+*Nếu được hỏi thêm:* baseline gửi ở tốc độ mà tier miễn phí cho phép: **10 request mỗi phút**, trong 1386 giây.
 
 **A3.7** **Ý chính:** "Tuỳ lỗi đến từ đâu. Lỗi trả về nhanh — 503 từ phía model hay từ phần embedding — nằm
-chung phân phối với request thành công, vì histogram không chia theo mã trạng thái, và kéo p95 xuống. Nhưng trong
-đường gọi có retry với backoff, nên rate limit cũng có thể làm request chậm đi và đẩy T lên **[kiểm chứng: client
-Gemini có retry khi bị giới hạn tốc độ không]**. Vì vậy baseline ghi lại số lỗi, để nhận ra T bị méo theo chiều nào."
+chung phân phối với request thành công, vì histogram không chia theo mã trạng thái, và kéo p95 xuống. Còn retry thì ở đường gọi OpenAI **không có**: một lời gọi, thất bại là một
+`UpstreamError` rồi 503 ngay, nên T không bị retry che. (Đường Gemini thì có `max_retries=1` và không test nào phủ
+nó **[kiểm chứng]**.) Vì vậy baseline ghi lại số lỗi, để nhận ra T bị méo theo chiều nào."
 
 *Nếu được hỏi thêm:* SLI cũng đếm lỗi như vậy, nên T và SLI vẫn nhất quán với nhau.
 
@@ -141,7 +157,8 @@ Gemini có retry khi bị giới hạn tốc độ không]**. Vì vậy baseline
 không nói gì về p95 của hai trăm request bị giới hạn tốc độ — có thể cao hơn nhiều. T rơi vào bucket nào là câu trả
 lời của phép đo, không phải thứ để xác nhận."
 
-*Nếu được hỏi thêm:* kết quả `[điền: T sau khi làm tròn lên]`.
+*Nếu được hỏi thêm:* p95 thật rơi trong bucket 6–8 s, `histogram_quantile` nội suy ra 7.07 s, nên T là mép trên
+của bucket đó: **8 s**.
 
 ### A4. Capacity
 
@@ -149,7 +166,9 @@ lời của phép đo, không phải thứ để xác nhận."
 tiền, trong 10 phút, với tốc độ gửi tăng dần. Tiêu chí xác định điểm gãy được viết ra trước khi chạy, không chọn sau
 khi đã nhìn đồ thị."
 
-*Nếu được hỏi thêm:* tiêu chí đó là `[điền: hệ số so với p95 lúc tải thấp]`.
+*Nếu được hỏi thêm:* tiêu chí đó là **1.5 lần p95 lúc tải thấp**, với p95 tải thấp là trung bình bốn điểm p95 đầu
+ở lưới 30 giây — đo được 1.432 s và 1.453 s, nên ngưỡng là 2.148 s và 2.179 s. Cùng với nó là hai điều kiện hợp lệ,
+và chính chúng đã trượt: xem A7.1.
 
 **A4.2** **Ý chính:** "Mô hình đóng giả lập một số người dùng cố định, mỗi người chờ câu trả lời rồi mới hỏi tiếp.
 Service chậm thì họ hỏi thưa đi, và những request lẽ ra đã được gửi trong lúc chậm không bao giờ được gửi, cũng không
@@ -176,7 +195,11 @@ chạm tới trần. Trần đó thuộc về lần chạy autoscaling ở stage
 được đặt thấp hơn con số đó một chút, để scale bắt đầu *trước* điểm gãy chứ không phải *tại* nó. CPU và memory mỗi pod
 đo trong lần ramp cũng là căn cứ cho resource request."
 
-*Nếu được hỏi thêm:* kết quả `[điền: in-flight mỗi pod tại điểm gãy]`. Gauge in-flight tăng trước khi handler
+*Nếu được hỏi thêm:* nó ra **170.5** ở lần 1 và **117.5** ở lần 2 — lệch 45%, nên tôi không dùng con số này.
+Cụm cư xử giống nhau cả hai lần, trần 93.9 req/s chứng minh điều đó, nên chỗ bất định nằm ở *dụng cụ đo* chứ không ở
+hệ thống. Ngưỡng cho KEDA vì thế lấy từ giới hạn kiến trúc mà nó đang thay mặt: 40 luồng mỗi pod, nên in-flight trên
+40 nghĩa là có hàng đợi — một định nghĩa, và các phép đo đồng ý với nó (ở 83 req/s pod giữ 46.5 in-flight mà p95 vẫn
+1.46 s, điểm tiếp theo thì tách hẳn). Gauge in-flight tăng trước khi handler
 chạy, nên nó đếm cả request đang xếp hàng chờ thread — middleware tăng gauge trước khi handler chờ thread; tôi
 ghi nó cạnh số thread. Vì sao scale theo in-flight chứ không theo CPU nằm ở stage Scaling.
 
@@ -193,8 +216,9 @@ phải CPU. Đó là lý do một điểm gãy ở chế độ fake vẫn nói �
 ### A5. Hai chế độ
 
 **A5.1** **Ý chính:** "Mỗi con số có một nơi dùng, và được đo trong chế độ mà nơi dùng đó sẽ gặp. T dành cho SLO, mà
-SLO chấm traffic thật, nên baseline gọi Gemini — và cả API embedding của Hugging Face, vì mỗi request thật đều đi qua
-nó. Capacity dành cho autoscaler, và cần đẩy mạnh, lặp lại chính xác, không tốn tiền, nên dùng fake provider."
+SLO chấm traffic thật, nên baseline gọi model thật — **OpenAI `gpt-4o-mini`** — và cả API embedding của Hugging
+Face, vì mỗi request thật đều đi qua nó. T thuộc về đúng provider ấy: đo trên Gemini sẽ ra một số khác, và SLO phải đo
+lại. Tôi chọn `gpt-4o-mini` vì Gemini mất khoảng 50 giây một lời gọi trong khi nó trả lời trong 1–3 giây. Capacity dành cho autoscaler, và cần đẩy mạnh, lặp lại chính xác, không tốn tiền, nên dùng fake provider."
 
 **A5.2** **Ý chính:** "Vì latency của fake provider là một thông số cấu hình — p95 dưới hai giây, chỉ bằng một phần của
 bất kỳ T hợp lý nào. So nó với T thì lần chạy vẫn pass trong suốt giai đoạn đầu của bão hoà, và chỉ trượt khi thiệt hại
@@ -206,7 +230,7 @@ nằm trong con số."
 
 ### A6. Pass mà vẫn hỏng
 
-**A6.1** **Ý chính:** "Ba cách. Ngưỡng đo ở chế độ fake mà thực thi với traffic Gemini, hoặc ngược lại. T đọc từ k6 mà
+**A6.1** **Ý chính:** "Ba cách. Ngưỡng đo ở chế độ fake mà thực thi với traffic real mode, hoặc ngược lại. T đọc từ k6 mà
 thực thi trên histogram của server. Và một p95 từ vài chục request, mà một lời gọi chậm có thể đẩy sang bucket khác."
 
 **A6.2** **Ý chính:** "Ba cách. Ramp theo mô hình đóng, thấy được trần nhưng giấu hàng đợi. Một điểm đi ngang thật ra là
@@ -222,10 +246,16 @@ hiệu bạn hiểu cả hệ thống.
 
 ### A7. Giới hạn
 
-**A7.1** **Ý chính:** "Khi chạy xong, stage này sẽ chứng minh: api được scrape; T đọc ở phía server từ đủ request thật,
-có số lỗi bên cạnh; capacity của bản deploy nhỏ nhất và in-flight mỗi pod tại điểm gãy, với máy chạy k6 đã được loại
-trừ. Nó giả định rằng latency của provider trong một buổi chiều đại diện cho những ngày khác. Và rằng workstation, ở một
-VPC khác, đi tới ALB public gần giống một client gọi thẳng — gần giống, nhưng không y hệt."
+**A7.1** **Ý chính:** "Stage này đã chứng minh: api được scrape; T đọc ở phía server từ 230 request thật với 0 lỗi
+bên cạnh; và một cái trần 93.9 req/s cho bản deploy nhỏ nhất, đo hai lần khớp nhau và khớp với giới hạn thread pool
+94.1 tính trước khi chạy. Máy chạy k6 đã được loại trừ: CPU cao nhất 46% và 54%.
+
+Hai thứ nó **không** chứng minh, và tôi nói ra trước khi bị hỏi. Capacity theo quy tắc đặt trước — 88 tới 89 req/s —
+có điều kiện hợp lệ trượt ở cả hai lần, nên tôi quote trần chứ không quote capacity. Và in-flight tại điểm gãy không
+tái lập được, 170.5 so với 117.5; lần thứ ba sẽ lấy mẫu cùng đoạn dốc theo cùng cách, nên nó không được chạy.
+
+Nó cũng giả định rằng latency của provider trong một buổi chiều đại diện cho những ngày khác. Và rằng workstation, ở
+một VPC khác, đi tới ALB public gần giống một client gọi thẳng — gần giống, nhưng không y hệt."
 
 **A7.2** **Ý chính:** "Metric mất cùng cụm mỗi lần teardown. Nên bằng chứng của mỗi lần chạy được lưu ngay lúc đó —
 output của k6 và kết quả các query — chứ không bao giờ đọc lại từ Prometheus về sau."
@@ -247,3 +277,26 @@ nghi phạm."
 ---
 
 [Câu hỏi](questions.md) · [README](README.md) · [Concepts](concepts.md)
+
+---
+
+### A10. Câu đào sâu — vì sao trần là 40 luồng
+
+**A10.1** **Ý chính:** "Handler `/recommend` *đã là* `async def`. Cái nằm trong thread pool là hàm recommender đồng
+bộ: handler gọi `run_in_threadpool(recommender.recommend, …)`, và pool mặc định của Starlette có 40 luồng — nên kích
+thước pool *chính là* trần đồng thời của một pod. Đó là con số 40 trong phép tính 40 / 0.85 s = 47 req/s mỗi pod."
+
+*Nếu được hỏi thêm:* việc dồn phần chặn vào pool là có chủ ý, và lý do nằm ở ba endpoint còn lại. `/healthz`,
+`/readyz` và `/metrics` đều `async def`, có comment giải thích ngay trong code: một handler `def` thường sẽ chạy
+trong *cùng* cái pool bị giới hạn ấy, nên một api đang bão hoà sẽ ngừng trả lời chính probe của nó — và Kubernetes
+giết những pod chỉ đang bận. Tách ra như vậy nghĩa là khi pod tắc, nó vẫn nói được rằng nó còn sống.
+
+Muốn nâng trần thì phải làm cuộc gọi provider async thật, bằng một HTTP client async — lúc đó đồng thời bị chặn bởi
+socket và memory chứ không phải bởi luồng, cỡ hàng trăm in-flight mỗi pod. **Tín hiệu autoscale không đổi**, vẫn là
+in-flight; chỉ ngưỡng cao hơn nhiều. Tôi cố ý không sửa app trong đợt này: mục đích là đo một *platform* trên một app
+cố định, và sửa app giữa đường thì cái trần đã đo hai lần mất giá trị. Đó là thứ đầu tiên tôi đổi nếu mục tiêu là
+throughput trên mỗi đô la thay vì một phép đo tái lập được.
+
+**Mẹo:** câu hỏi này là chỗ dễ bị bắt nhất của cả bullet capacity, vì người hỏi sẽ giả định handler là `def` đồng bộ.
+Sửa lại giả định đó ngay câu đầu, rồi mới giải thích — nếu không, mọi thứ sau đó nghe như đang bào chữa cho một
+default không ai sửa.

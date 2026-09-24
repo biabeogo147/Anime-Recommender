@@ -16,8 +16,10 @@ Bộ liên quan: [tổng quan project](../common/questions.md), [Load](../4-load
 [GitOps](../2-gitops/questions.md), [CI/CD](../3-cicd/questions.md), [scaling](../7-scaling/questions.md). Ý tưởng của
 stage: [README](README.md) · [concepts](concepts.md).
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **mới thiết kế, chưa chạy**: chưa có drill nào. Các
-con số như 1.43 lần là *tính toán*, không phải số đo — câu trả lời tốt nói rõ điều đó.
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **đã chạy cả hai drill**, #8 và #9 đều pass
+(2026-09-23). Hai con số cần thuộc: **167 giây** tới lúc abort, và **1.36%** toàn bộ request lỗi trong lúc canary còn
+sống. Chỗ vẫn phải nói là *tính toán* chứ không phải số đo: độ nhạy thật của gate latency — drill rollback cho thấy
+gate đó đã **để bản xấu đi qua**.
 
 ---
 
@@ -107,3 +109,11 @@ con số như 1.43 lần là *tính toán*, không phải số đo — câu tr�
 
 [Đáp án](answers.md) · [README](README.md) · [Concepts](concepts.md) ·
 [Design §4.4](../eks-sre-llmops-design.md#44-progressive-delivery-argo-rollouts)
+
+---
+
+### A10. Câu đào sâu — Spot giữa canary, và giá của drill
+
+**A10.1** Một node Spot bị thu hồi giữa lúc phân tích canary đang chạy. Cổng của bạn làm gì?
+
+**A10.2** 1.36% request lỗi trong lần drill đó có đốt error budget không? Nó có gọi page không?

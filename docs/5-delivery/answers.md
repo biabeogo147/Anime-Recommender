@@ -4,8 +4,8 @@
 ngôi thứ nhất, thường là đủ. *Nếu được hỏi thêm* dùng khi người phỏng vấn đào sâu. Dòng **Mẹo** là lời nhắc cho
 bạn, không nói ra. Tham chiếu dạng `Load A3.5` trỏ tới bộ tương ứng.
 
-Stage này **mới thiết kế, chưa chạy**. Mọi câu ở thì hiện tại bên dưới nói về thiết kế, và câu đầu tiên của A1.1
-nói rõ điều đó một lần. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
+Stage này **đã chạy**: criteria #8 (promote theo phép đo) và #9 (bản xấu tự abort) đều **pass**, 2026-09-23
+([evidence](../evidence/delivery.md)). Nói ở thì quá khứ được, nhưng chỉ với những gì evidence ghi. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
 chưa đo. Ghi chú **[kiểm chứng]** là hành vi của công cụ cần xác nhận trước khi nói chắc. Số thập phân viết bằng
 dấu chấm.
 
@@ -13,14 +13,31 @@ Thuật ngữ dùng thống nhất trong bộ này: **gate** cho một điều k
 latency); **lần đo** cho một measurement; **hash** cho label `rollouts-pod-template-hash`; **drill** cho lần cố ý chạy
 promote hay rollback để lấy bằng chứng.
 
-**Số liệu đã có:** chưa có số nào cho stage này. Các hệ số 1.43 và 1.22, và các mốc thời gian dự kiến ở A2.2, là
-**tính toán** — nói rõ như vậy khi dùng.
+**Số liệu đã đo** ([`../evidence/delivery.md`](../evidence/delivery.md), 2026-09-23, fake mode, k6 giữ đúng 20
+req/s):
 
-| Chỗ cần điền | Lấy từ | Dùng ở |
+| Đọc được | Giá trị | Dùng ở |
 |---|---|---|
-| Timeline của Rollout; giá trị từng lần đo và hash canary của nó, ở mỗi mức | Drill promote | A1.3 |
-| Thời gian từ lúc bắt đầu tới lúc abort, lần đo thất bại, tỉ lệ request bị lỗi khi canary chạy | Drill rollback | A1.3, A8.1 |
-| Tỉ lệ lỗi của canary trước khi abort | Drill rollback | A8.2 |
+| **Drill promote:** start → `Healthy` | **8 m 23 s** (`08:08:19Z → 08:16:42Z`) | A1.3 |
+| Các bước đã đi | 10% → 50% → 100%, một phân tích ở mỗi lần dừng | A1.3 |
+| AnalysisRun | **2, cả hai `Successful`** | A1.3 |
+| `canary-hash` / `stable-hash` | `586cd55b4f` / `589794b4fd` — **khác nhau** | A1.3, A6.1 |
+| `canary-requests` ở 10% / 50% | 250.2, 261.3, 276, 256 / 1189.3, 1157.3, 1168, 1198.7 (cổng ≥ 20) | A4.1 |
+| `success-rate` | 1 ở cả tám lần đo (cổng ≥ 0.99) | A4.1 |
+| `latency-ratio` | 0.968–1.038 ở 10%; 0.995–1.005 ở 50% (cổng ≤ 1.2) | A4.1, A5.1 |
+| **Drill rollback:** start → abort | **167 s** (`08:18:13Z → 08:21:00Z`) | A1.3, A8.1 |
+| Lần đo thất bại | `anime-api-594bfd86bf-6-2` **`Failed`**: `success-rate` 0.813 và 0.819 dưới 0.99 | A1.3, A8.1 |
+| `latency-ratio` của bản xấu | **1.042 và 1.030 — đạt cổng cả hai lần** | A8.2 |
+| Canary nhận / canary lỗi | 250.9 / **45.0** — 17.9% traffic của chính nó, so với 20% cấu hình | A8.2 |
+| Lỗi trên **toàn bộ** request lúc canary còn sống | **1.36%** (≈45 trên ≈3300) | A1.3, A8.1 |
+| `stable` trong suốt drill | không rời `586cd55b4f` | A8.1 |
+
+**Đọc đúng 1.36%:** đó là phần trăm của *toàn bộ* request được phục vụ trong 167 giây canary còn sống — **không** phải
+tỉ lệ lỗi của canary (17.9%), **không** phải phần traffic canary nhận được.
+
+**Chi tiết mạnh nhất của drill, nói ra nếu có chỗ:** bản xấu **không hề chậm**. `latency-ratio` đo 1.042 và 1.030 và
+đạt cổng ở cả hai lần probe; chỉ `success-rate` bắt được nó. Một quy trình phán xử theo latency thôi đã promote bản
+này lên 100%.
 
 ---
 
@@ -28,16 +45,20 @@ promote hay rollback để lấy bằng chứng.
 
 ### A1. Tổng quan
 
-**A1.1** **Ý chính:** "Stage này tôi mới thiết kế, chưa chạy. API chuyển từ Deployment sang Rollout. Bản mới nhận 10%
-traffic, chờ, được đo, rồi 50%, rồi 100%. Ở mỗi mức, một phân tích hỏi Prometheus hai câu: tỉ lệ thành công của canary
-có đạt ít nhất 99% không, và p95 của nó có vượt 1.2 lần p95 của bản stable trong cùng khoảng thời gian không. Phần khó
-không phải là quyết định. Phần khó là bảo đảm con số được đọc đúng là của canary, và ngưỡng viết trên giấy đúng là
-ngưỡng đang có hiệu lực."
+**A1.1** **Ý chính:** "Stage này tôi đã chạy cả hai drill, và cả hai pass. API chuyển từ Deployment sang Rollout.
+Bản mới nhận 10% traffic, chờ, được đo, rồi 50%, rồi 100%. Ở mỗi mức, một phân tích hỏi Prometheus ba câu: canary có
+nhận đủ ít nhất 20 request để phán xử không, tỉ lệ thành công của nó có đạt 99% không, và p95 của nó có vượt 1.2 lần
+p95 của bản stable trong cùng khoảng thời gian không. Một bản tốt đi hết ba bước trong 8 phút 23 giây; một bản cố ý
+lỗi một request trong năm tự abort sau 167 giây ở bước 10%, và 1.36% toàn bộ request lỗi trong lúc nó còn sống.
+
+Phần khó không phải là quyết định. Phần khó là bảo đảm con số được đọc đúng là của canary, và ngưỡng viết trên giấy
+đúng là ngưỡng đang có hiệu lực."
 
 *Nếu được hỏi thêm:* chỉ API là Rollout; UI vẫn là Deployment và ra bản không qua phân tích. Con số của canary ở A4.1,
 ngưỡng thật ở A5.1, quá ít bằng chứng ở A6.2.
 
-**Mẹo:** câu đầu tiên đặt khung cho cả buổi. Nói rõ một lần là "thiết kế, chưa chạy", rồi trình bày tự nhiên.
+**Mẹo:** câu đầu tiên đặt khung cho cả buổi. Nói rõ một lần là "hai drill đã chạy, cả hai pass", rồi trình bày tự
+nhiên. Hai con số cần thuộc nằm lòng: **167 s** và **1.36%**.
 
 **A1.2** **Ý chính:** "Merge xong là cụm nhận bản mới mà không người nào đứng giữa. API còn là Deployment, nên image mới
 thay mọi pod nhanh nhất có thể. Dấu hiệu đầu tiên của một bản lỗi sẽ là mọi người dùng đều gặp nó."
@@ -46,8 +67,10 @@ thay mọi pod nhanh nhất có thể. Dấu hiệu đầu tiên của một b�
 AnalysisRun, kèm hash của canary. #9: một bản ở chế độ fake với tỉ lệ lỗi 20% tự abort — bằng chứng là thời gian tới
 lúc abort, lần đo thất bại, và tỉ lệ request bị lỗi khi canary chạy."
 
-*Nếu được hỏi thêm:* kết quả `[điền: timeline, giá trị từng lần đo và hash]` và `[điền: thời gian tới abort, lần đo
-thất bại, tỉ lệ request lỗi]`.
+*Nếu được hỏi thêm:* drill promote đi `08:08:49Z` dừng ở 10% → `08:11:15Z` qua phân tích thứ nhất → `08:12:27Z`
+lên 50% → `08:14:52Z` qua phân tích thứ hai → `08:16:42Z` `Healthy`, tổng 8 phút 23 giây, hai AnalysisRun đều
+`Successful`, và `canary-hash` `586cd55b4f` khác `stable-hash` `589794b4fd`. Drill rollback abort sau **167 s**, vì
+`success-rate` đo 0.813 rồi 0.819 dưới cổng 0.99, và 1.36% toàn bộ request đã lỗi trong lúc canary còn sống.
 
 ### A2. Release theo từng lát
 
@@ -197,14 +220,17 @@ như vậy, cộng `FAULT_RATE=0.2`. Theo thiết kế, phân tích sẽ thất 
 stable."
 
 *Nếu được hỏi thêm:* tính ra, canary lỗi khoảng 20% request của nó, tức khoảng 2% tổng traffic trong lúc nó chạy. Request
-bị tiêm lỗi vẫn chờ đủ latency rồi mới trả 503, nên lỗi hiện ở gate tỉ lệ thành công, không phải gate latency. Ghi lại
-`[điền: thời gian tới abort, lần đo thất bại, tỉ lệ request lỗi]`.
+bị tiêm lỗi vẫn chờ đủ latency rồi mới trả 503, nên lỗi hiện ở gate tỉ lệ thành công, không phải gate latency. Đo được đúng như vậy: abort sau **167 s**, lần đo thất bại là `success-rate` (0.813 và 0.819), còn `latency-ratio`
+đo 1.042 và 1.030 và **đạt** cổng — nên đúng là gate tỉ lệ thành công bắt được, không phải gate latency. 1.36% toàn bộ
+request lỗi.
 
 **A8.2** **Ý chính:** "Vì `FAULT_RATE` chỉ được fake provider đọc. Bản drill phải ghim cả `LLM_PROVIDER=fake`. Đặt tỉ lệ lỗi
 lên một bản chạy Gemini thì không tiêm gì cả: canary khoẻ, phân tích pass, bản đó được promote — và drill được ghi là bằng
 chứng rollback hoạt động. Một drill không tiêm gì mà vẫn ghi 'rollback chạy tốt' còn tệ hơn không có drill."
 
-*Nếu được hỏi thêm:* tỉ lệ lỗi đo được của canary `[điền: tỉ lệ lỗi của canary trước khi abort]`.
+*Nếu được hỏi thêm:* canary nhận 250.9 request và lỗi **45.0** — **17.9%** traffic của chính nó, so với 20% đã
+cấu hình. Con số trên 0 là điều kiện hợp lệ của drill: một lần abort với số lỗi bằng 0 thì không chứng minh gì về
+cổng, dù Rollout có làm gì.
 
 **A8.3** **Ý chính:** "Không. Một image không pull được sẽ kẹt tới hết hạn tiến độ rồi thành Degraded — và chỉ abort nếu được
 cấu hình như vậy; mặc định là không. Công lao đó không thuộc về phân tích. Bản ghi phải mang chính lần thất bại của
@@ -218,9 +244,13 @@ cuối."
 
 **Mẹo:** so với Load A6.3 — ở Load con số đúng về thứ khác; ở đây quyết định dựa trên con số đó.
 
-**A9.2** **Ý chính:** "Khi các drill chạy xong, stage này sẽ chứng minh: một bản tốt tới được toàn bộ traffic dựa trên lần đo
-được ghi lại và thuộc về canary; một bản lỗi bị chính phân tích abort, với giá trị thất bại được ghi lại. Nó *tính ra* nhưng
-không đo độ nhạy thật của gate latency. Muốn đo cần một drill với bản cố ý chậm hơn, và drill đó không nằm trong tiêu chí."
+**A9.2** **Ý chính:** "Stage này đã chứng minh: một bản tốt tới được toàn bộ traffic dựa trên lần đo được ghi lại
+và thuộc về canary — hai hash khác nhau, cả hai đều có traffic thật trong cửa sổ, 7070.6 và 2825.4 request; và một
+bản lỗi bị chính phân tích abort, với giá trị thất bại được ghi lại.
+
+Nó vẫn *tính ra* nhưng **không đo** độ nhạy thật của gate latency — và drill rollback còn cho thấy vì sao điều đó
+đáng nói: bản xấu ấy có `latency-ratio` 1.042 và 1.030, tức gate latency đã **để nó đi qua**. Muốn đo độ nhạy cần một
+drill với bản cố ý chậm hơn, và drill đó không nằm trong tiêu chí."
 
 **A9.3** **Ý chính:** "Ba điều. Controller load balancer nằm trên đường đi của mọi release — nó không áp được trọng số thì
 không gì di chuyển. Cho tới khi bucket đổi, gate latency lỏng hơn 1.2 lần rất nhiều. Và chỉ một người trả lời mọi lần dừng —
@@ -232,3 +262,42 @@ drill với một bản cố ý chậm hơn, để đo độ nhạy thật của
 ---
 
 [Câu hỏi](questions.md) · [README](README.md) · [Concepts](concepts.md)
+
+---
+
+### A10. Câu đào sâu — Spot giữa canary, và giá của drill
+
+**A10.1** **Ý chính:** "Nếu pod canary cuối cùng mất, mẫu của nó già ra khỏi cửa sổ hai phút và truy vấn trả về
+một **vector rỗng** — mà phép so `< 20` không đánh giá được vector rỗng. Nếu để nguyên thì phép đo thành error, đủ
+error liên tiếp là run thất bại, và cổng **abort bản release vì một sự kiện về capacity**. Đó là chỗ tôi đã đóng
+sẵn: cả `successCondition` lẫn `failureCondition` đều bắt đầu bằng `len(result) > 0`, nên kết quả rỗng không khớp cái
+nào và phép đo thành `Inconclusive` — rollout **dừng lại chờ người** thay vì abort. Còn nếu canary vẫn còn replica mà
+traffic mỏng dưới 20 request, cùng cặp guard ấy cho ra `Inconclusive`."
+
+*Nếu được hỏi thêm:* Argo Rollouts không có điều kiện `inconclusive` riêng, nên phải làm gián tiếp bằng cặp guard đó —
+`analysistemplate.yaml`, các dòng 34–35, 51–52 và 74–75, và comment đầu file nói thẳng là nó tồn tại để "không quy
+lỗi cho bản release vì một sự kiện về capacity".
+
+Cùng một lập luận — **"vắng dữ liệu không phải bằng không"** — tôi áp ở cả hai chỗ: stage 7 là `ignoreNullValues=false`
+cho KEDA, stage 5 là cặp guard này. Chỗ chưa trọn là **tài liệu**: bảng rủi ro §5 của thiết kế vẫn ghi trường hợp này
+như một lỗ hổng kèm chữ "to be verified", tức tài liệu cũ hơn code. Và tôi chưa *đo* nó — trong hai ngày 22–23/09
+không có lần thu hồi Spot nào để thử.
+
+**Mẹo:** đây là câu hỏi mạnh nhất bạn có về thiết kế. Nó cho thấy bạn nghĩ về sự cố của *nền tảng* chứ không chỉ sự cố
+của bản release, và nó tự nhiên dẫn sang một chỗ bạn thừa nhận chưa nhất quán — thừa nhận đúng lúc thì đó là điểm cộng.
+
+**A10.2** **Ý chính:** "Có đốt, và đốt là chuyện có chủ ý. Nhưng nó không gọi page, và số học giải thích tại sao: 45
+request lỗi trong một cửa sổ 5 phút ở 20 req/s là khoảng 6.000 request, tức tỉ lệ lỗi khoảng 0.75%. So với budget
+0.5% thì burn rate khoảng **1.5** — trong khi page cần **13.44** ở cả cửa sổ 1 giờ và 5 phút. Nên nó không tới đâu
+gần ngưỡng page."
+
+*Nếu được hỏi thêm:* con số 1.5 đó là tôi **tính**, không phải đo — evidence không ghi lần drill canary nào gọi page,
+và tôi không suy ra từ sự im lặng đó. Phép đo về page nằm ở drill riêng của stage SLO, nơi lỗi tiêm là 50% *toàn bộ*
+traffic chứ không phải 20% của một canary 10%: đó chính là một trong các pass sai mà tiêu chí #10 nêu tên — một lỗi
+bị chia loãng qua phần traffic của canary sẽ giữ burn dưới ngưỡng, và sự im lặng khi đó bị đọc thành "alerting hỏng".
+
+Ý nghĩa thiết kế thì đáng nói: **canary được phép tiêu một ít budget có chủ ý, để một lần rollout đầy đủ không tiêu
+hết budget một cách vô tình.** 1.36% trong 167 giây là cái giá đã biết trước của việc biết được bản này xấu.
+
+**Mẹo:** nói rõ "đây là tính, không phải đo" giữa câu. Nếu không, một con số nghe như đo được mà không có file bằng
+chứng nào đứng sau là đúng cái lỗi mà cả bộ tài liệu này tồn tại để tránh.

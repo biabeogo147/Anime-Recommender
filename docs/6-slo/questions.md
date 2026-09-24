@@ -15,8 +15,10 @@ chứng minh được gì.
 Bộ liên quan: [tổng quan project](../common/questions.md), [Load](../4-load/questions.md),
 [progressive delivery](../5-delivery/questions.md). Ý tưởng của stage: [README](README.md) · [concepts](concepts.md).
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **mới thiết kế, chưa chạy**: chưa có drill nào, và
-T chưa đo. Các con số như "khoảng tám phút" là *tính toán* — câu trả lời tốt nói rõ điều đó.
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **đã chạy drill**, #10 pass (2026-09-23), và T
+đã đo: **8 giây**. Con số cần thuộc: page tới Discord sau **9 phút 30**, trong đó **tám phút là số học cửa sổ**. Câu
+trả lời tốt vẫn nói rõ một điều: SLO 99.5% là một *định nghĩa*, chưa bao giờ và sẽ không bao giờ "đạt" trên một cụm bị
+huỷ khi không dùng.
 
 ---
 
@@ -98,3 +100,11 @@ T chưa đo. Các con số như "khoảng tám phút" là *tính toán* — câu
 
 [Đáp án](answers.md) · [README](README.md) · [Concepts](concepts.md) ·
 [Design §4.3](../eks-sre-llmops-design.md#43-slos-and-alerting-deployslo)
+
+---
+
+### A10. Câu đào sâu — runbook, và ai canh người canh
+
+**A10.1** Dẫn tôi qua runbook của page availability. Bạn làm gì, theo thứ tự nào?
+
+**A10.2** Làm sao bạn biết Prometheus đã chết sáu tiếng?

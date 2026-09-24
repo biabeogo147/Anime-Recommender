@@ -12,15 +12,25 @@ dấu chấm.
 Thuật ngữ dùng thống nhất trong bộ này: **stack** cho cả `shared`, `cluster` và `bootstrap`; **tunnel** cho
 port-forward qua SSM; **phép kiểm** cho một check; **huỷ** cho `destroy`.
 
-**Số liệu đã có:** chưa có số nào cho stage này. Số đo duy nhất của project là của phase app, chạy local
-([`../evidence/local.md`](../evidence/local.md)).
+**Số liệu đã đo** ([`../evidence/terraform.md`](../evidence/terraform.md), 2026-09-22):
 
-| Chỗ cần điền | Lấy từ | Dùng ở |
+| Đọc được | Giá trị | Dùng ở |
 |---|---|---|
-| Số resource dự kiến của từng stack, và tổng | Ghi *trước* lần apply đầu | A1.3, A7.2 |
-| Thời gian apply từ con số không, từng stack | Lần dựng đầu | A1.3 |
-| Đầu ra của `kubectl get --raw /readyz` qua tunnel | Lần dựng đầu | A7.3 |
-| Chứng chỉ được gia hạn hay bị cấp lại | Quan sát sau vài tháng | A8.4 |
+| Resource: plan (ghi trước) = applied = trong state | `shared` 15, `cluster` 92, `bootstrap` 2 — tổng 109 | A1.3, A1.4, A7.2 |
+| Thời gian apply từ con số không | 0m55s, 12m18s, 1m14s | A1.3 |
+| Plan lại, không dùng `-refresh=false` | `No changes.` cả ba stack | A1.3, A7.1 |
+| `kubectl get --raw /readyz` qua tunnel | `ok` | A7.3 |
+| Gọi thẳng endpoint từ ngoài (nửa âm) | `curl: (28) Connection timed out after 10002 milliseconds` | A1.4, A3.1 |
+| Cụm | EKS 1.36, platform `eks.14`, public endpoint `False`, 2 node Spot `m7i-flex.large` | A1.1 |
+
+| Chỗ còn trống | Vì sao | Dùng ở |
+|---|---|---|
+| Chứng chỉ được gia hạn hay bị cấp lại | Phải quan sát sau vài tháng | A8.4 |
+
+**Một điều kiện tái lập bị hụt, tìm ra sau khi đo.** Lần chạy ấy resolve provider theo khoảng `~> 6.0` và trong Git
+chưa có lock file, nên "apply từ trống rồi plan không thay đổi" được đo với đúng phiên bản mà `terraform init` lấy
+hôm đó — `aws` ra 6.66.0. Ba file `.terraform.lock.hcl` được commit ngày 2026-09-23, *sau* phép đo, nên từ đó trở đi
+một lần dựng lại mới so sánh được với nó. Phép đo không chạy lại vì chuyện này; cái thay đổi là lần sau đã so được.
 
 ---
 
@@ -36,7 +46,8 @@ tôi vốn cần cho các UI nội bộ. Cả project không có một access ke
 
 *Nếu được hỏi thêm:* vì sao chia theo vòng đời ở A2.1, vì sao đóng endpoint ở A3.1, sáu danh tính ở A5.1.
 
-**Mẹo:** câu đầu tiên đặt khung cho cả buổi. Nói rõ một lần là "thiết kế, chưa dựng", rồi trình bày tự nhiên.
+**Mẹo:** câu đầu tiên đặt khung cho cả buổi. Nói rõ một lần là "tôi đã dựng và đã chạy stage này, criterion #1
+đóng", rồi trình bày tự nhiên.
 
 **A1.2** **Ý chính:** "Vì ứng dụng đã chạy được và đã đo, nhưng chỉ trên đúng một laptop, dựng bằng tay. Không có
 bản thứ hai và không có cách tạo ra bản thứ hai. Trước khi làm SLO hay canary thì phải có một tài khoản dựng lại
@@ -45,16 +56,21 @@ bản thứ hai và không có cách tạo ra bản thứ hai. Trước khi làm
 **A1.3** **Ý chính:** "Apply từ con số không, rồi plan lại và thấy không có thay đổi nào — đối chiếu với một số
 lượng resource tôi ghi ra từ trước. Nó chứng minh cấu hình tái lập được và khớp với thực tế."
 
-*Nếu được hỏi thêm:* số resource dự kiến là `[điền: số resource từng stack và tổng]`, thời gian apply
-`[điền: thời gian từng stack]`. Chỗ yếu của tiêu chí này ở A7.1.
+*Nếu được hỏi thêm:* số resource ghi ra trước khi apply là 15 cho `shared`, 92 cho `cluster`, 2 cho
+`bootstrap` — tổng 109, và cả ba khớp đúng con số đó khi applied và trong state. Thời gian apply 0m55s, 12m18s và
+1m14s. Chỗ yếu của tiêu chí này ở A7.1.
 
-**A1.4** **Ý chính:** "Khi chạy, stage này sẽ chứng minh hai điều: tài khoản dựng lại được đúng số resource dự
-kiến, và API server trả lời qua tunnel. Có một điều chỉ là suy luận. API server không trả lời từ bất cứ đâu khác —
-tôi suy ra từ cấu hình endpoint và security group, chưa có phép kiểm nào cố gọi từ ngoài vào để thấy nó thất bại.
-Và ba điều vẫn là giả định: Spot bị thu hồi thì mọi thứ xử lý đúng, chứng chỉ được gia hạn chứ không bị cấp lại, và
-việc chia stack đứng vững khi `make down` thật — chỉ lần `make down` đầu tiên mới cho biết."
+**A1.4** **Ý chính:** "Stage này đã chứng minh ba điều. Tài khoản dựng lại được đúng số resource tôi ghi ra
+trước — 15, 92 và 2. API server trả lời `ok` qua tunnel. Và gọi thẳng vào endpoint từ ngoài thì timeout sau 10
+giây, nên nửa âm cũng đã chạy chứ không chỉ đọc cấu hình.
 
-**Mẹo:** tách ba nhóm — sẽ chứng minh, chỉ suy luận, còn giả định. Người phỏng vấn thường hỏi đúng nhóm giữa.
+Còn một điều vẫn là suy luận: rằng API server không trả lời từ *bất cứ* đâu khác. Tôi kiểm được một đường vào thất
+bại, không phải mọi đường. Và ba điều vẫn là giả định: Spot bị thu hồi thì mọi thứ xử lý đúng; chứng chỉ được gia
+hạn chứ không bị cấp lại — phải vài tháng mới biết; và việc chia stack đứng vững qua một lần `make down` thật —
+evidence chưa ghi lần `make down` nào, nên tôi không nói là đã chứng minh."
+
+**Mẹo:** tách ba nhóm — đã chứng minh, chỉ suy luận, còn giả định. Người phỏng vấn thường hỏi đúng nhóm giữa, và
+nhóm đó là chỗ ghi điểm: nói ra giới hạn của phép kiểm trước khi bị hỏi.
 
 ### A2. Chia theo vòng đời
 
@@ -200,14 +216,14 @@ nói chuyện với API của AWS, nên cả hai hoàn hảo trong khi tunnel h�
 không lừa được ai — Terraform từ chối plan khi không có cấu hình nào.
 
 **A7.2** **Ý chính:** "Vì 'không thay đổi' chỉ nói rằng cấu hình và thực tế khớp nhau, không nói rằng cấu hình đủ.
-Thiếu hẳn một phần resource thì plan vẫn êm. Đi kèm `[điền: số resource dự kiến]` thì nó thành một khẳng định có thể
-sai."
+Thiếu hẳn một phần resource thì plan vẫn êm. Đi kèm con số ghi ra trước — 15, 92 và 2 — thì nó thành một khẳng
+định có thể sai, và cả ba đã khớp."
 
 **A7.3** **Ý chính:** "Khi `kubectl get --raw /readyz` in ra `ok` từ workstation, qua tunnel. Điều đó vốn nằm ngoài
 tiêu chí #1, nhưng lại là thứ quan trọng nhất vào buổi sáng đầu tiên. Nó cũng là phép kiểm đầu tiên của mọi phiên làm
 việc ở mọi stage sau."
 
-*Nếu được hỏi thêm:* lần dựng đầu in ra `[điền: đầu ra của /readyz qua tunnel]`.
+*Nếu được hỏi thêm:* lần dựng đầu in ra `ok`, cả từ `make ready` và từ `kubectl get --raw /readyz`.
 
 ### A8. Giới hạn và đánh đổi
 

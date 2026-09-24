@@ -1,7 +1,7 @@
 # Câu hỏi tổng quan về project
 
 Bộ này hỏi về Anime Recommender như một toàn thể: nó là gì, vì sao nó tồn tại cạnh Medical, phần nào đã làm và đo,
-phần nào mới thiết kế, và những ý xuyên suốt cả tám stage. Đây thường là mười phút đầu của một buổi phỏng vấn —
+phần nào còn trống, và những ý xuyên suốt cả tám stage. Đây thường là mười phút đầu của một buổi phỏng vấn —
 người nghe chọn chỗ đào sâu dựa vào những gì bạn nói ở đây.
 
 Đáp án nằm ở [`answers.md`](answers.md), cùng số thứ tự.
@@ -16,14 +16,26 @@ Bộ theo stage: [Terraform](../1-terraform/questions.md) · [GitOps](../2-gitop
 [Scaling](../7-scaling/questions.md) · [Tracing](../8-tracing/questions.md). So sánh với Medical:
 [managed so với self-managed](../aws/questions.md).
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Phần app **đã làm và đã đo, chạy local**. Bên dưới nó, tính tới
-**2026-09-23**: hạ tầng, GitOps và CI/CD **đã dựng và đã đo trên AWS**; canary, SLO, autoscaler và tracing **mới thiết
-kế**. Câu trả lời tốt nói được con số thật của phần đã đo, và không bao giờ mượn thì quá khứ cho phần chưa dựng —
-trạng thái từng criterion đọc ở [`docs/evidence/`](../evidence/).
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Phần app **đã làm và đã đo, chạy local**. Bên dưới nó,
+tính tới **2026-09-23**: **cả tám stage đã dựng và đã đo trên AWS** — **mười một** tiêu chí đóng bằng số đo trích dẫn được, ba tiêu chí nữa (#2, #15, #16) pass nhưng không giữ output, #7 đo được
+một nửa, #13 chưa làm. Câu trả lời tốt nói được con số thật, và nói ba chỗ chưa trọn trước khi bị hỏi — trạng thái
+từng criterion đọc ở [`docs/evidence/`](../evidence/).
 
 ---
 
 ## Phần A — Phỏng vấn
+
+### A0. Mở đầu và định hướng
+
+**A0.1** Kể về bản thân bạn trong hai phút.
+
+**A0.2** Vì sao chuyển từ backend và AI sang DevOps/SRE?
+
+**A0.3** Bạn chưa từng đi trực thật. Sao tôi tin bạn xử lý được sự cố lúc ba giờ sáng?
+
+**A0.4** Bạn có câu nào muốn hỏi lại chúng tôi không?
+
+---
 
 ### A1. Giới thiệu
 
@@ -37,7 +49,7 @@ trạng thái từng criterion đọc ở [`docs/evidence/`](../evidence/).
 
 ### A2. Trạng thái thật
 
-**A2.1** Phần nào đã làm, phần nào mới thiết kế? Bạn đã đo được gì?
+**A2.1** Phần nào đã đo, phần nào còn trống? Bạn đã đo được gì?
 
 **A2.2** Kể về những lỗi mà phase app đã sửa.
 
@@ -100,3 +112,13 @@ trạng thái từng criterion đọc ở [`docs/evidence/`](../evidence/).
 ---
 
 [Đáp án](answers.md) · [README gốc](../../README.md) · [Design](../eks-sre-llmops-design.md)
+
+---
+
+### A10. Câu đào sâu — điểm yếu, thứ tự cắt, và phụ thuộc
+
+**A10.1** Điểm yếu lớn nhất của project này là gì?
+
+**A10.2** Nếu phải cắt, bạn cắt gì trước? Và tất cả những thứ này có over-engineer cho một app gợi ý 269 bộ anime không?
+
+**A10.3** SLI của bạn tính một 429 của provider là lỗi của service bạn. Thế đúng không?

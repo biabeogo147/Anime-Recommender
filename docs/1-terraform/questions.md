@@ -32,7 +32,7 @@ nhớ. Câu nào bắt bạn phải mở design mới trả lời được thì 
 
 **A1.3** Tiêu chí #1 là gì, và nó chứng minh được điều gì?
 
-**A1.4** Khi chạy, stage này sẽ chứng minh được gì, và điều gì vẫn chỉ là giả định?
+**A1.4** Stage này đã chứng minh được gì, điều gì chỉ là suy luận, và điều gì vẫn là giả định?
 
 ### A2. Chia theo vòng đời
 

@@ -16,8 +16,10 @@ Bộ liên quan: [tổng quan project](../common/questions.md), [Load](../4-load
 [progressive delivery](../5-delivery/questions.md), [managed so với self-managed](../aws/questions.md). Ý tưởng của
 stage: [README](README.md) · [concepts](concepts.md).
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **mới thiết kế, chưa chạy**: ngưỡng của trigger
-chưa có, vì nó đến từ lần ramp ở stage Load. Câu trả lời tốt nói rõ con số nào sẽ lấy từ đâu.
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **đã chạy**, #14 pass (2026-09-23). Ngưỡng
+trigger là **30** in-flight mỗi pod — và câu trả lời tốt nói rõ nó *không* lấy từ in-flight tại điểm gãy, con số đã
+trượt phép tái lập, mà lấy từ giới hạn 40 luồng của pod. Câu đáng nhớ nhất của stage: tải gấp ba mà p95 không nhúc
+nhích.
 
 ---
 
@@ -97,3 +99,9 @@ chưa có, vì nó đến từ lần ramp ở stage Load. Câu trả lời tốt
 
 [Đáp án](answers.md) · [README](README.md) · [Concepts](concepts.md) ·
 [Design §4.5](../eks-sre-llmops-design.md#45-autoscaling-and-load-testing)
+
+---
+
+### A10. Câu đào sâu — Spot bị thu hồi
+
+**A10.1** Node của bạn là Spot. Một lần thu hồi thì xảy ra gì?

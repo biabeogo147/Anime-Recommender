@@ -106,7 +106,9 @@ chính *dữ liệu*, tức là đúng cái lỗi sẽ thật sự xảy ra — 
 
 *Nếu được hỏi thêm:* cách cắt cũng phải chọn kỹ. Cắt còn không byte nào thì lỗi là thiếu cột, không phải
 `IndexValidationError`. Cắt giữa phần tóm tắt của dòng cuối thì có thể vẫn còn đủ 269 dòng. Nên cắt phải giữ header và
-bỏ nguyên dòng **[kiểm chứng]**. Dòng lỗi trong CI `[điền: dòng lỗi khi CSV bị cắt ngắn]`.
+bỏ nguyên dòng **[kiểm chứng]**. Dòng lỗi trong CI đọc đúng như thế, với `drop_rows` 10:
+`IndexValidationError: Loaded 259 documents from /app/data/anime_with_synopsis.csv, expected 269`, và job xanh vì
+build đã fail *đúng bằng lỗi được nêu tên* — fail vì lý do khác thì job đỏ.
 
 **A3.3** **Ý chính:** "Vì một lần build thất bại vì cả chục lý do không liên quan gì tới index — thiếu token, lỗi
 mạng. Nếu đếm mọi thất bại là 'phép kiểm đã bắn', thì một lần mất mạng cũng được tính là bằng chứng. Đòi đúng dòng
@@ -122,7 +124,10 @@ bản vá còn chưa ra."
 ghi là chưa chứng minh, cho tới khi có một lần positive control: hạ ngưỡng severity tới khi một lỗ hổng *có* bản vá
 lọt vào phạm vi, và lần chạy đó phải đỏ."
 
-*Nếu được hỏi thêm:* kết quả `[điền: positive control, tổng critical và số có bản vá]`. Medical sau đó chuyển base
+*Nếu được hỏi thêm:* positive control đã chạy. Hạ ngưỡng xuống `MEDIUM,HIGH,CRITICAL` thì gate **đỏ**:
+`anime-api` 169 finding với 5 có bản vá, `anime-ui` 165 với 5. Ở `HIGH,CRITICAL` và ở `CRITICAL` — ngưỡng dùng trên
+mọi build — gate xanh, vì ở mức CRITICAL không finding nào có bản vá, đúng như thiết kế dự đoán cho Debian 12. Nên
+gate xanh vì *không có gì sửa được*, chứ không phải vì gate không biết đỏ. Medical sau đó chuyển base
 lên Debian 13 và hết cả năm lỗ hổng đó; với Anime đó là một lựa chọn còn để ngỏ. Một cái bẫy nữa từ Medical: gate
 phải là chính lệnh scan — `trivy convert`, dùng để đọc lại một report đã lưu, không có `--ignore-unfixed`.
 
@@ -214,7 +219,8 @@ hay scan."
 dùng tới. Sau khi tách và build nhiều tầng: api 619 MB, ui 559 MB. CI phải đo lại chính hai image nó push, và nói cả
 *hai* so với một image cũ mà chúng thay thế."
 
-*Nếu được hỏi thêm:* kích thước trong CI `[điền: kích thước hai image do CI push]`. Chỉ nói con số của API — mức giảm
+*Nếu được hỏi thêm:* kích thước trong CI là `anime-api` **619 MB** và `anime-ui` **559 MB** — cộng 1.18 GB, so
+với **6.45 GB** của một image duy nhất trước đó. Chỉ nói con số của API — mức giảm
 90% — là đúng cái pass sai mà tiêu chí này cảnh báo: so một image với hai. Cũng phải so cùng một phương pháp: CI đo
 bằng `docker image ls` trên runner, không lấy kích thước trong ECR, vì ECR báo kích thước nén.
 
@@ -242,10 +248,15 @@ baseline nào, workflow nào. Cách sửa lần nào cũng giống nhau: bắt b
 
 **Mẹo:** câu này nối thẳng với GitOps A7.4. Hai stage, cùng một kỷ luật.
 
-**A8.3** **Ý chính:** "Khi các tiêu chí chạy xong, stage này sẽ chứng minh: một thay đổi đã merge thành image đã ký và
-một commit một dòng mà không ai phải đụng tay; phép kiểm index bắt được một file bị cắt ngắn; chữ ký verify đúng với
-workflow này, trên nhánh này. Nó vẫn giả định: gate scan có thể thất bại, cho tới khi positive control chạy; một image
-đã ký là image an toàn, điều mà không gì thực thi; và image để rollback vẫn còn trong registry."
+**A8.3** **Ý chính:** "Stage này đã chứng minh: một thay đổi đã merge thành image đã ký và một commit một dòng mà
+không ai phải đụng tay — một pull request tầm thường được merge và cả vòng chạy lại với digest mới; phép kiểm index
+bắt được một file bị cắt ngắn, với đúng dòng `IndexValidationError`; và chữ ký verify đúng với workflow này, trên
+nhánh này, còn chữ ký kiểm theo danh tính của nhánh khác thì bị từ chối. Gate scan cũng đã được chứng minh là biết
+thất bại: positive control ở ngưỡng MEDIUM làm nó đỏ.
+
+Hai điều vẫn là giả định, và tôi không đòi hơn: rằng một image đã ký là một image an toàn — không có gì thực thi
+điều đó, chữ ký chỉ nói ai build; và rằng image để rollback vẫn còn trong registry. Một chỗ còn thiếu số: thời
+lượng pipeline của lần chạy đó không được ghi lại."
 
 ### A9. Giới hạn và nhìn lại
 

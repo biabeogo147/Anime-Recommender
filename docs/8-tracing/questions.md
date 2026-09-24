@@ -16,8 +16,10 @@ Bộ liên quan: [tổng quan project](../common/questions.md), [Load](../4-load
 [Scaling](../7-scaling/questions.md).
 Ý tưởng của stage: [README](README.md) · [concepts](concepts.md).
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Span đã có trong code của app, nhưng collector, Tempo và
-Langfuse **mới thiết kế, chưa dựng**, và việc ghi prompt chưa được viết. Câu trả lời tốt tách rõ ba thứ đó.
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **đã dựng và đã đo**, #11 và #12 đều pass
+(2026-09-23) trên **OpenAI `gpt-4o-mini`** — không phải Gemini. Việc ghi prompt vẫn chưa được viết. Phép lập luận
+đáng nhớ nhất ở đây: **đừng đo sự vắng mặt** — muốn chứng minh trace fake không rò sang Langfuse thì đo một trace
+thật *tạo sau nó*.
 
 ---
 
