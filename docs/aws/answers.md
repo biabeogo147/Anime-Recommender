@@ -65,7 +65,7 @@ quyền đúng, và chứng minh nó chạy. Một policy IAM quá rộng trên 
 
 **A1.4** **Ý chính:** "Những câu cần một control plane của chính mình. *Dựng lại cụm từ đầu* — kubeadm trên ba EC2,
 API server sau NLB nội bộ, chạy Ansible lần hai thì `changed=0`. *Khôi phục khi mất state* — snapshot etcd theo lịch
-lên S3, và một drill khôi phục đo được RTO 7 phút 02 giây. *Nâng cấp Kubernetes* — một playbook đi từng node; nói thẳng là drill mới đi đường patch, minor upgrade chưa chạy. *Chặn
+lên S3, và một drill khôi phục đo được RTO 7 phút 02 giây. *Nâng cấp Kubernetes* — một playbook đi từng node; nói thẳng là nó chưa chạy lần nào, vì 1.36.4 đã là bản patch mới nhất, nên #14 là *not measured*. *Chặn
 image chưa ký ở admission* — Kyverno từ chối trong prod, tức không chỉ ký mà còn chặn. *Vận hành chứng chỉ* —
 cert-manager với wildcard Let's Encrypt qua DNS-01. Trên EKS không có cái nào trong số đó để mà làm: không có control
 plane để dựng, không có etcd để snapshot, chứng chỉ do ACM cấp và gia hạn."
@@ -115,8 +115,9 @@ phần đó; tôi không đăng nhập vào máy control plane nào và không v
 tôi."
 
 *Nếu được hỏi thêm:* RTO khôi phục etcd của Medical là 7 phút 02 giây (`Medical-RAG-Chatbot/docs/evidence/drills.md`);
-thời gian dựng lại EKS `[điền: thời gian dựng lại]` — phép đo M8, chưa chạy. Nâng cấp Kubernetes thì nói cho đúng: drill
-mới đi đường **patch**, còn minor upgrade như criterion #14 **của Medical** yêu cầu thì chưa chạy (`drills.md`). Ở repo này #14 là
+thời gian dựng lại EKS `[điền: thời gian dựng lại]` — phép đo M8, chưa chạy. Nâng cấp Kubernetes thì nói cho đúng:
+playbook chưa chạy lần nào, vì không có bản patch nào mới hơn 1.36.4, nên criterion #14 **của Medical** là *not measured*;
+minor upgrade như #14 yêu cầu còn cần nâng Rancher trước (`drills.md`). Ở repo này #14 là
 Autoscaling.
 
 **A2.2** **Ý chính:** "Truy cập trực tiếp vào etcd — không có snapshot nào để lấy, nên khôi phục trên EKS nghĩa
@@ -134,9 +135,9 @@ giống cụm chết là khi lệnh update-kubeconfig ghi đè địa chỉ serv
 
 *Nếu được hỏi thêm:* Terraform A3.4.
 
-**A2.4** **Ý chính:** "Ở Medical, cụm đang ghim một bản 1.36 và chưa nâng cấp lần nào. Playbook nâng cấp tôi đã
-thiết kế: từng node một, drain, `kubeadm upgrade`, nâng kubelet, uncordon, chờ Ready và Argo CD khoẻ mới sang
-node sau. Lần chạy thật là một drill còn lại. Ở Anime, tôi thiết kế nâng theo thứ tự: control plane lên một minor
+**A2.4** **Ý chính:** "Ở Medical, cụm đang ghim một bản 1.36 và chưa nâng cấp lần nào. Playbook nâng cấp đã viết
+(`upgrade.yml`): từng node một, drain, `kubeadm upgrade`, nâng kubelet, uncordon, chờ Ready và Argo CD khoẻ mới sang
+node sau. Nó qua `--syntax-check` nhưng chưa chạy, vì 1.36.4 đã là bản patch mới nhất. Ở Anime, tôi thiết kế nâng theo thứ tự: control plane lên một minor
 — AWS làm và không quay lui được — rồi các add-on, rồi node group rolling update, tôn trọng PDB. Tôi ghim minor
 để thời điểm nâng minor do tôi quyết; bản vá trong một minor thì AWS tự áp **[kiểm chứng]**."
 
@@ -185,8 +186,8 @@ tôi tin là IAM — chỉ role CI được ký. Chữ ký không ghi vào log c
 dùng một khoá tạm, Sigstore cấp chứng chỉ ngắn hạn gắn khoá đó với danh tính OIDC của workflow, và chữ ký được
 ghi vào log public. Verify thì tin vào root của Sigstore và vào danh tính ghi trong chứng chỉ."
 
-*Nếu được hỏi thêm:* hiện cả hai đều chưa có gì trong cụm verify chữ ký. Ở Medical, Kyverno là việc đã lên kế
-hoạch; Anime cố ý không verify trong cụm, chỉ verify tay một lần ở tiêu chí #3.
+*Nếu được hỏi thêm:* ở Medical, Kyverno verify chữ ký lúc admission: `Deny` ở prod, `Audit` ở dev, và đã chặn được
+một image chưa ký (phase drills). Anime cố ý không verify trong cụm, chỉ verify tay một lần ở tiêu chí #3.
 
 **A4.2** **Ý chính:** "Vì ký keyless *công bố*: digest, repo, workflow và danh tính được ghi vĩnh viễn vào một
 log public. Image của Medical là private, và những thông tin đó không có lý do gì để công khai. Ở Anime, repo vốn

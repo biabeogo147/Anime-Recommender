@@ -39,7 +39,6 @@ path, so a figure re-measured in a drill cannot leave a stale copy behind.
 The itemised version of both columns, the shared ground, and what **neither** project proves are in
 [what each project proves](what-each-project-proves.md); the stage-level lists are in
 [Only in Medical](compare-by-stage.md#only-in-medical) and [Only in Anime](compare-by-stage.md#only-in-anime).
-A path above that does not exist yet belongs to a stage that has not run.
 
 ## 2. Who does what
 
@@ -48,7 +47,7 @@ A path above that does not exist yet belongs to a stage that has not run.
 | API server, scheduler, controller manager | Me: kubeadm on 3 nodes, behind an internal NLB | **AWS**, across availability zones, out of sight |
 | etcd | Me: 3 members on the same nodes, snapshots to S3 every 6 hours, a restore drill measured at 7 m 02 s | **AWS**. No access at all, so no etcd backup or restore exists to practise |
 | Cluster certificates | Me: kubeadm generates them, so `127.0.0.1` could be added as a SAN for the tunnel | **AWS**. Its certificate cannot name `127.0.0.1`, so the kubeconfig for the tunnel sets `tls-server-name` to the real endpoint name (`make kubeconfig`) |
-| Kubernetes upgrades | Me: an Ansible playbook, node by node (`upgrade.yml`); not yet run, since no newer 1.36 patch existed | AWS upgrades the control plane on request, and by itself when standard support ends (`upgrade_policy = STANDARD`, `eks.tf`); me for the node group and add-ons |
+| Kubernetes upgrades | Me: an Ansible playbook, node by node (`upgrade.yml`); written and syntax-checked, not yet run, since no newer 1.36 patch existed (#14 not measured) | AWS upgrades the control plane on request, and by itself when standard support ends (`upgrade_policy = STANDARD`, `eks.tf`); me for the node group and add-ons |
 | Node operating system | Me: Ubuntu, containerd, kubelet, installed and pinned by Ansible | AWS supplies the node image; the managed node group replaces nodes |
 | Pod network | Calico, VXLAN, pod CIDR `192.168.0.0/16`: pod addresses exist only inside the cluster | **VPC CNI**: every pod gets a real address from the VPC subnet |
 | Pulling from ECR | An `ecr-credential-provider` binary, installed on each node by Ansible | The EKS node image already has the credential provider, and the node role the EKS module creates can read ECR. Nothing to install |

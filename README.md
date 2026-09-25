@@ -11,10 +11,10 @@ alerts, a canary that rolls itself back, autoscaling on the right signal, and an
 ![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Tempo_%2B_Langfuse-425CC7?logo=opentelemetry&logoColor=white)
 ![TLS](https://img.shields.io/badge/HTTPS-ACM_wildcard,_admin_UIs_VPN--only-2EA44F?logo=letsencrypt&logoColor=white)
 
-**Status, 2026-09-23.** The cluster, the GitOps tree and the CI/CD pipeline are **built and running on AWS**,
-and the load stage is under way: criteria #1, #3, #4, #5 and #6 are closed with evidence in
-[`docs/evidence/`](docs/evidence/). The canary, the SLO alerting, the autoscaler and the tracing are **designed
-and not yet built**. The pictures and tables that follow describe the target, and each one says where it stands.
+**Status, 2026-09-23.** All eight stages are **built and have run on AWS**. Criteria #1, #3–#6, #8–#12 and #14
+are closed with quoted evidence in [`docs/evidence/`](docs/evidence/); #2, #15 and #16 ran and matched but their
+output was not kept; #7 is partly measured; #13 (P1) is not built. The one timed measurement still owed is the
+rebuild (M8), and the pipeline's own duration is still *pending*.
 
 - **This is the managed counterpart to
   [Medical-RAG-Chatbot](https://github.com/biabeogo147/Medical-RAG-Chatbot).** That one builds a cluster by
@@ -54,13 +54,22 @@ Measured on the cluster since:
 - **#1** — the `cluster` stack applied from empty, and a re-plan with no changes
   ([terraform](docs/evidence/terraform.md)).
 - **#3, #4, #5** — a commit signed, pushed by digest and running; both image sizes; and a truncated catalogue
-  refused at startup ([cicd](docs/evidence/cicd.md)). The pipeline's own duration is still *pending*.
-- **#6** — the latency target the SLO will use: **T = 8 s**, from 230 real requests with 0 errors
+  that fails the image build with `IndexValidationError` ([cicd](docs/evidence/cicd.md)). The pipeline's own
+  duration is still *pending*.
+- **#6** — the latency target the SLO uses: **T = 8 s**, from 230 real requests with 0 errors
   ([load](docs/evidence/load.md)).
+- **#7** — partly measured: a ceiling of **93.9 req/s** for two pods, in both runs; the capacity figure's own
+  validity condition failed, so it is not quoted ([load](docs/evidence/load.md)).
+- **#8, #9** — a good version promoted 10 → 50 → 100; a canary made to fail 20% of its requests aborted
+  itself at the 10% step after **167 s**, with **1.36%** of all requests failed while it was live ([delivery](docs/evidence/delivery.md)).
+- **#10** — the fast-burn page reached Discord **9 m 30 s** after the fault began, from the 1h/5m pair
+  ([slo](docs/evidence/slo.md)).
+- **#11, #12** — one trace with both spans in Tempo and Langfuse, and **$0.4186 per 1,000** real requests on
+  `gpt-4o-mini` ([tracing](docs/evidence/tracing.md)).
+- **#14** — **2 → 8 pods and 2 → 3 nodes** under a ramp to 267 req/s, p95 1.44–1.47 s, 0 failed requests on the
+  way back down ([scaling](docs/evidence/scaling.md)).
 
-Still not measured, because the stage that produces them has not run: the capacity of the minimum replica count
-(#7), time-to-rollback (#9), time-to-alert (#10), cost per 1,000 requests (#12) and the replica count under load
-(#14). Criteria **#2**, **#15** and **#16** — the GitOps tree, HTTPS on the app, and admin UIs that answer only over
+Criteria **#2**, **#15** and **#16** — the GitOps tree, HTTPS on the app, and admin UIs that answer only over
 the VPN — ran on the cluster in stage 2 and matched, but their output was not captured, so
 [gitops](docs/evidence/gitops.md) records them as run rather than quoted. The numbers are defined in [design
 §6](docs/eks-sre-llmops-design.md#6-verification-and-evidence-definition-of-done).
@@ -68,7 +77,7 @@ the VPN — ran on the cluster in stage 2 and matched, but their output was not 
 ## Architecture
 
 Three pictures — what AWS holds, what runs inside the cluster, and what happens to a commit — then one
-close-up of the box that does the most work. They describe the target, not today. Colour says who owns a box
+close-up of the box that does the most work. They describe the system as built. Colour says who owns a box
 once it exists — **Terraform**, **Argo CD**, **GitHub Actions** — and grey is what we neither build nor run:
 people, and services belonging to someone else.
 
@@ -209,7 +218,7 @@ flowchart LR
     class PUSH ext
 ```
 
-**The bot commit will be the only writer to `main` that is not a human.** It edits one line — the image digest —
+**The bot commit is the only writer to `main` that is not a human.** It edits one line — the image digest —
 and carries `[skip ci]` so it cannot trigger itself. It is how the registry and the cluster stay in step
 without anyone typing a digest by hand.
 
@@ -242,28 +251,29 @@ same window, not with the SLO threshold T. T is measured against the real model 
 provider at a fraction of that latency, so a `p95 ≤ T` gate would sail through saturation and could never
 fail. Reasoning in [design §4.4](docs/eks-sre-llmops-design.md#44-progressive-delivery-argo-rollouts).
 
-## The stack, in the order it will be built
+## The stack, in the order it was built
 
 Each tool exists because of what the one before it left unsolved. Read the last column of a row and you have
-the reason for the next one. Rows 1 to 3 are done and measured; the rest is designed and not built.
+the reason for the next one. Rows 1 to 15 are built, and `docs/evidence/` holds what each one measured; row 16
+is P1 and not built.
 
 | # | Tool | The problem before it | What it solves | What it does not solve |
 |---|---|---|---|---|
 | 1 | **FastAPI api + thin Streamlit ui** | Streamlit talks over a websocket: there is no HTTP status code to count and no request to replay, so no SLI can be measured and no load test can be written | A real `POST /recommend`, plus `/healthz`, `/readyz`, `/metrics`. The UI becomes a client with no LangChain in it | The index was still whatever happened to be on the build machine's disk |
 | 2 | **Index built during the image build, count asserted** | `chroma_db/` is gitignored and copied in by `COPY . .`; a clean build ships an **empty** index and nothing complains | 269 documents asserted at build time, a content hash recorded in the image, `.dockerignore` blocking any local copy | Every load test and failure drill would burn real Gemini and Hugging Face quota |
 | 3 | **`fake` provider** | Drills against a rate-limited paid API are neither free nor repeatable, and a failure cannot be asked for on demand | Deterministic hash embeddings, settable latency and `FAULT_RATE`, synthetic token counts so the cost path still runs | It runs on one laptop, by hand, and nowhere else |
-| 4 *(not built)* | **Terraform: VPC, EKS, Spot node group** | Nothing is reproducible; the cluster is a story, not an artifact | An account built from empty and a clean `plan` afterwards — criterion #1 | The cluster is empty, and nothing records what should be in it |
-| 5 *(not built)* | **Argo CD app-of-apps** | Nobody can say what the cluster runs, or put it back after a teardown | Git is the record; one root Application renders the rest — criterion #2 | Traffic still has no way in, and later, a canary will have no way to split it |
-| 6 *(not built)* | **AWS Load Balancer Controller** | An `Ingress` would sit `Pending` forever, and weighted routing does not exist | Two load balancers from one controller: a public one with the weighted target groups the canary depends on, and an internal one | Both answer on an `*.elb.amazonaws.com` name over plain HTTP, and the internal one has no name at all |
-| 7 *(not built)* | **Route 53 + ACM + an internal ALB + WireGuard** | The app answers on an AWS load-balancer name over plain HTTP, and Argo CD, Grafana, Prometheus and Alertmanager would answer to anyone who found them | Real names under `anime.recruitai.io.vn`; one ACM wildcard on **both** load balancers, renewed by AWS with a key that cannot be exported; the four admin names resolve publicly but answer with **private** addresses, reachable only over the VPN. The gateway doubles as the SSM target for `make tunnel`, which lets the Kubernetes API endpoint be closed to the internet entirely — criteria #15, #16 | Keys and webhooks would still have to live in Git |
-| 8 *(not built)* | **External Secrets + EKS Pod Identity** | The model keys, HF token, Langfuse keys and Discord webhook have nowhere safe to live | Values arrive from Secrets Manager; Git holds only their names, and no pod holds an AWS access key | Images are still built by hand, unscanned and unsigned |
-| 9 *(not built)* | **GitHub Actions: test → index → build → Trivy → ECR → cosign** | Whoever can build can ship, and nobody can say what is inside an image | Commit to signed digest with no human in the path, over OIDC with no stored AWS credentials — criteria #3 and #5 | Nothing measures whether what shipped is healthy |
-| 10 *(not built)* | **kube-prometheus-stack** | No metrics leave the pods; health is a guess | Scrape, dashboards, Alertmanager, and the one datastore both controllers below will read | "Healthy" is still a human reading a graph, with no threshold to compare against |
-| 11 *(not built)* | **k6 baseline and ramp** | An SLO threshold chosen without a measurement is a number someone liked | Real latency in real mode, read from the server's own histogram, sets the target **T**; a fake-mode ramp at an open arrival rate measures what the minimum replica count can carry — criteria #6, #7 | A threshold nobody is paged about |
-| 12 *(not built)* | **Sloth SLOs + multi-window burn-rate alerts** | A target with no alert is a wish; a naive alert either pages on noise or sleeps through an outage | Fast-burn pages, slow-burn tickets, each with a runbook link — criterion #10 | Alerts fire *after* users were hurt; a bad release still reaches everyone first |
-| 13 *(not built)* | **Argo Rollouts canary + AnalysisRun** | A bad release reaches 100% of users at once, and rollback is a human noticing | 10/50/100 with Prometheus analysis at each step, automatic abort, and a pause when traffic is too thin to judge — criteria #8, #9 | Capacity is fixed: a spike queues behind whatever pods exist |
-| 14 *(not built)* | **KEDA on in-flight requests, and the Cluster Autoscaler** | Capacity is whatever replica count was committed, and the obvious remedy does not work here: the pods spend their time waiting on two remote APIs, so CPU barely moves and an HPA on CPU would never fire | Scaling follows in-flight requests — the one signal that tracks demand when the work is waiting, not computing — between 2 and 8 pods; nodes added when pods no longer fit — criterion #14 | You can see *that* a request was slow, never *where* it was slow |
-| 15 *(not built)* | **OpenTelemetry → Tempo + Langfuse, and cost metrics** | Latency is one number; retrieval versus generation is invisible, and so is the money | A span per stage with `gen_ai.*` attributes, traces in Tempo, real-model traces in Langfuse (prompt text once capture is built), dollars per 1,000 requests on a dashboard — criteria #11, #12 | A retrieval regression still ships: nothing tests answer quality |
+| 4 | **Terraform: VPC, EKS, Spot node group** | Nothing is reproducible; the cluster is a story, not an artifact | An account built from empty and a clean `plan` afterwards — criterion #1 | The cluster is empty, and nothing records what should be in it |
+| 5 | **Argo CD app-of-apps** | Nobody can say what the cluster runs, or put it back after a teardown | Git is the record; one root Application renders the rest — criterion #2 | Traffic still has no way in, and later, a canary will have no way to split it |
+| 6 | **AWS Load Balancer Controller** | An `Ingress` would sit `Pending` forever, and weighted routing does not exist | Two load balancers from one controller: a public one with the weighted target groups the canary depends on, and an internal one | Both answer on an `*.elb.amazonaws.com` name over plain HTTP, and the internal one has no name at all |
+| 7 | **Route 53 + ACM + an internal ALB + WireGuard** | The app answers on an AWS load-balancer name over plain HTTP, and Argo CD, Grafana, Prometheus and Alertmanager would answer to anyone who found them | Real names under `anime.recruitai.io.vn`; one ACM wildcard on **both** load balancers, renewed by AWS with a key that cannot be exported; the four admin names resolve publicly but answer with **private** addresses, reachable only over the VPN. The gateway doubles as the SSM target for `make tunnel`, which lets the Kubernetes API endpoint be closed to the internet entirely — criteria #15, #16 | Keys and webhooks would still have to live in Git |
+| 8 | **External Secrets + EKS Pod Identity** | The model keys, HF token, Langfuse keys and Discord webhook have nowhere safe to live | Values arrive from Secrets Manager; Git holds only their names, and no pod holds an AWS access key | Images are still built by hand, unscanned and unsigned |
+| 9 | **GitHub Actions: test → index → build → Trivy → ECR → cosign** | Whoever can build can ship, and nobody can say what is inside an image | Commit to signed digest with no human in the path, over OIDC with no stored AWS credentials — criteria #3 and #5 | Nothing measures whether what shipped is healthy |
+| 10 | **kube-prometheus-stack** | No metrics leave the pods; health is a guess | Scrape, dashboards, Alertmanager, and the one datastore both controllers below will read | "Healthy" is still a human reading a graph, with no threshold to compare against |
+| 11 | **k6 baseline and ramp** | An SLO threshold chosen without a measurement is a number someone liked | Real latency in real mode, read from the server's own histogram, sets the target **T**; a fake-mode ramp at an open arrival rate measures what the minimum replica count can carry — criteria #6, #7 | A threshold nobody is paged about |
+| 12 | **Sloth SLOs + multi-window burn-rate alerts** | A target with no alert is a wish; a naive alert either pages on noise or sleeps through an outage | Fast-burn pages, slow-burn tickets, each with a runbook link — criterion #10 | Alerts fire *after* users were hurt; a bad release still reaches everyone first |
+| 13 | **Argo Rollouts canary + AnalysisRun** | A bad release reaches 100% of users at once, and rollback is a human noticing | 10/50/100 with Prometheus analysis at each step, automatic abort, and a pause when traffic is too thin to judge — criteria #8, #9 | Capacity is fixed: a spike queues behind whatever pods exist |
+| 14 | **KEDA on in-flight requests, and the Cluster Autoscaler** | Capacity is whatever replica count was committed, and the obvious remedy does not work here: the pods spend their time waiting on two remote APIs, so CPU barely moves and an HPA on CPU would never fire | Scaling follows in-flight requests — the one signal that tracks demand when the work is waiting, not computing — between 2 and 8 pods; nodes added when pods no longer fit — criterion #14 | You can see *that* a request was slow, never *where* it was slow |
+| 15 | **OpenTelemetry → Tempo + Langfuse, and cost metrics** | Latency is one number; retrieval versus generation is invisible, and so is the money | A span per stage with `gen_ai.*` attributes, traces in Tempo, real-model traces in Langfuse (prompt and completion text behind `OTEL_CAPTURE_CONTENT`, on in this deployment), dollars per 1,000 requests on a dashboard — criteria #11, #12 | A retrieval regression still ships: nothing tests answer quality |
 | 16 *(not built, P1)* | **Retrieval eval gate** | Prompt and data changes are merged on opinion | `hit@4` over a golden set, compared against a stored baseline, run in CI with no LLM calls — criterion #13 | — |
 
 **The workload itself:** FastAPI on uvicorn, LangChain, a Chroma index of 269 anime, embeddings from the
@@ -272,7 +282,7 @@ Prometheus, and `config/pricing.yaml` turns tokens into dollars.
 
 ## Trade-offs, on purpose
 
-Decisions already taken in the design, and the price each one carries. None of them is running yet.
+Decisions taken in the design, and the price each one carries. All of them were built and ran.
 
 - **Spot nodes, 2 to 4.** Cheap, and interruption becomes something the design must survive rather than
   something it hopes to avoid. The api keeps `minAvailable: 1` and spreads across nodes. The bounds only matter
@@ -311,9 +321,10 @@ The image build embeds all 269 anime and fails if the count is wrong. For drills
 | `GET /healthz`, `GET /readyz` | Liveness; readiness is 503 until the index is loaded and its count matches |
 | `GET /metrics` | Prometheus metrics, listed in [design §4.1](docs/eks-sre-llmops-design.md#41-the-application) |
 
-**The cluster, on AWS:** not yet. The plan for it — every resource, every parameter and the measurement that
-closes each criterion — is the [design](docs/eks-sre-llmops-design.md). Commands will go in a runbook once
-there is something to run them against.
+**The cluster, on AWS:** from the ops workstation, stage by stage — [terraform guide](docs/1-terraform/guide.md)
+→ … → [tracing guide](docs/8-tracing/guide.md), the full list under Docs below. Alerts link to
+[the runbook](docs/runbooks/anime-api.md). Every resource and parameter, and the measurement that closes each
+criterion, is in the [design](docs/eks-sre-llmops-design.md).
 
 ## Docs
 

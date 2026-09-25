@@ -184,8 +184,8 @@ All five exist because of the split. Medical's design lists canary releases and 
 belonging to Anime, and names autoscaling and LLM observability as Anime's focus. Each also depends on
 something Medical does not have.
 
-- **4 · Load.** It measures two numbers: T, the latency target of the SLO, and the knee, which sets the
-  autoscaler's threshold. Medical has neither an SLO nor an autoscaler, so it needs neither number. Its app
+- **4 · Load.** It measures two numbers: T, the latency target of the SLO, and the throughput ceiling, which
+  corroborates the 40-thread limit the autoscaler's threshold is set below. Medical has neither an SLO nor an autoscaler, so it needs neither number. Its app
   phase sized pod resources from Prometheus data instead (`docs/evidence/app.md`).
 - **5 · Delivery.** Medical promotes dev → prod by a pull request that a person merges. Anime replaces that with
   a canary that judges itself. The canary also needs something Medical's ingress path does not offer as built:

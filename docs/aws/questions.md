@@ -9,7 +9,7 @@ giải thích được mình nhận gì, trả gì, và mất khả năng làm g
 | Phần | Kiểm tra điều gì |
 |---|---|
 | **A. Phỏng vấn** | Bạn so sánh được hai cách làm ở từng chỗ, bằng lý do chứ không bằng sở thích |
-| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về API và giới hạn cụ thể của từng dịch vụ, khi code của Anime đã có |
+| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về API và giới hạn cụ thể của từng dịch vụ; code đó đã có, nên phần này giờ viết được |
 
 Bộ liên quan: [tổng quan project](../common/questions.md), [Terraform](../1-terraform/questions.md),
 [GitOps](../2-gitops/questions.md), [CI/CD](../3-cicd/questions.md), [Scaling](../7-scaling/questions.md). Bộ AWS của
