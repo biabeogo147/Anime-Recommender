@@ -25,6 +25,37 @@ retry curl -fsSL -o awscliv2.zip https://awscli.amazonaws.com/awscli-exe-linux-x
 unzip -q awscliv2.zip
 ./aws/install --update
 
+# The instance profile is attached by the same Terraform apply that launches this machine, and IAM is eventually
+# consistent: the role can take minutes to appear on the instance metadata service. Until it does, every AWS call
+# returns NoCredentials - which the retry above cannot outlast, because its ten attempts are sized for the Elastic
+# IP swap, not for IAM. Measured 2026-09-23: the role had not appeared after 100 s, cloud-final failed, and the
+# gateway came up with no WireGuard configuration and no way in. So wait for the credentials themselves, with a
+# budget of their own, before the first call that needs them.
+wait_for_instance_role() {
+  local token
+  for attempt in $(seq 60); do
+    token=$(curl -fsS -X PUT http://169.254.169.254/latest/api/token       -H 'X-aws-ec2-metadata-token-ttl-seconds: 300' 2>/dev/null) || { sleep 5; continue; }
+    if curl -fsS -H "X-aws-ec2-metadata-token: $token"          http://169.254.169.254/latest/meta-data/iam/security-credentials/ | grep -q .; then
+      echo "instance role visible on IMDS after $((attempt * 5))s"
+      return 0
+    fi
+    sleep 5
+  done
+  echo "no instance role on IMDS after 300s: check the instance profile" >&2
+  return 1
+}
+wait_for_instance_role
+
+# The SSM agent lost the same race, earlier and worse. It is a snap started by the AMI, so it asks for credentials
+# before user-data runs at all: measured 2026-09-23, the instance launched at 15:58:14 and the agent gave up at
+# 15:58:33, nineteen seconds in. Having failed the EC2-identity path it falls back to Default Host Management
+# Configuration - an account-level feature this account does not use - and stays there:
+#   "no valid credentials could be retrieved for ec2 identity. Default Host Management Err: ...
+#    Systems Manager's instance management role is not configured for account"
+# The instance then never registers, so there is no session, no tunnel, and no way in to repair it by hand. Nothing
+# in user-data can run early enough to prevent that, so restart the agent once the role is actually visible.
+snap restart amazon-ssm-agent || systemctl restart amazon-ssm-agent || true
+
 # Keys come from the secret only this instance's role may read. umask 077: the temporary file is private.
 umask 077
 retry aws --region "${region}" secretsmanager get-secret-value \

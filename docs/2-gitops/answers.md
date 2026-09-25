@@ -4,23 +4,38 @@
 ngôi thứ nhất, thường là đủ. *Nếu được hỏi thêm* dùng khi người phỏng vấn đào sâu. Dòng **Mẹo** là lời nhắc cho
 bạn, không nói ra. Tham chiếu dạng `Terraform A5.4` trỏ tới bộ tương ứng.
 
-Stage này **đã dựng và đã chạy trên cụm, nhưng chưa viết evidence**: cây Argo CD đã lên 8/8, HTTPS và bốn UI nội bộ
-đã kiểm, song `docs/evidence/gitops.md` chưa tồn tại — nên criteria #2, #15, #16 vẫn tính là **chưa có bằng chứng**.
-Kể được bằng kinh nghiệm, nhưng đừng đọc ra con số nào chưa ghi. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
+Stage này **đã dựng, đã chạy, và evidence đã viết — nhưng không giữ output**: cây Argo CD đã lên 8/8, HTTPS và bốn UI nội bộ
+đã kiểm, và `docs/evidence/gitops.md` ghi cả ba criteria #2, #15, #16 là **pass as run, unquoted**: các phép kiểm
+đã chạy và khớp kỳ vọng của guide, nhưng terminal output *không được giữ lại*. Nên kể bằng kinh nghiệm thì được, và
+nói thẳng là không giữ bản ghi — đừng đọc ra con số nào ngoài cái evidence có. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi dùng — đừng nói con số bạn
 chưa đo. Ghi chú **[kiểm chứng]** là hành vi của công cụ cần xác nhận trước khi nói chắc. Số thập phân viết bằng
 dấu chấm.
 
 Thuật ngữ dùng thống nhất trong bộ này: **cửa** cho một load balancer (cửa public, cửa nội bộ); **phép kiểm** cho
 một check; **nửa âm / nửa dương** cho hai nửa của #16 (tắt VPN phải thất bại / bật VPN phải thành công).
 
-**Số liệu đã có:** chưa có số nào cho stage này. Số đo duy nhất của project là của phase app, chạy local
-([`../evidence/local.md`](../evidence/local.md)).
+**Số liệu đã đo** ([`../evidence/gitops.md`](../evidence/gitops.md), 2026-09-22):
 
-| Chỗ cần điền | Lấy từ | Dùng ở |
+| Đọc được | Giá trị | Dùng ở |
 |---|---|---|
-| Danh sách Application theo tên, và số lượng, khi stage này đóng | Lần dựng đầu | A1.3, A7.1 |
-| Serial của chứng chỉ trên listener so với chứng chỉ ACM | Lần kiểm #15 đầu | A7.2 |
-| Mạng nhà có chặn câu trả lời mang địa chỉ private không | Lần kiểm #16 đầu, từ laptop | A6.2 |
+| Application `Synced` **và** `Healthy` sau bootstrap | **8 trên 8** | A1.3, A7.1 |
+| Hai tên public, từ ngoài VPN | cổng 80 trả `301`, HTTPS trả `200`, chain verify không cần `-k` | A7.2 |
+| Bốn tên quản trị, tắt VPN, từ laptop | resolve ra địa chỉ `10.30.x.x` và không nối được | A6.2 |
+| Bốn tên quản trị, bật VPN | mở được cả bốn | A6.2 |
+
+Cây app-of-apps sau đó còn dài ra: stage 5 thêm `argo-rollouts`, stage 6 thêm `alerting-secret` và `slo`, stage 7
+thêm `keda` và `cluster-autoscaler`, stage 8 thêm `tracing-secret`, `tempo`, `opentelemetry-collector` và `dashboards`
+(`deploy/argocd/root/templates/`). Các stage đó đã chạy, nhưng trạng thái `Synced`/`Healthy` của chính các Application ấy
+không được ghi lại.
+
+| Chỗ còn trống | Vì sao | Dùng ở |
+|---|---|---|
+| Serial chứng chỉ trên listener so với ACM | **Evidence không ghi phép so này** — nên false pass chính của #15 (controller tự tìm ra một chứng chỉ *khác* bằng host match, trong một zone dùng chung với Medical) chưa được đóng | A7.2 |
+| Mạng nhà có chặn câu trả lời mang địa chỉ private không | Không thuộc phép đo nào đã chạy | A6.2 |
+
+**Bằng chứng của bộ này là hành vi đã kiểm, không phải output đã lưu.** Ba phép kiểm chạy đúng và khớp kỳ vọng
+của guide, và guide tái tạo lại cả ba trong khoảng mười phút trên một cụm đang sống. Ở đây nói "đã kiểm" rồi dừng, và
+con số duy nhất evidence giữ là 8 trên 8 Application.
 
 ---
 
@@ -28,15 +43,20 @@ một check; **nửa âm / nửa dương** cho hai nửa của #16 (tắt VPN ph
 
 ### A1. Tổng quan
 
-**A1.1** **Ý chính:** "Stage này tôi đã dựng và chạy trên cụm, nhưng chưa viết file bằng chứng. Sau bootstrap không có gì được apply bằng tay: mọi
+**A1.1** **Ý chính:** "Sau bootstrap không có gì được apply bằng tay: mọi
 thành phần là một Application trong Git, và Argo CD trong cụm tự kéo về. Stage này đưa vào bốn thứ, theo một thứ
 tự mà chính cụm phải tự giữ được: controller dựng load balancer, External Secrets, external-dns, và các UI quản
 trị. Kết quả là hai cửa — một ALB public cho app, một ALB nội bộ cho bốn UI chỉ mở qua VPN. Cả hai dùng chung một
-chứng chỉ ACM, và TLS kết thúc ngay ở load balancer."
+chứng chỉ ACM, và TLS kết thúc ngay ở load balancer. Cây lên **8 trên 8** Application vừa `Synced` vừa `Healthy`.
+
+Một điểm về bằng chứng: ba phép kiểm của stage này tôi chạy trên cụm và chúng khớp kỳ vọng, nhưng tôi không giữ
+terminal output — nên tôi kể bằng kinh nghiệm chứ không đọc số ngoài 8 trên 8. Guide tái tạo cả ba trong khoảng mười
+phút."
 
 *Nếu được hỏi thêm:* thứ tự ở A2.4, hai cửa ở A3.1, vì sao mỗi phép kiểm cần một phép kiểm đi kèm ở A7.4.
 
-**Mẹo:** câu đầu tiên đặt khung cho cả buổi. Nói rõ một lần là "thiết kế, chưa dựng", rồi trình bày tự nhiên.
+**Mẹo:** câu đầu tiên đặt khung cho cả buổi — mở bằng *việc stage này làm được*, và để chuyện không giữ bản ghi ở câu
+cuối, như một ranh giới chứ không phải một lời thú nhận.
 
 **A1.2** **Ý chính:** "Bốn thứ. Không traffic nào vào được, vì Ingress cần một controller để thành load balancer.
 Không secret nào đọc được, vì chưa có gì trong cụm đọc từ Secrets Manager. Không có tên nào, vì chưa có load
@@ -48,7 +68,8 @@ cả đều xanh'. #15: cả `anime` lẫn `api.anime` đều trả 301 ở cổ
 thực được, và đúng là chứng chỉ ACM của mình. #16: bốn tên UI, từ laptop — tắt VPN thì không tới được, bật VPN thì
 200."
 
-*Nếu được hỏi thêm:* khi stage đóng, danh sách là `[điền: danh sách Application và số lượng]`.
+*Nếu được hỏi thêm:* khi stage đóng, cây đạt **8 trên 8** Application vừa `Synced` vừa `Healthy` — evidence ghi
+số lượng, không giữ danh sách theo tên.
 
 ### A2. Git là lối vào duy nhất
 
@@ -119,7 +140,7 @@ Cùng lỗi đó giờ khiến pod mới không Ready, và rollout dừng lại 
 readiness gate đổi nó từ im lặng thành ồn ào."
 
 *Nếu được hỏi thêm:* health check mặc định gọi `GET /`, đường dẫn mà cả hai app đều không phục vụ, nên mỗi app
-khai rõ đường dẫn của mình — `/healthz` cho API, `/_stcore/health` cho UI. Gate chỉ được gắn vào pod tạo ra sau
+khai rõ đường dẫn của mình — `/readyz` cho API (pod chưa nạp index thì không nhận traffic), `/_stcore/health` cho UI. Gate chỉ được gắn vào pod tạo ra sau
 khi target group binding đã tồn tại, nên những pod đầu tiên của lần dựng đầu có thể lọt qua **[kiểm chứng]**.
 
 **Mẹo:** đây là câu thể hiện rõ nhất cách nghĩ của cả project — "khi một cấu hình sai là có thể xảy ra, hãy làm
@@ -195,7 +216,8 @@ và nửa dương của #16 thất bại vì một lý do không liên quan gì 
 điều đã chứng minh."
 
 *Nếu được hỏi thêm:* cách vòng qua là đưa một DNS server vào profile WireGuard, hoặc dùng mạng khác — tức là đúng
-cái giá mà bản ghi public được chọn để tránh. Mạng nhà của tôi `[điền: có chặn hay không]`.
+cái giá mà bản ghi public được chọn để tránh. Mạng laptop dùng lúc kiểm không chặn (evidence không ghi là mạng nào): tắt VPN, cả bốn tên vẫn resolve ra
+`10.30.x.x` từ laptop (`evidence/gitops.md`).
 
 **A6.3** **Ý chính:** "Hai chỗ. Gateway không bật IP forwarding thì gói từ tunnel bị bỏ ngay ở gateway, không tới
 được VPC. Có forwarding mà không có masquerade — viết lại địa chỉ nguồn thành địa chỉ của gateway — thì request tới
@@ -231,7 +253,10 @@ Argo CD đã *tải về*, có thể chậm hơn `main`. Và 'tất cả đều 
 gọi đúng tên từng Application, đếm số lượng, so revision với `main`, và đọc một trường readiness thật cho mỗi kiểu
 custom."
 
-*Nếu được hỏi thêm:* danh sách khi stage đóng là `[điền: danh sách Application và số lượng]`.
+*Nếu được hỏi thêm:* khi stage đóng là **8 trên 8**. Các stage sau còn thêm vào — stage 5 thêm `argo-rollouts`, stage 6
+thêm `alerting-secret` và `slo`, stage 7 thêm `keda` và `cluster-autoscaler`, stage 8 thêm bốn cái của tracing. Cây
+đầy đủ **theo thiết kế** là 17 Application; đó là con số phép đo M8 chờ, và M8 chưa chạy, nên tôi không nói 17 như
+một số đã đếm.
 
 **A7.2** **Ý chính:** "Bốn cách. Kiểm bằng `-k`, hoặc kiểm vào tên `*.elb.amazonaws.com` của ALB, nơi sai tên là
 chuyện dự kiến và không nói lên gì. Chuỗi chứng chỉ xác thực được ngay cả khi app phía sau trả 404 hay 503 — TLS vẫn hoàn tất
@@ -239,7 +264,7 @@ dù không rule nào khớp hay không target group nào healthy, nên phải ki
 chứng chỉ ACM khác, như ở A3.7. Và kiểm một tên trong khi tuyên bố hai. Nên phép kiểm so serial của chứng chỉ đang
 được phục vụ với chứng chỉ ACM, đọc lại từ listener."
 
-*Nếu được hỏi thêm:* kết quả so serial `[điền: serial trên listener so với ACM]`.
+*Nếu được hỏi thêm:* kết quả so serial: không ghi lại — đó là lý do #15 chỉ là "đã chạy, không trích được".
 
 **A7.3** **Ý chính:** "Vì timeout cũng là hình dạng của một load balancer chưa bao giờ được dựng. Nếu Ingress nội
 bộ không có load balancer nào, nửa âm pass y hệt. Nên hai nửa phải chạy trong cùng một phiên, trên cả bốn tên:
@@ -300,3 +325,22 @@ hỏng duy nhất cho cả truy cập lẫn release, và chốt câu hỏi Argo 
 ---
 
 [Câu hỏi](questions.md) · [README](README.md) · [Concepts](concepts.md)
+
+---
+
+### A10. Câu đào sâu — phân quyền, không chỉ khả năng tới được
+
+**A10.1** **Ý chính:** "Argo CD và Grafana có đăng nhập riêng. **Prometheus và Alertmanager thì không có xác thực
+nào** — nên với hai cái đó, vị trí mạng *chính là* phân quyền: mọi peer VPN và mọi pod trong VPC có toàn quyền, kể cả
+tạo silence. Tôi ghi điều đó vào thiết kế đúng ở chỗ nói về tiêu chí #16, vì nó là giới hạn của chính phép kiểm: #16
+chứng minh **khả năng tới được**, nó không chứng minh phân quyền."
+
+*Nếu được hỏi thêm:* hai thứ tôi sẽ thêm, theo thứ tự đó. Một NetworkPolicy chỉ cho phép vào hai service ấy từ `ipBlock` của
+các subnet ALB nội bộ và dải VPN, chặn phần còn lại — rẻ, và đóng đúng đường mà một pod bị chiếm sẽ dùng. Nói cho
+đúng: với VPC CNI thì NetworkPolicy phải bật network policy agent mới được thực thi, và design của Anime hiện chưa có
+NetworkPolicy nào. Rồi OIDC ở tầng ALB cho cả bốn tên, để
+người dùng là một danh tính chứ không phải một địa chỉ IP. Một silence đặt sai làm im luôn cái page mà cả stage SLO
+tồn tại để tạo ra, nên đây là lỗ hổng đáng đóng nhất trong project.
+
+**Mẹo:** đừng chờ bị hỏi câu này. Nói "reachability is all this proves" ngay khi trình bày #16 thì nó thành sự cẩn
+thận; nói sau khi bị hỏi thì thành chỗ hở.

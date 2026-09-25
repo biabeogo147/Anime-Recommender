@@ -10,14 +10,16 @@ có mặt chưa chắc là một con số có nghĩa.
 | Phần | Kiểm tra điều gì |
 |---|---|
 | **A. Phỏng vấn** | Bạn trình bày được các quyết định của stage và lý do đằng sau từng quyết định, bằng lời của mình |
-| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về cấu hình collector, span trong code và query chi phí, khi code đã có |
+| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về cấu hình collector, span trong code và query chi phí; code đó đã có, nên phần này giờ viết được |
 
 Bộ liên quan: [tổng quan project](../common/questions.md), [Load](../4-load/questions.md), [SLO](../6-slo/questions.md),
 [Scaling](../7-scaling/questions.md).
 Ý tưởng của stage: [README](README.md) · [concepts](concepts.md).
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Span đã có trong code của app, nhưng collector, Tempo và
-Langfuse **mới thiết kế, chưa dựng**, và việc ghi prompt chưa được viết. Câu trả lời tốt tách rõ ba thứ đó.
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **đã dựng và đã đo**, #11 và #12 đều pass
+(2026-09-23) trên **OpenAI `gpt-4o-mini`** — không phải Gemini. Việc ghi prompt đã viết, sau cờ `OTEL_CAPTURE_CONTENT` đang bật trong chart. Phép lập luận
+đáng nhớ nhất ở đây: **đừng đo sự vắng mặt** — muốn chứng minh trace fake không rò sang Langfuse thì đo một trace
+thật *tạo sau nó*.
 
 ---
 

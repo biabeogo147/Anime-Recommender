@@ -4,8 +4,8 @@
 ngôi thứ nhất, thường là đủ. *Nếu được hỏi thêm* dùng khi người phỏng vấn đào sâu. Dòng **Mẹo** là lời nhắc cho
 bạn, không nói ra. Tham chiếu dạng `Load A5.2` trỏ tới bộ tương ứng.
 
-Span đã có trong code của app; collector, Tempo, Langfuse và dashboard **mới thiết kế, chưa dựng**; ghi prompt **chưa
-viết**. Câu đầu tiên của A1.1 nói rõ điều đó một lần. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi
+Stage này **đã chạy**: criteria #11 (một trace thật ở cả hai nơi nhận, token khác không) và #12 (chi phí mỗi nghìn
+request ở real mode) đều **pass**, 2026-09-23 ([evidence](../evidence/tracing.md)). Ghi prompt **đã viết**, sau cờ `OTEL_CAPTURE_CONTENT` đang bật trong chart, nhưng chưa có evidence riêng. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi
 dùng — đừng nói con số bạn chưa đo. Ghi chú **[kiểm chứng]** là hành vi của công cụ cần xác nhận trước khi nói chắc. Số
 thập phân viết bằng dấu chấm.
 
@@ -20,12 +20,26 @@ cho Tempo hoặc Langfuse; **dấu** cho resource attribute đánh chế độ c
 | Token sau hai request, `gemini-3.5-flash-lite`, local | 1829 input, 790 output | A6.4 |
 | Chi phí ước tính theo giá niêm yết của tier trả phí, local | 0.0025 USD cho hai request, khoảng 0.0013 USD mỗi request | A6.4 |
 
-**Còn phải điền:**
+**Số liệu đã đo trên AWS** ([`../evidence/tracing.md`](../evidence/tracing.md), 2026-09-23, real mode **OpenAI
+`gpt-4o-mini`** — không phải Gemini):
 
-| Chỗ cần điền | Lấy từ | Dùng ở |
+| Đọc được | Giá trị | Dùng ở |
 |---|---|---|
-| Attribute của span generation, dạng text, từ cả Tempo lẫn Langfuse, ở chế độ Gemini; request fake cùng phiên tra theo trace id | Lần kiểm #11 | A1.3, A8.1 |
-| Chi phí mỗi nghìn request trên dashboard, chế độ, và ngày của file giá | Lần kiểm #12 | A1.3, A6.4 |
+| Trace thật, trong Tempo | `d19d2834e2fb4216c71cb8fad4bf2f95`: `POST /recommend` (SERVER), `rag.retrieve` (INTERNAL, `rag.top_k=4`, `rag.docs_returned=4`), `chat gpt-4o-mini` (CLIENT) | A1.3, A8.1 |
+| Token trên span generation | `gen_ai.usage.input_tokens=957`, `gen_ai.usage.output_tokens=461` | A1.3, A8.1 |
+| Cùng trace đó trong Langfuse | **7 observation**, `chat gpt-4o-mini` kiểu `GENERATION`, **1418 token** (= 957 + 461) và **$0.00042** | A1.3, A8.1 |
+| Request fake cùng phiên, trong Tempo | có, với `anime.llm.provider = fake` | A8.1 |
+| Cùng trace fake đó trong Langfuse | `http 200`, **observation: 0** | A8.1 |
+| Một trace thật tạo **sau** trace fake | `http 200`, **7 observation** — chứng minh ingestion đã vượt mốc thời gian đó | A8.1 |
+| Drill 5 phút: request / span qua collector / trace riêng biệt trong Langfuse | **6343 / 6076 / 0** | A1.3 |
+| **Chi phí mỗi 1000 request** | **$0.4186**, nhãn `model="gpt-4o-mini"` | A1.3, A6.4 |
+| Tổng chi phí lần đo | $0.01739 cho 40 request → $0.435 mỗi nghìn — khớp tới hai chữ số | A6.4 |
+| `model="fake"` trong cùng cửa sổ | **$0** | A6.4 |
+| Giá dùng, và **ngày đọc** | `gpt-4o-mini` $0.15 / 1M input, $0.60 / 1M output, đọc **2026-09-22** | A6.4 |
+| Dashboard | 4 panel; hai panel cạnh nhau trên cùng dữ liệu, panel chi phí lọc `fake` ra, panel p95 giữ nó lại | A1.3 |
+
+**Ba đường tính độc lập khớp nhau:** $0.01739 / 40 request = $0.435 mỗi nghìn; tỉ số trên cửa sổ `increase()` mười
+phút ra $0.4186; và Langfuse tự tính $0.00042 cho một request bằng bảng giá riêng của nó.
 
 ---
 
@@ -33,27 +47,31 @@ cho Tempo hoặc Langfuse; **dấu** cho resource attribute đánh chế độ c
 
 ### A1. Tổng quan
 
-**A1.1** **Ý chính:** "Span đã có trong code của app; phần còn lại — collector, Tempo, Langfuse — tôi mới thiết kế, chưa
-dựng. Mỗi request `/recommend` có một span retrieval và một span generation. Collector gửi mọi trace tới Tempo trong cụm để
+**A1.1** **Ý chính:** "Stage này tôi đã dựng và chạy, hai tiêu chí #11 và #12 đều pass. Mỗi request `/recommend` có
+một span retrieval và một span generation. Collector gửi mọi trace tới Tempo trong cụm để
 debug, và chỉ trace của model thật tới Langfuse để đọc; nó tách hai loại bằng một dấu đặt trên từng pod. Số token nhân giá
 niêm yết thành chi phí ước tính mỗi nghìn request. Phần khó không phải là thu dữ liệu, mà là quyết định cái gì đi đâu. Và
 không bao giờ nhầm một con số có mặt với một con số có nghĩa."
 
 *Nếu được hỏi thêm:* tách theo pod ở A3.2, chi phí ở A6.1, con số có mặt mà vô nghĩa ở A6.3.
 
-**Mẹo:** câu đầu tiên đặt khung cho cả buổi. Ở stage này có ba trạng thái — đã có, đã thiết kế, chưa viết. Nói rõ cả ba.
+**Mẹo:** câu đầu tiên đặt khung cho cả buổi. Ở stage này có hai trạng thái — **đã dựng và đã đo** (#11, #12), và
+**ghi prompt đã dựng nhưng chưa có evidence riêng**. Nói rõ cả hai.
 
 **A1.2** **Ý chính:** "Metrics đã tách được thời gian retrieval với thời gian model ở mức tổng, vì mỗi phần có histogram
 riêng. Nhưng chúng không nói được *một request cụ thể* chậm ở đâu, và không có cách nào đi từ một điểm chậm trên đồ thị tới
 đúng request đó. Chi phí có counter trong Prometheus nhưng chưa nằm trên dashboard nào. Và nội dung của một câu trả lời tệ —
 thứ đáng đọc nhất khi một service LLM chạy sai — hoàn toàn không được ghi."
 
-**A1.3** **Ý chính:** "#11: một trace `/recommend` ở chế độ Gemini có span retrieval và span generation với số token *khác
-không*, kiểm ở cả Tempo lẫn Langfuse. #12: dashboard hiện chi phí mỗi nghìn request ở chế độ Gemini, kèm chế độ và ngày của
-file giá."
+**A1.3** **Ý chính:** "#11: một trace `/recommend` ở **real mode, OpenAI `gpt-4o-mini`**, có span retrieval và
+span generation với số token *khác không* — 957 vào, 461 ra — kiểm ở cả Tempo lẫn Langfuse. #12: dashboard hiện chi
+phí mỗi nghìn request ở **real mode**, kèm nhãn `model` và ngày của file giá.
 
-*Nếu được hỏi thêm:* kết quả `[điền: attribute span generation từ hai nơi, request fake cùng phiên]` và `[điền: chi phí mỗi
-nghìn request, chế độ, ngày file giá]`.
+*Nếu được hỏi thêm:* span generation mang `gen_ai.provider.name=openai`, `gen_ai.request.model=gpt-4o-mini`,
+**957** token vào và **461** token ra trong Tempo; cùng trace id đó trong Langfuse có **7 observation** với
+**1418** token — đúng bằng 957 + 461 — và $0.00042. Request fake cùng phiên có trong Tempo với
+`anime.llm.provider = fake` và **0 observation** trong Langfuse. Chi phí: **$0.4186** mỗi nghìn request, real mode
+`gpt-4o-mini`, giá đọc ngày **2026-09-22**.
 
 ### A2. Trace và span
 
@@ -67,9 +85,10 @@ lời, nên một request mà ai đó phàn nàn có thể được tìm ra. Pro
 instrument, vì chúng chạy liên tục và sẽ lấn át trace thật.
 
 **A2.2** **Ý chính:** "Là bộ tên attribute mà OpenTelemetry thống nhất cho AI tạo sinh: tên thao tác, model, provider, số
-token, và quy tắc đặt tên span. Span generation theo quy tắc tên và mang thao tác, model và token. Còn hai chỗ chưa theo: nó
-chưa có `gen_ai.provider.name` — bản cũ của quy ước gọi là `gen_ai.system` — và dùng loại span `INTERNAL` mặc định thay vì
-`CLIENT`. Bản thân bộ quy ước vẫn đang ở trạng thái phát triển, nên tôi kiểm theo phiên bản được ghim lúc dựng."
+token, và quy tắc đặt tên span. Span generation theo quy tắc tên, mang thao tác, model và token, có
+`gen_ai.provider.name` — bản cũ của quy ước gọi là `gen_ai.system` — và dùng loại span `CLIENT`, không phải `INTERNAL`
+mặc định. Hai chỗ đó được sửa ở stage 8. Bản thân bộ quy ước vẫn đang ở trạng thái phát triển, nên tôi kiểm theo phiên
+bản được ghim lúc dựng."
 
 **A2.3** **Ý chính:** "Những con số project này dựa vào không nên phụ thuộc vào việc một thư viện có theo kịp LangChain hay
 không. Thư viện đó sẽ thêm chi tiết, và nó vẫn là một lựa chọn để đánh giá, nhưng không phải một phụ thuộc. Hai span viết tay
@@ -172,13 +191,13 @@ Phép kiểm đòi số token *khác không*, từ request model thật."
 *Nếu được hỏi thêm:* chế độ fake còn tệ hơn — fake provider bịa ra số token trông hợp lý, nên một ảnh chụp màn
 hình không chứng minh gì. Cùng họ với "rỗng không phải là không" ở Load A2.2.
 
-**A6.4** **Ý chính:** "Chỉ có số local. Sau hai request Gemini, 1829 token vào và 790 token ra, ước tính 0.0025
-USD theo giá niêm yết — khoảng 0.0013 USD mỗi request. Đó là giá của tier trả phí, trong khi project chạy trên
-tier miễn phí: nó là số tiền traffic *sẽ* tốn, không phải số đã trả. Số này đọc từ counter khi chạy local, chưa
-qua trace nào, và hai request thì quá ít để nhân lên thành chi phí mỗi nghìn request. Con số trên dashboard thì
-chưa có."
+**A6.4** **Ý chính:** "**$0.4186 mỗi nghìn request** thật trên `gpt-4o-mini`, giá đọc ngày 2026-09-22, từ 40 request
+ở real mode. Đó là ước tính theo giá niêm yết, không phải số trên hoá đơn. Con số local trước đó — hai request Gemini,
+0.0025 USD — chỉ là ước tính ban đầu: quá ít request để nhân lên, và là model khác."
 
-*Nếu được hỏi thêm:* con số trên dashboard `[điền: chi phí mỗi nghìn request, chế độ, ngày file giá]`.
+*Nếu được hỏi thêm:* panel hiện legend `model=gpt-4o-mini` với giá trị 0.42–0.45, khớp con số truy vấn trả về:
+**$0.4186** mỗi nghìn request, real mode, giá đọc **2026-09-22**. Và panel p95 ngay cạnh đó *giữ* `model=fake` lại —
+nên cái filter nhìn thấy được, không phải một dòng cấu hình ai đó phải tin.
 
 ### A7. Trace sống bao lâu
 
@@ -197,7 +216,10 @@ drill' cũng là hình dạng của một export Langfuse bị hỏng. Nên phé
 kiểm cả Tempo *lẫn* Langfuse, và tra một request fake cùng phiên theo trace id — có trong Tempo, không có trong
 Langfuse — cạnh một trace thật đã tới Langfuse."
 
-*Nếu được hỏi thêm:* kết quả `[điền: attribute span generation từ hai nơi, request fake cùng phiên]`.
+*Nếu được hỏi thêm:* trace thật có đủ ba span ở Tempo với 957 + 461 token, và 7 observation ở Langfuse với 1418
+token. Trace fake cùng phiên: có ở Tempo, **0 observation** ở Langfuse. Và phép kiểm làm nó thành câu trả lời chứ
+không phải sự chậm trễ là một trace **thật tạo sau** trace fake — khi trace đó đã hiện, ingestion đã vượt mốc thời
+gian ấy.
 
 **A8.2** **Ý chính:** "Hai cách. Một lần chạy ở chế độ fake cho ra con số đô-la thật từ token bịa, không phân
 biệt được bằng số với con số thật — luôn đọc label model. Và một model không có giá trong file, cho ra `0.00` đầy
@@ -210,16 +232,22 @@ ra để có. Cách bắt lần nào cũng như nhau: hỏi giá trị đó nói
 **Mẹo:** đây là stage cuối của phần P0. Kể được dạng pass sai của cả tám stage theo thứ tự là một kết thúc rất mạnh cho buổi
 phỏng vấn.
 
-**A8.4** **Ý chính:** "Khi chạy xong, stage này sẽ chứng minh: một request model thật sinh ra trace có span
-retrieval và span generation, span generation mang số token khác không, ở cả Tempo lẫn Langfuse; một request fake
-cùng phiên có trong Tempo mà không có trong Langfuse; và dashboard hiện chi phí ước tính mỗi nghìn request model
-thật. Nó giả định giá niêm yết vẫn còn đúng — giá được đọc tay và ghi ngày — và số token provider báo đúng là số
-nó sẽ tính tiền."
+**A8.4** **Ý chính:** "Stage này đã chứng minh cả ba: một request model thật sinh ra trace có span retrieval và
+span generation, span generation mang 957 và 461 token khác không, ở cả Tempo lẫn Langfuse — và hai nơi nhận đồng ý
+với nhau, vì 1418 token Langfuse báo đúng bằng 957 + 461, nên chúng đang giữ *cùng một request* chứ không phải chỉ
+cùng có dữ liệu. Một request fake cùng phiên có trong Tempo mà không có trong Langfuse, và trên cả cửa sổ drill là
+6343 request ra 0 trace. Dashboard hiện $0.4186 mỗi nghìn request cho model thật.
+
+Nó vẫn giả định giá niêm yết còn đúng — giá được đọc tay và ghi ngày 2026-09-22 — và số token provider báo đúng là số
+nó sẽ tính tiền. Và ba sự cố trên đường đi đều tạo ra câu trả lời *sai nhưng hợp lý* chứ không tạo ra lỗi: Langfuse ở
+sai region nên export bị chặn trong im lặng; endpoint list trả `modelId` null nên đọc ra 'provider không báo usage',
+điều không phân biệt được với sự thật; và một lần đổi chế độ chỉ promote được một nửa, nên spec đã là `fake` mà 90%
+traffic vẫn về pod real mode. Phép kiểm đúng cho cái cuối là `stable = latest`, không phải `provider=fake`."
 
 ### A9. Nhìn lại
 
-**A9.1** **Ý chính:** "Ghi prompt chưa được viết. Tempo không giữ gì qua teardown. Chi phí là ước tính theo giá niêm yết, cho
-một project chạy trên tier miễn phí. Và hai pipeline dính nhau qua bộ nhớ của collector khi Langfuse sập lâu."
+**A9.1** **Ý chính:** "Ghi prompt đã viết nhưng chưa có evidence riêng. Tempo không giữ gì qua teardown. Chi phí là ước tính
+theo giá niêm yết, không phải số trên hoá đơn. Và hai pipeline dính nhau qua bộ nhớ của collector khi Langfuse sập lâu."
 
 **A9.2** **Ý chính:** "Tempo với storage bền — object storage — để trace sống qua đêm. Ghi nội dung có che thông
 tin cá nhân trước khi gửi ra ngoài, không chỉ một cờ bật tắt. Tail sampling ở collector thay vì giữ mọi trace.

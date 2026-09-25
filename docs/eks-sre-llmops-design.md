@@ -56,9 +56,10 @@ projects split the subject deliberately so that neither repeats the other:
 
 The application layer is **done and measured**; nothing is deployed anywhere.
 
-**Changed in stage 1-4 (2026-09-23).** That sentence is the baseline of 2026-09-21 and is kept as written, the
-way this document keeps everything else. It is no longer the present: the cluster, the GitOps tree and the
-pipeline are deployed, and criteria #1, #3, #4, #5 and #6 are closed. Current status is read from
+**Changed in stages 1–8 (2026-09-22/23).** That sentence is the baseline of 2026-09-21 and is kept as written, the
+way this document keeps everything else. It is no longer the present: all eight stages have run on AWS
+(2026-09-22/23); criteria #1, #3–#6, #8–#12 and #14 are closed with quoted evidence, #2, #15 and #16 ran unquoted,
+#7 is partly measured, and #13 (P1) is not built. Current status is read from
 [`docs/evidence/`](evidence/), never from this section.
 
 **What exists in the repository today**
@@ -107,6 +108,10 @@ stage) and the `MLops-Common` submodule (dropped once CI no longer uses the on-p
 - Control of a subdomain. This project takes `anime.recruitai.io.vn` under the Route 53 public zone that
   Medical's `shared` stack already owns; Anime reads that zone with a `data` source and only ever creates
   records inside it. See [§11](#11-resolved-decisions) for the coupling this accepts.
+
+**Changed in stages 4–6:** k6 and Sloth run in containers from the Makefile, so the workstation needs docker rather
+than either binary, and the Makefile reads the Rollout with `kubectl` and `jq`, so the `kubectl argo rollouts`
+plugin is not needed.
 - Admin on this GitHub repository, to create the OIDC trust and the Actions variables.
 - An OpenAI API key (a Gemini API key to run Gemini instead), and a Hugging Face token with the **Inference Providers** permission.
 - A Langfuse Cloud project (free tier) with its public and secret keys.
@@ -372,6 +377,11 @@ the client is told nothing useful. Closing this is a prerequisite for trusting
 [§6](#6-verification-and-evidence-definition-of-done) row 11, and it is the reason the
 diagram above draws an error exit from `HF` as well as from the model.
 
+**Changed before stage 4:** closed. A retrieval failure now raises `UpstreamError(stage="retrieval")`
+(`src/anime/recommender.py`), and the api answers **503 "Retrieval unavailable" with `Retry-After`**, counted in
+`anime_upstream_errors_total{stage}` (`services/api/main.py`, `src/anime/metrics.py`). The diagram above still
+shows the original 500.
+
 **Endpoints**
 
 | Endpoint | Behaviour |
@@ -405,7 +415,7 @@ samples until the first error.
 | Metric | Type | Labels / buckets | Read by |
 |---|---|---|---|
 | `anime_http_requests_total` | Counter | route, method, status | the availability SLI |
-| `anime_http_request_duration_seconds` | Histogram | route; buckets 0.1 … 32 s, **to be refined** — see below | the latency SLI, and the canary analysis |
+| `anime_http_request_duration_seconds` | Histogram | route; buckets 0.1 … 32 s, **to be refined** — see below (refined before stage 4: 16 buckets) | the latency SLI, and the canary analysis |
 | `anime_http_requests_in_flight` | Gauge | — | KEDA |
 | `anime_retrieval_duration_seconds` | Histogram | — | dashboards: retrieval versus generation |
 | `anime_llm_request_duration_seconds` | Histogram | model, outcome | dashboards, and the error accounting above |
@@ -431,6 +441,10 @@ passes. The same coarseness makes T jump from 2 s to 4 s to 8 s. The buckets bec
 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 6, 8, 16, 32 s: the estimate then lands at 1.45 s, the gate trips at about 1.22×,
 and T can be 2.5 or 3. That is a change to `src/anime/metrics.py`, made in the build before the capacity run;
 until it lands, the gate's real threshold is the bucket geometry, not the parameter.
+
+**Changed before stage 4:** both changes landed. `/healthz`, `/readyz` and `/metrics` are `async def`
+(`services/api/main.py`), and the buckets are the sixteen above (`LATENCY_BUCKETS` in `src/anime/metrics.py`); the
+1.22× is computed, not measured.
 
 **Configuration** is environment variables only, read once into a frozen `Settings` in `src/anime/config.py`:
 `LLM_PROVIDER` (`gemini` default in the app, `openai` in the cluster), `MODEL_NAME` (by provider:
@@ -551,10 +565,17 @@ Two gaps against the GenAI conventions remain and are closed with the capture fl
 conventions are themselves still in development status, so the attribute set is checked against the version pinned
 at build time.
 
+**Changed in stage 8:** both gaps are closed. The generation span is `CLIENT` and carries `gen_ai.provider.name`
+(`src/anime/recommender.py`; `docs/evidence/tracing.md` shows `SPAN_KIND_CLIENT` and `openai`).
+
 Because those attributes are emitted directly, `opentelemetry-instrumentation-langchain` (OpenLLMetry) is
 **optional here, not required**. It would add library-level spans; it also tracks LangChain's own versions
 closely, and the original design listed a version mismatch as a risk. The manual spans are the primary path
 and the library is an addition to evaluate, not a dependency to plan around.
+
+**Changed in stage 8:** capture is built — the prompt and completion, as the conventions' two message attributes and Langfuse's two
+equivalents, behind `OTEL_CAPTURE_CONTENT`, on in this
+deployment's chart (`tracing.captureContent`). The paragraph below is the reasoning as first written.
 
 **Prompt and response capture does not exist yet, and without it the Langfuse export is close to pointless.**
 No span carries the prompt or the completion: `recommender.py` sets `rag.*` and `gen_ai.*` numbers and nothing
@@ -576,6 +597,9 @@ from both, not read back the next day.
 overview, an LLM dashboard (latency split into retrieval and generation, tokens per minute, cost per 1,000
 requests) and a rollout dashboard. Metric panels link to example traces through exemplars, configured on the
 Prometheus datasource as above.
+
+**As built (stage 8):** one dashboard as code, *Anime — LLM* (`deploy/dashboards/anime-llm.yaml`): cost per 1,000,
+tokens per minute, p95 by stage, and span p95 with exemplars. The SLO and rollout dashboards were not built.
 
 **The cost panel reads real models only.** `config/pricing.yaml` prices the `fake` model identically to the real
 one, so a panel summing cost across every `model` label would add fabricated dollars from every drill. The panel
@@ -652,7 +676,8 @@ budget an alert should catch, times the period, divided by its long window: 2% o
 13.44. The familiar 14.4, 6, 3 and 1 are the same budget shares over 720 hours. Sloth derives the 28-day set —
 13.44, 5.6, 2.8 and 0.93 — when it is run with a 28-day period; its default is 30 days, so the period has to be set
 in the command CI re-runs as well, or the committed rules quietly carry the 30-day factors (**to be verified**
-against the Sloth version in use). These are the numbers the generated rules will contain, and any drill arithmetic
+against the Sloth version in use). (Verified in stage 6: the Makefile passes `--default-slo-period=28d`, and the
+generated rules carry 13.44 and 5.6 — `docs/evidence/slo.md`.) These are the numbers the generated rules will contain, and any drill arithmetic
 uses them.
 
 **What the SLO is on this platform, and what it is not.** The cluster lives for a few hours a day and its metrics
@@ -666,7 +691,9 @@ the drill that fires the alert. An alert that arrives with no instructions is an
 
 **The alert drill, and why `FAULT_RATE=0.5`.** A drill runs a version with **both** `LLM_PROVIDER=fake` **and**
 `FAULT_RATE=0.5`, **promoted straight to all traffic** — `kubectl argo rollouts promote --full`, which skips the
-remaining steps and their analyses — and measures time-to-alert.
+remaining steps and their analyses — and measures time-to-alert. (**Changed in stage 8:** the controller consumes
+that flag once, so a Rollout can pause again at a later step; mode switches promote until `Healthy` —
+`docs/evidence/tracing.md`.)
 All traffic, because the alert reads the error ratio across the whole service: held at a 10% canary step, 50%
 errors become 5% overall — a burn rate of 10×, under the 1h/5m pair's 13.44×, so that pair never fires, and above
 the 6h/30m pair's 5.6× only after more than an hour of it (computed) — longer than a drill, so the silence in
@@ -689,7 +716,7 @@ things — the first how long the rule takes to *notice* a burn, the second how 
 a page — and the record states which one it is.
 
 One hour of clean traffic is not enough to make the *calibrated* pair the one that fires. Sloth writes both fast
-pairs into a single page alert, joined by `or` (**to be verified** against the generated file), so the drill cannot
+pairs into a single page alert, joined by `or` (**to be verified** against the generated file; verified in stage 6), so the drill cannot
 choose a pair; whichever crosses first fires the page. In a ratio of rates, hours with no traffic count for nothing,
 so what matters is how much clean traffic the store holds, not how old it is. With one clean hour, the 6-hour
 window holds that hour plus the fault and crosses 5.6× after about 4 minutes, before the 1h/5m pair's 8 — the page
@@ -703,6 +730,10 @@ of the fault either way, as `[TICKET]` messages, and are recorded as uncalibrate
 three. By the arithmetic above, the 6h/30m pair then probably pages first, at about 4 minutes. The 1h/5m pair's
 own crossing, about 8 minutes, is still read from its condition: one full clean hour is all its 1-hour window needs.
 The evidence records both and which paged; the CV claims only the time to the page.
+
+**Changed after the drill (2026-09-23):** the prediction was wrong. The store held hours of earlier clean traffic,
+so the 6h/30m pair's 6h leg reached only 5.30 against 5.6 and could not win; the calibrated **1h/5m pair paged, at
+9 m 30 s** (`docs/evidence/slo.md`).
 
 **Time-to-alert is a sum, recorded in parts:** the scrape that first carries failing requests; the recording
 rules that turn counters into burn-rate ratios, evaluated on their own interval; the alert rule's evaluation that
@@ -809,7 +840,7 @@ the failed measurement value, and the share of requests that saw an error while 
 ```mermaid
 flowchart LR
     PODS["anime-api pods"] -->|"anime_http_requests_in_flight"| PROM["Prometheus"]
-    PROM --> TRIG["KEDA trigger<br/>sum(in_flight), AverageValue<br/>target per pod from #7"]
+    PROM --> TRIG["KEDA trigger<br/>sum(in_flight), AverageValue<br/>target per pod from #7<br/>as built: 30, below the 40-thread pool"]
     TRIG --> SO["ScaledObject<br/>min 2 · max 8<br/>scale-down window set explicitly"]
     SO -->|"scales the Rollout"| PODS
     PODS -->|"a pod that does not fit<br/>stays Pending"| CAS["Cluster Autoscaler<br/>node group 2 to 4"]
@@ -878,12 +909,17 @@ time while the pod has already been told to stop. Without a short `preStop` dela
 longer than the drain, every scale-in returns errors to requests still on their way — errors the SLO would count.
 The chart sets a 15-second `preStop` sleep, a 45-second grace period, and a 30-second target-group deregistration
 delay instead of the ALB's default 300. Whether 15 seconds covers the controller's deregistration is **to be
-verified** by the error ratio during the scaling run's scale-in.
+verified** by the error ratio during the scaling run's scale-in. (Verified in stage 7: 0 of 4,935 requests failed
+during scale-in, `docs/evidence/scaling.md`.)
 
 **The trigger's threshold comes from stage 4, not from this page.** The `4` below is a placeholder. The
 capacity run measures, at the point where p95 breaks away, how many requests each pod had in flight — which
 by Little's law is the rate per pod times the latency. The trigger is set some way below that, so scaling
 starts before the knee rather than at it. A threshold chosen before that number exists is a guess.
+
+**Changed in stage 4:** the knee's in-flight reading did not reproduce (170.5 against 117.5), so the trigger is
+**30**, set below the limit that reading stood in for: the 40-thread pool, one request per thread
+(`deploy/charts/anime-api/values.yaml`, `docs/evidence/load.md`).
 
 **k6 scripts (`loadtest/k6/`)**
 
@@ -894,6 +930,9 @@ starts before the knee rather than at it. A threshold chosen before that number 
 | `steady.js` | fake, 20 RPS constant arrival | Traffic for the canary analysis and the alert drill |
 
 Summaries are saved with `k6 --out json` into `docs/evidence/loadtest/`.
+
+**As built:** summaries are saved with `--summary-export` into `~/anime-evidence/` on the ops workstation (`Makefile`),
+and the numbers that matter are copied into `docs/evidence/*.md`. There is no `docs/evidence/loadtest/`.
 
 ### 4.6 CI/CD (GitHub Actions, `.github/workflows/`)
 
@@ -934,7 +973,8 @@ above zero, so every run that passes records zero by construction. Two things do
 CRITICAL beside **fixable** CRITICAL, so a gate that passes because nothing is fixable is visibly different
 from one that passes because nothing is there. And run a **positive control** once: a build with the
 severity threshold lowered until a finding *with* a fix is in scope, which must go red. Until that run exists
-the gate is reported as unproven, not as passing. One more trap from Medical: the gate must be the scan
+the gate is reported as unproven, not as passing. (**Changed in stage 3:** the positive control ran and went red at
+MEDIUM, 5 fixable findings per image — `docs/evidence/cicd.md`.) One more trap from Medical: the gate must be the scan
 command itself — `trivy convert`, used to re-read a saved report, has no `--ignore-unfixed` at all.
 
 **Keyless signing.** `cosign sign --yes <digest>` with `id-token: write`. The identity in the certificate is this
@@ -1145,7 +1185,7 @@ address, which clears within the record's TTL.
 | Failure | Behaviour |
 |---|---|
 | Model provider 429 or 5xx (Gemini or OpenAI) | 503 with `Retry-After`, counted in `anime_llm_request_duration_seconds{outcome="error"}` and in the 5xx SLI. On Gemini the retry is the client's own (`max_retries=1`); whether that means one retry or one attempt, and whether it jitters, is the library's behaviour and **no test in this repository covers it**. On OpenAI there is none: one call, and its failure is the 503 (tested in `tests/test_providers.py`). The jittered backoff we do own and test is `BatchedEmbeddings._with_retry`, on the embedding path |
-| Hugging Face embedding failure at query time | **Today: 500, with no `Retry-After` and no LLM error metric** — the `rag.retrieve` leg has no handler and `BatchedEmbeddings` re-raises the original exception ([§4.1](#41-the-application)). It reaches the 5xx SLI only through the middleware's status fallback. The fix is to map it to `UpstreamError` like the model path. Readiness reflects only local state either way, so the probe does not flap on an upstream outage |
+| Hugging Face embedding failure at query time | **Changed before stage 4:** 503 "Retrieval unavailable" with `Retry-After`, counted in `anime_upstream_errors_total{stage="retrieval"}`. As first written: **Today: 500, with no `Retry-After` and no LLM error metric** — the `rag.retrieve` leg has no handler and `BatchedEmbeddings` re-raises the original exception ([§4.1](#41-the-application)). It reaches the 5xx SLI only through the middleware's status fallback. The fix is to map it to `UpstreamError` like the model path. Readiness reflects only local state either way, so the probe does not flap on an upstream outage |
 | Index missing or wrong in the image | `/readyz` returns 503, the new pods never become Ready, and the Rollout does not progress. The CI assertion should prevent it reaching here |
 | Spot interruption | Managed node group rebalance handles the termination notice. `minAvailable: 1` PDB on the api; minimum 2 replicas spread across nodes |
 | **Spot interruption during a canary analysis** | The canary ReplicaSet loses a pod mid-window. If a replica survives, the minimum-traffic guard should return `Inconclusive`. If the **last** canary pod goes, its samples age out of the two-minute window and the query then returns an **empty vector** — which the `< 20` comparison cannot evaluate. The measurement errors; enough consecutive errors fail the run, and a failed run **aborts** the release on a capacity event. The guard protects against thin traffic, not absent series; the analysis must treat an empty result as `Inconclusive` — and since Argo Rollouts has no inconclusive condition of its own, that means both `successCondition` and `failureCondition` require a non-empty result before comparing it, so an empty one matches neither (**to be verified** against the version in use). Either way the record must say which happened, because an abort blamed on the release when capacity caused it is a wrong conclusion carried forward |
@@ -1158,7 +1198,7 @@ address, which clears within the record's TTL.
 | Hugging Face unavailable while scaling out, in real mode | A new pod's index load embeds a probe query, so it cannot become ready; scale-out stalls until the provider returns. Existing pods keep serving |
 | AWS Load Balancer Controller unhealthy | No ALB can be created and no weight can be changed: the service is unreachable *and* releases stall. First thing to check when a rollout hangs with no AnalysisRun |
 | OTel Collector or Langfuse unavailable | The SDK's batch exporter drops spans from a bounded queue; requests are unaffected. The collector's `memory_limiter` prevents it from being the thing that runs the node out of memory |
-| Prometheus restarted or its volume lost | Every window starts empty and returns nothing — *no data*, not *no errors* — until samples arrive. After that the longer windows are worse than empty: a 1-day or 3-day `rate()` over a store a few hours old is computed from the hours that exist, so every rule whose long window exceeds the store's age — the 6h/30m page pair as well as both ticket pairs — quietly behaves like a shorter window, keeping its threshold, and can fire on a burst it was designed to ignore. On a stack torn down nightly only the 1h/5m pair is calibrated for most of a session, and the drill is arranged — three hours of clean traffic first — so that it is the branch that fires first, which the record confirms from each window's burn rate. (28 days is the budget period, not any rule's range.) See [§6](#6-verification-and-evidence-definition-of-done) |
+| Prometheus restarted or its volume lost | Every window starts empty and returns nothing — *no data*, not *no errors* — until samples arrive. After that the longer windows are worse than empty: a 1-day or 3-day `rate()` over a store a few hours old is computed from the hours that exist, so every rule whose long window exceeds the store's age — the 6h/30m page pair as well as both ticket pairs — quietly behaves like a shorter window, keeping its threshold, and can fire on a burst it was designed to ignore. On a stack torn down nightly only the 1h/5m pair is calibrated for most of a session, and the drill is arranged — three hours of clean traffic first — so that it is the branch that fires first, which the record confirms from each window's burn rate. (As run: one clean hour on a 9.67 h store, and the 1h/5m pair fired — `docs/evidence/slo.md`.) (28 days is the budget period, not any rule's range.) See [§6](#6-verification-and-evidence-definition-of-done) |
 
 ## 6. Verification and evidence (definition of done)
 
@@ -1216,19 +1256,25 @@ Two files from the original repository are still present and are removed by the 
 
 `app/app.py` and `pipeline/` were already removed by the app split; `services/ui` and `src/anime` replaced them.
 
+**As built:** both are removed — neither is in `git ls-files`, and there is no `.gitmodules`. `eval/` and `eval.yml`
+are P1 and not built; `.github/workflows/` holds `ci.yml` and `index-negative.yml`. `docs/interview/` was added
+for the revision deck.
+
 ## 8. Make targets and teardown
 
 **None of these exist yet.** They are the interface the build stages are written against.
+
+**As built:** the targets are in the `Makefile`; the differences are marked in the table.
 
 | Target | What it does |
 |---|---|
 | `make shared` | `terraform apply` on the stack that survives a teardown: ECR, secrets, the OIDC role, the ACM certificate |
 | `make infra` | `terraform apply` on the cluster stack: VPC, EKS, nodes, the WireGuard gateway |
 | `make bootstrap` | Argo CD and the root app-of-apps, **after `make tunnel` is open** |
-| `make up` | `make shared`, `make infra`, `make tunnel`, `make bootstrap`, in that order |
+| `make up` | `make shared`, `make infra`, `make tunnel`, `make bootstrap`, in that order. **As built:** it only prints the order — the tunnel has to stay open in its own window |
 | `make down` | Delete **every Ingress** first — five: one public, four in the internal group — and wait for the controller to remove both load balancers and their target groups, then delete the remaining Argo CD Applications, then **every PersistentVolumeClaim** — claims made from a StatefulSet's templates survive the deletion of their Application, and their EBS volumes would outlive the cluster, unreachable and billed — then `terraform destroy` on the `cluster` stack only |
 | `make loadtest-baseline`, `make loadtest-ramp` | The k6 runs of [§4.5](#45-autoscaling-and-load-testing) |
-| `make drill-canary`, `make drill-alert` | The two drills |
+| `make drill-canary`, `make drill-alert` | The two drills. **As built:** not targets; the drills run from the delivery and SLO guides with `make loadtest-steady`, `make rollout` and `make promote-full` |
 | `make tunnel` | SSM port-forward to the private EKS endpoint, through the WireGuard gateway. Held open in a second window, exactly as on Medical |
 | `make vpn-config` | Print a WireGuard client profile for a new operator, with the gateway named `vpn.anime` |
 
@@ -1252,7 +1298,7 @@ stack table reads out — and each ends with its own evidence.
 | 4 | k6 `baseline.js` and `ramp.js` against the Prometheus that has been running since stage 2; **T is measured here** | #6, #7 | [load](4-load/README.md) |
 | 5 | Argo Rollouts, AnalysisTemplate, ALB traffic routing; the api's `Deployment` becomes a `Rollout`; the promotion and rollback drills | #8, #9 | [delivery](5-delivery/README.md) |
 | 6 | Sloth SLOs, Alertmanager to Discord, runbook entries, the alert drill | #10 | [slo](6-slo/README.md) |
-| 7 | KEDA and the api's `ScaledObject`, its threshold taken from #7; the Cluster Autoscaler; re-run the ramp against both | #14 | [scaling](7-scaling/README.md) |
+| 7 | KEDA and the api's `ScaledObject`, its threshold taken from #7 (as built: 30, below the 40-thread pool, because #7's in-flight reading did not reproduce); the Cluster Autoscaler; re-run the ramp against both | #14 | [scaling](7-scaling/README.md) |
 | 8 | OTel Collector, Tempo, Langfuse export, cost dashboard | #11, #12 | [tracing](8-tracing/README.md) |
 | 9 (P1) | `eval.yml` and the golden set | #13 | [cicd](3-cicd/README.md) |
 

@@ -225,7 +225,8 @@ workstation, through the tunnel. That is the first check of every session in eve
 through the tunnel.
 
 **Reasons, but does not prove:** that the API server answers from **nowhere else**. That follows from the
-endpoint setting and the security groups; no test in this stage tries to reach it from outside and fails.
+endpoint setting and the security groups. One direct call from outside the cluster's VPC was tried and timed out
+([evidence](../evidence/terraform.md)); that shows one path fails, not every path.
 
 **Assumes, until time or a later stage says otherwise:**
 

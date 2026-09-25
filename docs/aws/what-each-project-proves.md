@@ -34,7 +34,7 @@ Both designs say this themselves, and split the subject deliberately so neither 
 | Building a control plane, and a second run that changes nothing | Medical | #2 | **measured** | `M: docs/evidence/ansible.md` |
 | Surviving the loss of a control-plane node | Medical | #3 | **measured** | `M: docs/evidence/ansible.md` |
 | etcd backup, and a timed restore | Medical | #12 | **measured** | `M: docs/evidence/drills.md` |
-| A Kubernetes upgrade run as a procedure | Medical | #14 | **partly** — the patch path only; the minor upgrade #14 asks for has not run | `M: docs/evidence/drills.md` |
+| A Kubernetes upgrade run as a procedure | Medical | #14 | **not measured** — `upgrade.yml` exists and passed `--syntax-check`, but 1.36.4 had no newer patch to move to, so it has not run; the minor upgrade #14 asks for would need Rancher moved first | `M: docs/evidence/drills.md` |
 | CI a team hosts itself | Medical | #8 | **measured** | `M: docs/evidence/jenkins.md` |
 | Signing with a key you own, and refusing unsigned images at admission | Medical | #9, #13 | **measured** | `M: docs/evidence/jenkins.md`, `drills.md` |
 | Certificates issued and renewed by something you operate | Medical | — (no criterion of its own) | **partly** — configured and in use; the capture is listed as still to record | `M: docs/evidence/gitops.md` |
@@ -45,7 +45,7 @@ Both designs say this themselves, and split the subject deliberately so neither 
 | One image split in two, and both measured | Anime | #4 | **measured** | `A: docs/evidence/cicd.md` |
 | A check that can say no, proven by making it fail | Anime | #5 | **measured** | `A: docs/evidence/cicd.md` |
 | A latency objective taken from real traffic, not chosen | Anime | #6 | **measured** | `A: docs/evidence/load.md` |
-| The capacity of a known deployment | Anime | #7 | **planned** — the run that gives it has not produced a valid number yet | `A: docs/evidence/load.md` |
+| The capacity of a known deployment | Anime | #7 | **partly** — the 93.9 req/s ceiling is sound; the capacity figure's validity condition failed in both runs | `A: docs/evidence/load.md` |
 | A GitOps tree that converges, and HTTPS and VPN-only admin UIs | Anime | #2, #15, #16 | **run, recorded unquoted** — the checks ran and matched; the output was not captured | `A: docs/evidence/gitops.md` |
 | A release that judges itself | Anime | #8 | **measured** | `A: docs/evidence/delivery.md` |
 | A release that rolls itself back | Anime | #9 | **measured** | `A: docs/evidence/delivery.md` |
@@ -54,7 +54,7 @@ Both designs say this themselves, and split the subject deliberately so neither 
 | Cost and latency per request, for an LLM call | Anime | #11, #12 | **measured** | `A: docs/evidence/tracing.md` |
 
 `A:` is this repository, `M:` is Medical-RAG-Chatbot. **Read the status column, not the path**: a file can exist
-and still not hold the criterion — Anime's `load.md` holds #6 while #7 inside it is pending, and Medical's
+and still not hold the criterion — Anime's `load.md` holds #6 while #7 inside it is only partly measured, and Medical's
 `gitops.md` names captures it has not taken. Only a row marked **measured** may be spoken in the past tense.
 Statuses are as of 2026-09-23; the evidence files are the live version.
 
@@ -81,7 +81,8 @@ Two things that list does not say, and that an interview will reach for:
 
 - **Why CPU is the wrong signal here.** Under load this service's CPU stays near a fifth of a core per pod while
   its thread pool saturates — the threads are asleep waiting on the provider. A CPU-based autoscaler would react
-  late or never, which is why the threshold comes from in-flight requests (#7 feeds #14).
+  late or never, which is why the trigger is in-flight requests, with a threshold (30) set below the 40-thread
+  pool that #7's runs corroborate.
 - **That managed services must be wired, not switched on.** An ALB built from an Ingress, one IngressGroup for
   four interfaces, readiness gates, external-dns writing the names, ACM on the listener, and one IAM role per
   controller's ServiceAccount — each with its own failure modes, several of which this repo has hit and
@@ -98,7 +99,7 @@ detail that differs, and do not tell the second version unless asked.
 | Argo CD app-of-apps with sync waves | ordering a cluster's own components into existence | the health check that requires Synced as well as Healthy, and `ignoreDifferences` |
 | Secrets that never enter Git or state | values typed into Secrets Manager, rights from the node role | the same, with rights scoped per ServiceAccount through Pod Identity |
 | Internal interfaces on a VPN only | ingress-nginx allowing VPC addresses, in front of an internal NLB | a security group on an internal ALB, and a check run from the laptop both ways |
-| Evidence for every claim | the drills, and what they superseded | the same discipline, including a load run discarded by its own rule |
+| Evidence for every claim | the drills, and what they superseded | the same discipline, including a capacity figure whose own validity rule failed, recorded as failed |
 
 ## If asked, answer from
 
@@ -139,8 +140,8 @@ and both designs name the ones they knowingly dropped.
 
 **Read this from `docs/evidence/`, not from this page.** A criterion's evidence file exists when the stage that
 produces it has run; a row in the matrix above whose path does not exist yet is designed, not proven. As a
-starting point: Medical is built and its drills phase is done; Anime, at the time of writing, has built the
-cluster, the GitOps tree and the pipeline, and is part-way through the load stage.
+starting point: Medical is built and its drills phase is done. Anime has run all eight stages (2026-09-22/23); #7
+is partly measured, #13 (P1) is not built, and the timed rebuild (M8) is pending.
 
 Saying "designed" out loud about the parts that are designed costs nothing. Saying "built" about them is the
 one thing an interviewer can check in a minute, from the repository itself.

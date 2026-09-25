@@ -7,7 +7,7 @@ Every number in the CV's Anime entry, with the file it came from and the mode it
 |---|---|---|---|---|
 | `[T-SLO]` | M1 | **8 s** | real: openai `gpt-4o-mini` | `t-value.txt`, from `t-buckets.txt` (load 2.2), 2026-09-23 |
 | `[N-BASELINE]` | M1 | **230** | real: openai `gpt-4o-mini` | `t-count.txt` |
-| `[KNEE-RPS]` | M2 | **88–89 req/s**, ceiling **93.9** | fake, 2 replicas | `ramp-rate.txt`, `ramp-p95.txt` (load 3.4), two runs |
+| `[KNEE-RPS]` | M2 | ceiling **93.9 req/s** (sound, both runs); capacity **88–89** carries a failed validity condition — **quote the ceiling** | fake, 2 replicas | `ramp-rate.txt`, `ramp-p95.txt` (load 3.4), two runs; see [load](load.md#7--capacity-partly-measured) |
 | `[INFLIGHT-KNEE]` | M2 | **not reproducible** — 170.5 and 117.5; the threshold comes from the 40-thread pool instead | fake, 2 replicas | `ramp-inflight.txt`; see [load](load.md#what-the-two-runs-do-not-establish-and-why-a-third-was-not-run) |
 | `[T-ABORT]` | M3 | **167 s** | fake, 20 RPS | `rollback-time.txt` (delivery 4.2), 2026-09-23 |
 | `[AFFECTED-PCT]` | M3 | **1.36%** | fake, 20 RPS | `rollback-affected.txt` (delivery 4.3), 2026-09-23 |
@@ -15,6 +15,8 @@ Every number in the CV's Anime entry, with the file it came from and the mode it
 | `[PODS-MAX]` | M5 | **8** | fake, ramp to 267 req/s | `scaling-desired.txt`, `scaling-ready.txt`, 2026-09-23 |
 | `[NODES-MAX]` | M5 | **3** | fake, ramp to 267 req/s | `scaling-nodes.txt`, 2026-09-23 |
 | `[ERR-SCALEIN]` | M5 | **0** of 4,935 | fake, RPS=5 return | k6 `failed`, 2026-09-23 |
+| `[P95-2POD]` | M2 | **15.6 s** at 120 req/s, two fixed pods | fake, 2 replicas | `ramp-p95.txt` (load 3.4), run 2, 2026-09-23 |
+| `[P95-SCALED]` | M5 | **1.44–1.47 s** at 267 req/s, autoscaled | fake, ramp | `scaling-p95.txt`, 2026-09-23 |
 | `[COST-PER-1K]` | M6 | **$0.4186** | real: openai `gpt-4o-mini` | `cost-per-1000.txt`, prices read 2026-09-22 (tracing 3.2) |
 | `[N-DRILL]` | M7 | **6,343** | fake, 20 RPS, 5 min | `m7-counts.txt`, 2026-09-23 |
 | `[LF-LEAK]` | M7 | **0** distinct traces | fake | `m7-counts.txt` (`langfuse-count`), 2026-09-23 |

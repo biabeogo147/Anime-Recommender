@@ -1,7 +1,7 @@
 # Measurements for the CV
 
-Eight measurements that turn the bracketed placeholders in the CV's Anime entry (`cv_projects.tex`, outside this
-repository) into numbers. Six of them are taken while running the stage guides, at a step named below; M5 adds one
+Eight measurements that turn the bracketed placeholders in the CV's Anime entry
+(`latex-CV/sections/projects/film-recommender.tex`, outside this repository) into numbers. Six of them are taken while running the stage guides, at a step named below; M5 adds one
 count here, and M7 and M8 have their own commands. Every result goes in [`cv.md`](cv.md), with the file it came from.
 
 Each measurement says what it proves, and what a false pass would look like. A number whose conditions are not met
@@ -116,7 +116,8 @@ make -s prom AT=$E Q="sum(increase(anime_http_requests_total{route=\"/recommend\
 } | tee ~/anime-evidence/scaling-errors-scalein.txt
 ```
 
-Record `failed` as `[ERR-SCALEIN]`, with `requests` beside it in `cv.md` (about 9,000). If the server-side count is
+Record `failed` as `[ERR-SCALEIN]`, with `requests` beside it in `cv.md` (about 9,000 for a full 30 minutes; the
+recorded run served 4,935). If the server-side count is
 lower than `failed`, the difference is failures the load balancer answered for gone pods, which is exactly what this
 checks.
 
@@ -232,7 +233,7 @@ the ACM certificate, the secrets), so the CV says "from an empty cluster stack".
 
 ## What each result changes in the CV
 
-| Result | Edit in `cv_projects.tex` |
+| Result | Edit in `latex-CV/sections/projects/film-recommender.tex` |
 |---|---|
 | M1 | Replace `[T-SLO]` and `[N-BASELINE]` |
 | M2 valid | Replace `[KNEE-RPS]` and `[INFLIGHT-KNEE]` |

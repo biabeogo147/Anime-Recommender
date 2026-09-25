@@ -67,7 +67,7 @@ would end while the node is still tainted, and the run would read as "the autosc
 
 ## What the users saw: nothing
 
-Across **224,396 requests** at up to 267 req/s — three times what two pods sustain:
+Across **224,396 requests** at up to 267 req/s — nearly three times the 93.9 req/s two pods can serve:
 
 | Reading | Value |
 |---|---|
@@ -76,8 +76,9 @@ Across **224,396 requests** at up to 267 req/s — three times what two pods sus
 | p95 at low load in stage 4, for comparison | 1.43 – 1.45 s |
 | k6 dropped iterations | **0** (`PRE_VUS=800`, peak use 340) |
 
-Latency never moved. The queue that stage 4 measured at 15.6 s under the same offered rate never formed, because
-pods were added before it could. That is the criterion stated as a user would feel it: not "the cluster scaled",
+Latency never moved. Stage 4's ramp, two fixed pods with no autoscaler, ended at a p95 of **15.6 s** — and it did
+that at **120 req/s**, less than half the rate here ([load](load.md#the-two-runs)). Two pods at 267 req/s would
+have been worse still. The queue never formed here because pods were added before it could. That is the criterion stated as a user would feel it: not "the cluster scaled",
 but "the load tripled and nobody noticed".
 
 ## Scale-in

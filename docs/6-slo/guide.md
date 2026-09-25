@@ -15,10 +15,10 @@ Machines: **laptop** (git, browser), **ops** (inside tmux; start each block with
 cluster time: one hour of clean traffic, then the fault and its recovery.
 
 **This build runs the short drill.** Design §4.3 describes three clean hours, which let the calibrated 1h/5m pair fire
-first. Here there is about one clean hour, so the 6h/30m pair will probably fire first, at about 4 minutes. The page then
-proves that a fast burn reaches a person, and how long that took from the fault. The calibrated 1h/5m pair is still
-measured: its 1-hour window holds a full clean hour, so its own crossing time (3.4) is the calibrated one, about
-8 minutes. The evidence records both, and which paged; the CV claims only the time to the Discord page.
+first. Here there is about one clean hour. Expect the 1h/5m pair in about 9 minutes: the 6h/30m pair cannot win on a
+store that already holds hours of clean traffic (measured 5.30 against 5.6, 2026-09-23; section 3.3). The page proves
+that a fast burn reaches a person, and how long that took from the fault. The evidence records each window's burn
+rate and which pair paged; the CV claims only the time to the Discord page.
 
 Criterion closed ([design §6](../eks-sre-llmops-design.md#6-verification-and-evidence-definition-of-done)):
 - **#10:** the fast-burn page reaches Discord during the fault drill. The evidence is the time to alert in its parts,
@@ -375,7 +375,7 @@ Report the files in `~/anime-evidence/` whose names start with `alert`, and the 
 | Failed count above 0 | Discord refused the webhook | The URL in `anime/alerting`; test it with `curl` on ops |
 | Rollout not Healthy at the end of 3.1 | A release (the merge's new digests) paused on an inconclusive canary | Let it walk under the running k6, or promote it as in stage 5, 3.4; then restart the clean hour |
 | `NO PAGE WITHIN 20 MINUTES` | The fault is not reaching all traffic, or not injected | The error ratio in 3.4; the Rollout's template must show `FAULT_RATE=0.5` and `LLM_PROVIDER=fake` |
-| The page came from 6h/30m | Expected in the short drill: one clean hour is too little for the 1h/5m pair to win | Record it as it is; only the three-hour drill of design §4.3 would change it |
+| The page came from 6h/30m | Possible only on a store holding about one clean hour, for example just after a rebuild; on 2026-09-23 the 1h/5m pair won | Record it as it is, with each window's burn rate |
 | 3.5 `STOPPED` | The revert canary was judged against the faulty stable and failed, or paused | Read `make -s rollout`; push it through with `promote-full`, since the fault is what is being removed |
 | The latency alert fires in the drill too | Faulty requests take as long as good ones, so latency should not burn | Report it with the latency burn rates; check T in the spec |
 

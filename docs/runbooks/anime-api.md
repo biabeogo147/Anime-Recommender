@@ -61,8 +61,10 @@ kubectl -n anime get pods -l app=anime-api -o wide
 kubectl get nodes
 ```
 
-**Resolved when** the 5-minute burn rate is back below 1, and the page clears on its own. Record the cause, the start
-and end times, and the budget spent in the evidence or an incident note.
+**Resolved when** the 5-minute burn rate is back below 1, and the page clears on its own. **The page can stay up
+about 26 minutes after the fix**, held by the 6h/30m pair while its 30-minute window ages the fault out (measured
+26 m 06 s, [`slo.md`](../evidence/slo.md)); do not go looking for a second fault. Record the cause, the start and end
+times, and the budget spent in the evidence or an incident note.
 
 ---
 

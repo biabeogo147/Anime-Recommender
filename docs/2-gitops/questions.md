@@ -10,15 +10,16 @@ của stage này đều cần một phép kiểm thứ hai đi kèm.
 | Phần | Kiểm tra điều gì |
 |---|---|
 | **A. Phỏng vấn** | Bạn trình bày được các quyết định của stage và lý do đằng sau từng quyết định, bằng lời của mình |
-| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về từng file trong `deploy/argocd/`, và chỉ viết được khi code đã có |
+| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về từng file trong `deploy/argocd/`; code đó đã có, nên phần này giờ viết được |
 
 Bộ liên quan: [tổng quan project](../common/questions.md), [managed so với self-managed](../aws/questions.md),
 [Terraform](../1-terraform/questions.md), [CI/CD](../3-cicd/questions.md),
 [progressive delivery](../5-delivery/questions.md). Ý tưởng của stage: [README](README.md) ·
 [concepts](concepts.md).
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **đã chạy trên cụm nhưng chưa viết evidence**:
-kể việc đã làm được, nhưng #2, #15, #16 chưa có file bằng chứng nên đừng đọc ra con số. Câu nào bắt bạn phải mở
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **đã chạy, và evidence ghi cả ba criteria #2,
+#15, #16 là "pass as run, unquoted"**: phép kiểm đã chạy và khớp guide, nhưng terminal output không được giữ lại. Kể
+việc đã làm thì được — kèm câu "tôi không giữ bản ghi" — và chỉ đọc ra con số mà evidence có: 8 trên 8 Application. Câu nào bắt bạn phải mở
 design mới trả lời được thì đó là câu cần đọc lại.
 
 ---
@@ -126,3 +127,9 @@ load balancer?
 
 [Đáp án](answers.md) · [README](README.md) · [Concepts](concepts.md) ·
 [Design §4.7](../eks-sre-llmops-design.md#47-names-tls-and-the-two-ways-in)
+
+---
+
+### A10. Câu đào sâu — phân quyền, không chỉ khả năng tới được
+
+**A10.1** Ai ở trên VPN cũng mở được cả bốn UI. Cái gì xác thực họ?

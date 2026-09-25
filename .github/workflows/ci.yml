@@ -18,7 +18,7 @@ on:
     inputs:
       trivy_severity:
         # The Trivy positive control (design §4.6): run once with a LOWER threshold, e.g. "HIGH,CRITICAL", until a finding
-        # WITH a fix is in scope — that run must go red. Until it has, the gate is reported as unproven, not as passing.
+        # WITH a fix is in scope — that run must go red. It did, at MEDIUM (docs/evidence/cicd.md), so the gate is proven.
         description: "Severities that fail the scan"
         default: CRITICAL
         required: false

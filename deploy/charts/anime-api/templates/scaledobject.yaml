@@ -52,8 +52,8 @@ spec:
       metadata:
         serverAddress: {{ .Values.analysis.prometheus | quote }}
         query: sum(anime_http_requests_in_flight{job="anime/anime-api"})
-        # Set BELOW stage 4's in-flight per pod at the knee, so scaling starts before the knee, not at it (Scaling
-        # A3.2). The value and how it was chosen are in docs/evidence/load.md.
+        # Set below the 40-thread pool per pod, so scaling starts before a queue forms (Scaling A3.2). Stage 4's
+        # in-flight reading at the knee did not reproduce; the value and how it was chosen are in docs/evidence/load.md.
         threshold: {{ .Values.scaling.inFlightTarget | quote }}
         # An empty result is an ERROR, not zero load. By default KEDA reads it as 0 and scales down to the minimum in
         # the middle of whatever load there was, if the api's series vanish (Scaling A6.1).

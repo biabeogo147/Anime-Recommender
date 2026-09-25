@@ -4,9 +4,11 @@
 ngôi thứ nhất, thường là đủ. *Nếu được hỏi thêm* dùng khi người phỏng vấn đào sâu. Dòng **Mẹo** là lời nhắc cho
 bạn, không nói ra. Tham chiếu dạng `SLO A5.2` trỏ tới bộ của stage tương ứng.
 
-Phần app **đã làm và đã đo, chạy local** — nói bằng kinh nghiệm được. Bên dưới nó, tính tới **2026-09-23**: hạ tầng,
-GitOps và CI/CD **đã dựng và đã đo trên AWS** (criteria #1, #3, #4, #5, #6, xem [`docs/evidence/`](../evidence/)) — cũng
-nói bằng kinh nghiệm; canary, SLO, autoscaler và tracing **mới thiết kế** — nói bằng "tôi thiết kế", "tôi chọn". Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật; ghi chú **[kiểm chứng]** là
+Phần app **đã làm và đã đo, chạy local** — nói bằng kinh nghiệm được. Bên dưới nó, tính tới **2026-09-23**: **cả tám stage đã dựng
+và đã đo trên AWS** — **mười một** tiêu chí đóng bằng số đo trích dẫn được, ba tiêu chí nữa (#2, #15, #16) pass nhưng không giữ output (#1, #2, #3, #4, #5, #6, #8, #9, #10, #11, #12, #14, #15,
+#16, xem [`docs/evidence/`](../evidence/)), #7 **đo được một nửa**, và #13 — cổng eval chất lượng, hạng P1 — **chưa
+làm**. Nên nói bằng kinh nghiệm được, với đúng ba chỗ phải nói khác đi: #7 nói rõ nửa nào trượt, #13 nói là chưa
+làm, và #2/#15/#16 nói là đã kiểm nhưng không giữ bản ghi. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật; ghi chú **[kiểm chứng]** là
 hành vi của công cụ cần xác nhận trước khi nói chắc. Số thập phân viết bằng dấu chấm.
 
 Thuật ngữ dùng thống nhất trong bộ này: **phase app** cho phần đã làm; **stage** cho tám giai đoạn hạ tầng; **tiêu chí**
@@ -24,40 +26,105 @@ cho mười sáu điều kiện hoàn thành trong design; **pass sai** cho mộ
 | Fault drill 20% | đúng 80 request 200 và 20 request 503, ba counter khớp nhau | A2.1, A4.4 |
 | Test | 17 test pass, ruff sạch, container chạy UID 10001 | A2.1 |
 
+**Số liệu trên AWS đã có** — từ [`docs/evidence/`](../evidence/), 22–23/09/2026:
+
+| Số | Giá trị | Dùng ở |
+|---|---|---|
+| Tiêu chí đầu tiên được đóng | **#1**, 2026-09-22: 15 / 92 / 2 resource đúng như đã ghi trước, plan lại `No changes.` | A6.1, A7.3 |
+| T, mục tiêu độ trễ | 8 s, từ 230 request thật `gpt-4o-mini` | A1.1 |
+| Trần hai pod | 93.9 req/s, đo hai lần | A1.1 |
+| Canary xấu tự abort | 167 s, 1.36% toàn bộ request lỗi | A1.1 |
+| Page tới Discord | 9 m 30 s, tám phút trong đó là số học cửa sổ | A1.1 |
+| Scale 2 → 8 pod trên 3 node | 224396 request, 0 lỗi, p95 1.44–1.47 s | A1.1 |
+| Chi phí model | $0.4186 mỗi nghìn request, `gpt-4o-mini`, giá đọc 22/09 | A1.1 |
+
 **Còn phải điền:**
 
 | Chỗ cần điền | Lấy từ | Dùng ở |
 |---|---|---|
-| Chi phí một phiên làm việc | Cost Explorer sau phiên đầu | A6.3 |
-| Tiêu chí đầu tiên của hạ tầng được đóng, và con số của nó | Lần dựng đầu | A6.1, A7.3 |
+| Chi phí một phiên làm việc | Cost Explorer, **chưa đọc** | A6.3 |
+| Thời gian dựng lại toàn bộ nền tảng | Phép đo M8, **chưa chạy** | A6.3 |
 
 ---
 
 ## Phần A — Phỏng vấn
 
+### A0. Mở đầu và định hướng
+
+**A0.1** **Ý chính:** "Tôi là backend và AI engineer, hơn hai năm làm sản phẩm chạy thật, năm gần nhất làm hệ thống
+AI — retrieval với LLM, agent workflow, nhận dạng tiếng nói on-device. Phần công việc luôn kéo tôi lại là phần *vận
+hành* thứ mình viết ra: nó hỏng thế nào, ai biết trước, và mất bao lâu để quay về. Nên tôi dựng hai project để tự trả
+lời hai nửa của nghề đó. Medical thì tôi tự dựng Kubernetes bằng kubeadm — etcd, chứng chỉ, nâng cấp, chuỗi cung ứng.
+Anime thì trên EKS — SLO, canary, autoscaling, quan sát LLM. Mỗi stage tôi chỉ coi là xong khi có một phép đo, không
+phải một ảnh chụp màn hình."
+
+**Mẹo:** ba câu, khoảng 45 giây, rồi dừng. Đừng kể số ở đây — để dành cho A1.1.
+
+**A0.2** **Ý chính:** "Vì thứ quyết định một hệ thống AI dùng được hay không, phần lớn nằm dưới model. Ở chỗ làm cũ
+tôi viết service và deploy model, và những lần đau nhất không phải vì model sai — mà vì không ai biết nó đang chậm,
+vì một bản release xấu đi hết 100% traffic, vì không ai đo được một request tốn bao nhiêu. Đó đúng là công việc của
+SRE, nên tôi học nó bằng cách làm và đo chứ không bằng cách đọc."
+
+*Nếu được hỏi thêm:* nền cũ không phải thứ tôi bỏ lại, nó là lợi thế — tôi hiểu thứ mình đang vận hành. Cái trần
+93.9 req/s ở project này là một ví dụ: nó không đến từ CPU hay RAM, nó đến từ việc biết rằng handler đẩy lời gọi model
+vào một thread pool 40 luồng. Một người không đọc code app sẽ đi tìm nó ở nhầm chỗ.
+
+**Mẹo:** nói "đây là công việc tôi muốn làm" bằng *việc đã làm*, đừng bằng nguyện vọng. Và đừng nói xấu chỗ cũ.
+
+**A0.3** **Ý chính:** "Đúng, tôi chưa từng mang pager, và tôi không giả vờ đã từng. Cái tôi làm thay vào đó là dựng
+sẵn những thứ mà một người đi trực cần. Một runbook viết **trước** cái drill đầu tiên bắn alert — bốn bước, mỗi bước
+là một câu lệnh chạy được, không phải một đoạn văn. Một thời gian tới người đã đo được: 9 phút 30, trong đó tám phút
+là số học cửa sổ chứ không phải độ trễ hệ thống. Và một con số tôi cho là quan trọng nhất với người đi trực: **26
+phút 06** để page tự tắt sau khi lỗi đã sửa — vì người không biết trước con số đó sẽ kết luận bản sửa không ăn và đi
+tìm một sự cố thứ hai không tồn tại."
+
+*Nếu được hỏi thêm:* cái tôi *không* có thì tôi nói thẳng: chưa có ca trực, chưa có postmortem thật, chưa có
+dead-man's-switch nên nếu Prometheus chết thì hôm nay tôi không biết. Và chưa có error budget policy — ngưỡng burn
+rate thì có, còn quy tắc "budget dưới mức X thì dừng làm tính năng" thì không, vì trên một nền tảng một người với cụm
+bị huỷ mỗi tối thì một policy như vậy chỉ là diễn.
+
+**Mẹo:** trả lời "chưa, và đây là cái tôi dựng thay vào đó" — kèm đúng ba con số. Người phỏng vấn hỏi câu này để xem
+bạn có phóng đại không, nên phần mạnh nhất của câu trả lời chính là phần bạn nói mình chưa có.
+
+**A0.4** **Ý chính:** "Có, năm câu. Ca trực thật vận hành thế nào, và trung vị một tuần bao nhiêu lần bị gọi? Có
+error budget policy có hiệu lực thật không, hay chỉ có dashboard? Khi một SLO bị vi phạm thì ai sở hữu nó — team làm
+sản phẩm hay một team platform? Khoảng bao nhiêu phần trăm một tuần là toil? Và một thay đổi hạ tầng đi qua pull
+request, hay đi qua terminal của một người?"
+
+**Mẹo:** năm câu này đều là câu chỉ người đã làm mới nghĩ ra, và mỗi câu đều có một chỗ trong project của bạn để đỡ
+nếu họ hỏi lại "sao anh quan tâm cái đó". Chọn hai hoặc ba câu tuỳ thời gian còn lại, đừng đọc cả năm.
+
+---
+
 ### A1. Giới thiệu
 
 **A1.1** **Ý chính:** "Anime Recommender là một app RAG gợi ý anime — workload thì nhỏ, còn chủ đề là vận hành nó như một
 đội SRE: SLO với alert theo burn rate, canary tự rollback, autoscaling theo đúng tín hiệu, và một LLM mà tôi thấy được chi
-phí. Phần app tôi đã làm và đo, chạy local. Trên EKS tôi đã dựng tới stage 4: cụm, cây GitOps và pipeline CI/CD đang
-chạy, năm tiêu chí đã đóng bằng số đo thật — trong đó có mức trễ mục tiêu T = 8 giây, lấy từ 230 request thật. Bốn stage
-còn lại — canary, SLO, autoscaling, tracing — tôi đã thiết kế trọn vẹn nhưng chưa dựng. Nó là bản managed song song với
-Medical, project mà tôi đã tự dựng Kubernetes bằng kubeadm."
+phí. Tôi dựng nó trên EKS và chạy hết tám stage trong hai ngày, mỗi stage đóng bằng một
+phép đo. Hai con số tôi hay mở bằng: một bản release xấu tự abort sau **167 giây**, và một page tới Discord trong
+**9 phút rưỡi**. Hai chỗ chưa trọn thì tôi nói luôn: phép đo capacity mất điều kiện hợp lệ nên tôi chỉ nói được cái
+trần, và cổng eval chất lượng tôi chủ động chưa làm. Nó là bản managed song song với Medical, project mà tôi tự dựng
+Kubernetes bằng kubeadm."
 
-**Mẹo:** ba thì phải nằm trong mười giây đầu — **đã đo ở local**, **đã dựng và đo trên AWS**, **đã thiết kế nhưng chưa
-dựng**. Mọi câu hỏi sau đó sẽ dựa trên nó, nên nói sai thì ở đây là hỏng cả buổi.
+*Nếu được hỏi thêm:* bản năm phút ở A1.2. Danh sách tiêu chí đầy đủ và các con số khác ở bảng đầu bộ này.
 
-**A1.2** **Ý chính:** "App tách thành hai: một API FastAPI giữ index vector 269 anime và gọi Gemini, và một UI
+**Mẹo:** câu này phải gọn — khoảng 50 giây, **hai** con số, không phải tám. Người phỏng vấn sẽ hỏi tiếp; để dành số
+cho lúc đó. Và nói hai chỗ chưa trọn ngay trong một phút đầu, vì mọi câu sau sẽ dựa trên nó.
+
+**A1.2** **Ý chính:** "App tách thành hai: một API FastAPI giữ index vector 269 anime và gọi OpenAI `gpt-4o-mini`
+(Gemini vẫn chọn được), và một UI
 Streamlit mỏng. Phase app sửa sáu lỗi thật và đo kết quả: một image 6.45 GB thành hai image cộng lại 1.18 GB,
 token không lọt vào layer nào, và tôi cố tình làm phép kiểm index thất bại để chắc nó bắt được lỗi.
 
 Rồi tôi thiết kế tám stage hạ tầng, mỗi stage giải quyết thứ stage trước để lại — thứ tự ở A3.4. Ba cơ chế SRE là
 phần lõi. Một: SLO availability 99.5% trên 28 ngày, alert khi burn rate vượt 13.44 lần trên cặp cửa sổ một giờ và
 năm phút. Hai: canary 10, 50, 100 phần trăm, mỗi mức phải có tỉ lệ thành công ít nhất 99% và p95 không quá 1.2
-lần bản stable. Ba: KEDA scale api từ 2 tới 8 pod theo số request đang xử lý, với ngưỡng lấy từ phép đo.
+lần bản stable. Ba: KEDA scale api từ 2 tới 8 pod theo số request đang xử lý, với ngưỡng 30 đặt dưới giới hạn 40 thread
+mỗi pod, mà các lần ramp xác nhận.
 
-Xuyên suốt, mỗi stage có một mục riêng: nó có thể pass mà vẫn hỏng theo cách nào. Tất cả mới là thiết kế; con số đầu tiên của
-hạ tầng sẽ là số resource của Terraform, ghi trước rồi mới so."
+Xuyên suốt, mỗi stage có một mục riêng: nó có thể pass mà vẫn hỏng theo cách nào. Cả tám stage đã dựng và đã chạy trên
+AWS; con số đầu tiên của hạ tầng là số resource của Terraform — 15, 92 và 2 — ghi trước rồi mới so, và plan lại thì không
+đổi gì."
 
 *Nếu được hỏi thêm:* thứ tự ở A3.4, pass sai ở A4.2.
 
@@ -82,13 +149,16 @@ cho vế managed."
 MB — cộng lại 1.18 GB, giảm khoảng 82%. Index 269 anime embed trong 8.5 giây lúc build, và build thất bại nếu đặt
 số mong đợi là 270. Token Hugging Face không xuất hiện lần nào trong history hay trong image xuất ra. Hai request
 `/recommend` thật, qua Gemini, mất 3.0 và 2.7 giây tính cả embedding, ước tính khoảng 0.0025 USD cho cả hai. Một
-fault drill 20% cho đúng 80 request 200 và 20 request 503, ba counter khớp nhau. 17 test pass, container chạy UID
-10001. Trên AWS, tính tới 2026-09-23: hạ tầng, GitOps và CI/CD đã dựng và chạy — năm tiêu chí đã có số, trong đó
-T = 8 giây từ 230 request thật. Còn lại canary, SLO, autoscaling và tracing thì mới thiết kế."
+fault drill 20% cho đúng 80 request 200 và 20 request 503, ba counter khớp nhau. 17 test pass, container chạy UID 10001. Trên AWS, tính tới 2026-09-23: cả tám stage đã dựng và chạy — **mười một** tiêu chí đóng bằng số đo trích dẫn được, ba tiêu chí nữa (#2, #15, #16) pass nhưng không giữ output, trong đó T = 8 giây từ
+230 request thật, một canary xấu tự abort trong 167 giây, và một page tới Discord trong 9 phút rưỡi."
 
-*Nếu được hỏi thêm:* phase app còn nợ vài việc tôi đã ghi rõ: lỗi Hugging Face lúc query đang thành 500 chưa phân
-loại, ba endpoint health và metrics phải thành async, bucket histogram phải mịn hơn — cả ba làm trước stage Load.
-Ghi prompt vào trace thì chưa viết.
+*Nếu được hỏi thêm:* một chi tiết nên nói ra trước khi bị hỏi — ở real mode mỗi request đi **hai** cuộc gọi ra
+ngoài, embedding qua Hugging Face rồi chat qua OpenAI, nên **T = 8 giây là độ trễ của cả hai**, không phải của riêng
+model. Cả hai nhánh đều có phân loại lỗi riêng: `recommender.py` bắt lỗi retrieval thành `UpstreamError(stage="retrieval")`,
+đếm vào `anime_upstream_errors_total{stage}` và trả **503 "Retrieval unavailable"**, còn nhánh model trả 503 "Upstream
+model unavailable". Nhờ nhãn `stage` đó mà runbook bước 2 tách được "provider hỏng" khỏi "index hỏng" khỏi "api tự
+hỏng". Thiết kế §5 giữ nguyên câu cũ là 500 chưa phân loại, kèm một ghi chú "Changed before stage 4".
+Ghi prompt vào trace đã viết, sau cờ `OTEL_CAPTURE_CONTENT` đang bật trong chart.
 
 **Mẹo:** "cộng lại giảm khoảng 82%" — không nói "giảm 90%". 90% chỉ là của api, so một image với một nửa thứ thay nó.
 
@@ -121,7 +191,9 @@ rồi mới thấy thì đắt hơn nhiều — A7.1."
 **A3.1** **Ý chính:** "Ngoài cùng là hai cửa. Một ALB public cho app qua HTTPS, một ALB nội bộ cho bốn UI quản
 trị, chỉ tới được qua WireGuard; cả hai dùng một chứng chỉ ACM. API của Kubernetes không có địa chỉ public nào —
 tôi vào nó bằng tunnel SSM từ ops workstation. Bên trong là EKS với node group Spot từ hai tới bốn node. Argo CD
-kéo mọi thứ từ Git theo wave. Prometheus với rule SLO do Sloth sinh sẵn trong CI và commit vào Git, Alertmanager
+kéo mọi thứ từ Git theo wave. Prometheus với rule SLO do Sloth sinh sẵn — Sloth chỉ chạy trong container; CI chạy
+`make slo-check`, fail nếu file đã commit lệch so với bản sinh lại, và rule đang commit chính là bản CI sinh ra
+(artifact `slo-regenerated`) — Alertmanager
 gửi tới Discord. Argo Rollouts; KEDA và Cluster Autoscaler; OpenTelemetry Collector tới Tempo và Langfuse.
 Terraform giữ phần AWS, chia ba stack theo vòng đời."
 
@@ -129,13 +201,13 @@ Terraform giữ phần AWS, chia ba stack theo vòng đời."
 
 **A3.2** **Ý chính:** "Người dùng vào UI trên `anime`, và UI gọi API. Với một client gọi thẳng API — như k6 —
 request tới ALB public trên `api.anime`, TLS kết thúc ở đó, và listener chia request giữa target group stable và
-canary theo trọng số. Pod api — đăng ký bằng IP — embed câu hỏi qua Hugging Face, tìm trong index, gọi Gemini,
+canary theo trọng số. Pod api — đăng ký bằng IP — embed câu hỏi qua Hugging Face, tìm trong index, gọi OpenAI `gpt-4o-mini`,
 trả lời; cả hai lời gọi ra ngoài đều đi qua NAT. Trên đường đi, histogram ghi latency cho SLI và gate, gauge ghi
 số request đang xử lý cho KEDA, và span đi tới collector."
 
-*Nếu được hỏi thêm:* UI gọi API qua ALB hay qua Service trong cụm là một điểm design còn mở. Nó quyết định
-traffic của người dùng thật có đi theo trọng số canary hay không; drill thì không bị ảnh hưởng, vì k6 gọi thẳng
-`api.anime`.
+*Nếu được hỏi thêm:* UI gọi API qua ALB hay qua Service trong cụm đã chốt ở stage 5: UI gọi Service **stable**
+`anime-api-stable`, nên người dùng thật chỉ gặp canary qua `api.anime`, đúng theo trọng số của ALB
+(`deploy/argocd/root/templates/app.yaml`). Drill thì không bị ảnh hưởng, vì k6 gọi thẳng `api.anime`.
 
 **A3.3** **Ý chính:** "Merge vào `main`. GitHub Actions lint, test, build index và kiểm số tài liệu, build hai
 image, scan, rồi — chỉ trên `main` — đổi token OIDC lấy quyền push, push theo digest, ký keyless, gắn SBOM, và
@@ -196,7 +268,7 @@ chỉ là một định nghĩa, không bao giờ là thứ tôi tuyên bố đã
 **A5.1** **Ý chính:** "Rủi ro có thể chặn ngay từ đầu: tài khoản dùng chung với Medical đang ở gói Free, và gói đó chỉ
 chạy các loại instance free-tier-eligible. Nên tôi kiểm nó đầu tiên: EKS có trong gói, Spot chạy được, nhưng cả bốn
 loại tôi định dùng đều không eligible — nên node group chỉ còn `m7i-flex.large`. Sau đó: giới hạn tier miễn phí của
-Gemini và Hugging Face làm méo phép đo — nên chỉ baseline chạy model thật, còn lại chạy fake và ghi rõ chế độ. Spot
+OpenAI và Hugging Face làm méo phép đo — nên chỉ baseline chạy model thật, còn lại chạy fake và ghi rõ chế độ. Spot
 hết capacity — chỉ còn một loại instance, nên rủi ro này lớn hơn; phương án là cùng loại đó chạy on-demand. Và cấu
 hình chia traffic ở ALB có thể mất nhiều thời gian hơn dự kiến — phương án là canary theo tỉ lệ replica, yếu hơn, và
 bằng chứng sẽ nói vậy."
@@ -227,7 +299,8 @@ do chấp nhận, thay vì để ai đó tự phát hiện."
 không. Rồi tiêu chí #1 — số resource dự kiến ghi ra *trước*, apply, plan lại và không có thay đổi. Và trước khi
 tin bất kỳ con số nào từ Prometheus: target của api phải up và có dữ liệu trên counter tổng."
 
-*Nếu được hỏi thêm:* Terraform A7.2, Load A2.1. Kết quả `[điền: tiêu chí đầu tiên được đóng và con số của nó]`.
+*Nếu được hỏi thêm:* Terraform A7.2, Load A2.1. Tiêu chí đầu tiên được đóng là **#1**, ngày 2026-09-22: 15, 92 và
+2 resource đúng bằng con số tôi ghi ra trước khi apply, và plan lại báo `No changes.` cho cả ba stack.
 
 **A6.2** **Ý chính:** "Chắc chắn rằng con số mà một quyết định đọc là con số về đúng thứ đang được quyết — số của
 canary chứ không phải của stable, ngưỡng đang có hiệu lực chứ không phải ngưỡng viết trên giấy, cặp cửa sổ đã
@@ -240,7 +313,10 @@ cụm chạy. Tôi giữ nó bằng bốn thứ: cụm bị huỷ mỗi tối, S
 cảnh báo ở 50 và 100 USD. Model thật chạy trên tier miễn phí; mọi drill dùng fake provider. Chi phí thật của một
 phiên thì phải đo."
 
-*Nếu được hỏi thêm:* chi phí một phiên `[điền: từ Cost Explorer]`. Phí giờ của control plane **[kiểm chứng: mức hiện tại]**.
+*Nếu được hỏi thêm:* một cụm đang chạy tôi **ước tính** 0.4–0.6 USD một giờ — ước tính, tôi chưa đọc Cost
+Explorer cho một phiên nào. Con số đáng nói là nó đảo ngược trực giác: ở đúng mức tải tôi đã đo, **nền tảng tốn mỗi
+giờ nhiều hơn model tốn mỗi nghìn request**. Đó là lý do thật của việc huỷ cụm khi không dùng, và là lý do không SLO
+nào ở đây được phép nói là đã đạt. Chi phí thật một phiên `[điền: từ Cost Explorer]`. Phí giờ của control plane **[kiểm chứng: mức hiện tại]**.
 
 **A6.4** **Ý chính:** "Đã có trong thiết kế: không có access key AWS nào — CI dùng OIDC, mỗi controller có Pod
 Identity riêng, External Secrets chỉ đọc đúng ba secret có tên. API của Kubernetes không có địa chỉ public. UI
@@ -263,13 +339,13 @@ quan trọng — để đọc được."
 
 ### A7. Nhìn lại
 
-**A7.1** **Ý chính:** "Câu chuyện tôi thích kể nhất: tôi từng nghĩ drill alert chỉ cần một giờ traffic sạch. Tính
-lại, thì với một giờ sạch, cặp 6h/30m chưa hiệu chỉnh sẽ vượt ngưỡng trước cặp 1h/5m, vì cửa sổ sáu giờ chỉ chứa
-đúng giờ sạch đó cộng phần lỗi — theo tính toán, với giả định Sloth gộp hai cặp bằng `or` **[kiểm chứng]**. Nên
-drill giờ chạy khoảng ba giờ sạch và ghi burn của từng cửa sổ. Những lỗi khác cũng tìm ra khi rà lại: endpoint
-public với danh sách IP được thay bằng đóng hẳn; External Secrets suýt được đọc `anime/*`, tức đọc được cả key
-VPN; và Argo Rollouts không có điều kiện riêng cho inconclusive, nên chặn kết quả rỗng phải viết vào cả hai điều
-kiện **[kiểm chứng]**."
+**A7.1** **Ý chính:** "Câu chuyện tôi thích kể nhất: tôi dự đoán sai cặp nào sẽ page. Tính trên giấy, với một giờ
+sạch, cặp 6h/30m chưa hiệu chỉnh sẽ vượt ngưỡng trước, ở khoảng 4 phút. Chạy thật thì store đã có nhiều giờ traffic
+sạch từ trước, nên cửa sổ 6h chỉ lên 5.30 so với ngưỡng 5.6 và không thắng được; cặp 1h/5m đã hiệu chỉnh page ở
+9 phút 30 giây. Sloth gộp hai cặp bằng `or` — đã xác nhận trên file sinh ra. Những lỗi khác cũng tìm ra khi rà lại:
+endpoint public với danh sách IP được thay bằng đóng hẳn; External Secrets suýt được đọc `anime/*`, tức đọc được cả
+key VPN; và Argo Rollouts không có điều kiện riêng cho inconclusive, nên chặn kết quả rỗng phải viết vào cả hai điều
+kiện (`analysistemplate.yaml`)."
 
 *Nếu được hỏi thêm:* health check cho Application thì là bài học mang từ Medical: bản đầu của Medical chỉ đọc
 Healthy và thả hết các wave cùng lúc, tốn một lượt cấp Let's Encrypt; Anime dùng bản đòi cả Synced ngay từ
@@ -287,9 +363,66 @@ cho project một domain và bucket state riêng ngay từ đầu, để không 
 sai theo những cách nào, tôi nói rõ thứ gì đã đo và thứ gì chưa, và khi gặp lỗi thì tìm nguyên nhân gốc trước khi
 sửa. Tôi cũng chấp nhận ghi 'chưa được thử' hơn là ép ra một đồ thị đẹp."
 
-*Nếu được hỏi thêm:* khi hạ tầng bắt đầu được dựng, con số đầu tiên sẽ là `[điền: tiêu chí đầu tiên được đóng và
-con số của nó]`.
+*Nếu được hỏi thêm:* con số đầu tiên của hạ tầng là tiêu chí **#1** ngày 2026-09-22 — 15 / 92 / 2 resource khớp
+con số ghi trước, plan lại `No changes.`
 
 ---
 
 [Câu hỏi](questions.md) · [README gốc](../../README.md) · [Design](../eks-sre-llmops-design.md)
+
+---
+
+### A10. Câu đào sâu — điểm yếu, thứ tự cắt, và phụ thuộc
+
+**A10.1** **Ý chính:** "Xếp theo mức tôi thấy nghiêm trọng. Một: **Prometheus và Alertmanager không có xác thực**, nên
+mọi peer VPN và mọi pod trong VPC đặt được silence — silence sai chỗ làm im luôn cái page mà cả stage SLO tồn tại để
+tạo ra. Hai: **không có dead-man's-switch**, nên đường alert chết trong im lặng. Ba: **một NAT gateway** là điểm gãy
+duy nhất cho mọi thứ pod gọi ra ngoài — provider, Hugging Face, Langfuse *và* webhook Discord — nên một sự cố zone
+vừa làm service lỗi vừa làm im cái đường báo tin về nó. Bốn: **phép đo capacity có điều kiện hợp lệ trượt**, nên tôi
+chỉ nói được cái trần. Năm: **chưa có phép đo dựng lại có bấm giờ** — M8 chưa chạy."
+
+*Nếu được hỏi thêm:* ba cái đầu đều là *thiết kế*, không phải lỗi, và tôi biết chúng từ lúc viết thiết kế — chúng nằm
+trong bảng rủi ro §10 hoặc trong cột pass sai của §6, chứ không phải được tìm ra sau. Cái tôi sẽ làm khác đi nếu bắt đầu lại: đo capacity **sau** khi sửa
+`preAllocatedVUs`, không phải trước, để không mất điều kiện hợp lệ ở cả hai lần chạy; và viết `slo-check` vào CI ngay
+từ stage 2 thay vì stage 6, vì một rule không được nạp thì im lặng hoàn toàn và đó là pass sai đắt nhất tôi gặp.
+
+**Mẹo:** có sẵn thứ tự và nói đúng thứ tự đó. Một danh sách năm mục được xếp hạng nghe khác hẳn một lời thú nhận, và
+nó cho thấy bạn đã cân trọng số giữa chúng.
+
+**A10.2** **Ý chính:** "Tôi có sẵn thứ tự cắt, viết ra từ trước khi làm. Cắt đầu tiên là **KEDA và Cluster
+Autoscaler** — giữ một số replica cố định lấy từ cái trần đã đo, và *nói ra* là đã làm vậy; một HPA theo CPU thì ở
+đây không bao giờ bắn nên bỏ nó không mất gì. Rồi **drill alert**, nhưng giữ nguyên rule. Rồi **export sang
+Langfuse**, giữ Tempo. Ba thứ **không bao giờ cắt**: rule SLO, phân tích canary và rollback, và các con số k6."
+
+*Nếu được hỏi thêm:* còn câu "over-engineer cho 269 bộ anime" thì tôi trả lời ngược lại: **app được giữ nhỏ có chủ ý,
+để mọi thứ quanh nó là thật.** Nếu app lớn thì phần lớn thời gian sẽ đi vào app, và đây sẽ là một project về RAG với
+một đoạn kết về hạ tầng. Đảo lại thì mỗi thứ tôi làm phải kiếm chỗ của nó bằng một phép đo: KEDA vào được vì 0.23
+core chứng minh CPU là tín hiệu sai; ngưỡng 30 vào được vì thread pool có 40 luồng; T = 8 giây vào được vì 230
+request thật nói vậy. Không có gì trong đó phụ thuộc vào việc có 269 hay 269000 bộ anime — nó phụ thuộc vào việc
+service chờ một API bên ngoài, và đó là hình dạng của gần như mọi service LLM.
+
+**Mẹo:** đây là câu thử xem bạn có tự bảo vệ được phạm vi công việc của mình không. Trả lời bằng "app nhỏ là một
+quyết định" chứ đừng xin lỗi vì nó nhỏ.
+
+**A10.3** **Ý chính:** "Từ góc người dùng thì một 503 là một 503, nên nó thuộc về SLO availability — người dùng không
+quan tâm lỗi sinh ra ở đâu. Nhưng câu hỏi đúng ở chỗ nó không trả lời được *ai* hỏng, và tôi có nhãn cho việc đó:
+`anime_upstream_errors_total` mang nhãn `stage`, nên runbook bước 2 tách được `llm` với `retrieval` với 'api tự
+hỏng'."
+
+*Nếu được hỏi thêm:* cái còn thiếu là một SLI riêng cho phụ thuộc, để **page nói luôn bên nào hỏng** thay vì để người
+vận hành tự tra. Và có một chỗ ghép làm chuyện này tệ hơn: chỉ có một NAT gateway, nên một sự cố zone làm mất provider,
+Hugging Face, Langfuse và webhook Discord *cùng lúc* — SLI ghi tất cả thành lỗi của chính service, và cái đường đáng
+ra báo tin thì cũng đi qua đúng cái NAT đó.
+
+Còn một chi tiết cùng họ, tôi tự thấy và ghi lại: **SLI không có nhãn chế độ** — nó chỉ lọc `route="/recommend"`. Nên
+load test của chính tôi đốt cùng một error budget với traffic thật, và điều đó đã tự lộ ra: một ticket alert về latency
+bắn mà không ai tiêm lỗi, vì ramp của stage 4 đã đẩy p95 lên 15.6 giây và những request đó còn nằm trong cửa sổ 6 giờ.
+
+Còn hành vi thì tôi nói thẳng: một 429 của provider **không bao giờ đi ra ngoài như 429** — `OpenAIChat` biến mọi
+`HTTPError` thành `UpstreamError(stage="llm")` và api trả 503, nên nó vào SLI availability như mọi 5xx khác. Và nhánh
+provider **không thử lại**: một lời gọi, lỗi là 503 ngay. Đó là chọn có ý thức ở tier miễn phí — thử lại vào một hạn
+mức đã cạn chỉ làm nó cạn nhanh hơn. Với tier trả phí thì thứ tôi thêm là backoff có jitter cộng một ngân sách retry,
+và SLI phải tách "đã thử lại rồi vẫn lỗi" khỏi "lỗi ngay".
+
+**Mẹo:** trả lời "đúng, và đây là cái tôi không đo được từ nó" thì mạnh hơn là bảo vệ thiết kế. Hai chỗ ghép — NAT
+dùng chung và SLI không có nhãn chế độ — là thứ cho thấy bạn nghĩ về phụ thuộc chứ không chỉ về service.

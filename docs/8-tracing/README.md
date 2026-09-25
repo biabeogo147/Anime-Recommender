@@ -40,8 +40,8 @@ flowchart TB
 
 The value is in the split. Retrieval and generation fail differently and cost differently, and with one span each
 the question "which half got slower?" has an answer. The generation span uses the OpenTelemetry names for generative
-AI, so a tool built for LLM traces recognises it; the design lists the two places where the code does not yet follow
-those conventions fully.
+AI, so a tool built for LLM traces recognises it: the conventions' span name, the `CLIENT` kind and the
+`gen_ai.provider.name` attribute.
 
 The spans are written in the application by hand. A library that patches LangChain would add more detail, and it
 stays an option — but the numbers this project depends on do not wait for a library to keep pace with LangChain's
@@ -94,9 +94,9 @@ nothing to click, and nobody notices until they need it.
 *Concept: [§6 capturing content](concepts.md#6-capturing-content).*
 
 Langfuse is most useful for the text. Recording it means copying what users type to an outside service — and the box
-is free text, whatever it was meant for. Capture is **not built yet**. When it is, it will be on for this single-operator
-demonstration and off by default anywhere regulated, and the page with the input box will say which. Until then the
-spans carry numbers only, and criterion #11 is judged on their shape.
+is free text, whatever it was meant for. Capture is **built** behind `OTEL_CAPTURE_CONTENT`: off in the code, on in this
+deployment's chart for a single-operator demonstration, and meant to be off by default anywhere regulated. Criterion
+#11 is judged on the spans' numbers, not on the text.
 
 ## Decision 5 — cost is an estimate, and its labels are part of the number
 
@@ -147,7 +147,7 @@ counts the provider reports are the ones it would bill.
 - **Prompt capture is built but unproven:** which attribute names Langfuse maps to a generation's text is checked in
   the run.
 - **Tempo keeps nothing across a teardown.**
-- **The cost is an estimate at list price**, for a project that runs on a free tier — what the traffic *would* cost.
+- **The cost is an estimate at list price**, read by hand on a stated date — not a figure from an invoice.
 
 ---
 

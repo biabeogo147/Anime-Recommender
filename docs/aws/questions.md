@@ -9,18 +9,18 @@ giải thích được mình nhận gì, trả gì, và mất khả năng làm g
 | Phần | Kiểm tra điều gì |
 |---|---|
 | **A. Phỏng vấn** | Bạn so sánh được hai cách làm ở từng chỗ, bằng lý do chứ không bằng sở thích |
-| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về API và giới hạn cụ thể của từng dịch vụ, khi code của Anime đã có |
+| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về API và giới hạn cụ thể của từng dịch vụ; code đó đã có, nên phần này giờ viết được |
 
 Bộ liên quan: [tổng quan project](../common/questions.md), [Terraform](../1-terraform/questions.md),
 [GitOps](../2-gitops/questions.md), [CI/CD](../3-cicd/questions.md), [Scaling](../7-scaling/questions.md). Bộ AWS của
 Medical: `Medical-RAG-Chatbot/docs/aws/questions.md`. Câu nào trùng với một bộ stage thì ở đây chỉ trả lời ở mức ranh
 giới và trỏ sang bộ đó.
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Phía Medical **đã dựng và đã chạy**. Phía Anime, tính tới
-**2026-09-23**, đã dựng tới stage 4: cụm, cây GitOps và pipeline CI/CD đang chạy trên AWS, criteria #1, #3, #4, #5, #6
-đã đóng có bằng chứng; canary, cảnh báo SLO, autoscaler và tracing thì **mới thiết kế**. Câu trả lời tốt nói đúng thì
-cho từng phần — quá khứ cho phần đã chạy, "tôi thiết kế" cho phần chưa — và không trộn hai thì với nhau. Trạng thái
-từng criterion đọc ở [`docs/evidence/`](../evidence/), không đọc ở câu này.
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. **Cả hai project đã dựng và đã chạy.** Anime đi hết tám
+stage trong hai ngày 22–23/09/2026: **mười một** tiêu chí đóng bằng số đo trích dẫn được, ba tiêu chí nữa (#2, #15, #16) pass nhưng không giữ output, #7 đo được một nửa, #13 — cổng eval chất lượng,
+hạng P1 — chưa làm. Câu trả lời tốt so hai project theo *gánh vận hành* chứ không theo danh sách tính năng, và nói
+đúng ba chỗ chưa trọn thay vì nói "xong hết". Trạng thái từng criterion đọc ở
+[`docs/evidence/`](../evidence/), không đọc ở câu này.
 
 ---
 
@@ -105,3 +105,11 @@ từng criterion đọc ở [`docs/evidence/`](../evidence/), không đọc ở 
 ---
 
 [Đáp án](answers.md) · [Design, bảng so sánh](../eks-sre-llmops-design.md#1-goal)
+
+---
+
+### A10. Câu đào sâu — chi phí và bán kính ảnh hưởng
+
+**A10.1** Chạy cái này tốn bao nhiêu?
+
+**A10.2** Cùng một account AWS với project kia, và Anime còn ghi vào zone Route 53 của Medical. Bán kính ảnh hưởng là gì?

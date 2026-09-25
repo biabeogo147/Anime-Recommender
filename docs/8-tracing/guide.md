@@ -61,8 +61,14 @@ grep '^enabled_stages' $F
 make bootstrap-plan && make bootstrap
 kubectl -n argocd annotate application root argocd.argoproj.io/refresh=hard --overwrite
 ok=; for i in $(seq 40); do make -s rollout-status | grep -qE 'phase=(Paused|Progressing)' && { ok=1; break; }; sleep 15; done
-[ -n "$ok" ] && make -s promote-full || echo "NO NEW VERSION STARTED: promote-full not run, see troubleshooting"
-for i in $(seq 40); do make -s rollout-status | grep -q 'phase=Healthy' && break; sleep 15; done
+# Promote until Healthy, not once: a canary with no traffic pauses again at the next step (delivery guide section 2).
+[ -n "$ok" ] || echo "NO NEW VERSION STARTED: promote-full not run, see troubleshooting"
+[ -n "$ok" ] && for i in $(seq 12); do
+  make -s rollout-status | grep -q 'phase=Healthy' && break
+  make -s promote-full >/dev/null 2>&1
+  sleep 20
+done
+make -s rollout-status
 make -s apps
 ```
 
@@ -160,7 +166,7 @@ E=~/anime-evidence
 curl -s -X POST https://api.anime.recruitai.io.vn/recommend -H 'content-type: application/json' \
   -d '{"query":"space bounty hunters"}' | jq -r '.model, .trace_id' | tee $E/trace-fake.txt
 # A request right after the switch can still reach a draining real-mode pod: the id only counts if the model says fake.
-[ "$(head -1 $E/trace-fake.txt)" = fake ] || echo "NOT FAKE — send the request again"
+[ "$(head -1 $E/trace-fake.txt)" = fake ] || echo "NOT FAKE — check make rollout-status: if stable = latest, send again; if not, the switch has not finished"
 ID=$(tail -1 $E/trace-fake.txt); sleep 60
 kubectl -n tracing port-forward svc/tempo 3200:3200 >/dev/null 2>&1 & PF=$!; sleep 3
 curl -s -o $E/trace-fake-tempo.json -w 'tempo: %{http_code}\n' http://localhost:3200/api/traces/$ID | tee -a $E/trace-fake.txt

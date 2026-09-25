@@ -54,7 +54,7 @@ scaling:
 tracing:
   captureContent: "true"
 
-# Starting points, not measurements: stage 4's capacity run replaces them with what a pod used at the knee (Scaling A4.3).
+# Requests from what a pod used under stage 4's ramp (Scaling A4.3).
 # From stage 4's ramp, at the throughput ceiling: 0.236 cores and 143 MiB per pod (docs/evidence/load.md). Rounded up
 # a little, and NOT inflated to make the Cluster Autoscaler add nodes - the scheduler places by requests, so an
 # inflated request manufactures the node half of criterion #14 instead of measuring it. The memory limit stays at

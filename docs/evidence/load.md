@@ -57,6 +57,7 @@ Neither is discarded outright and neither is a clean pass; what each establishes
 | Plateau of the served rate | **93.9 req/s** | **93.9 req/s** |
 | in-flight per pod at the knee | 170.5 | 117.5 |
 | CPU / memory per pod at the plateau | 0.227 cores / 142 MiB | 0.236 cores / 143 MiB |
+| p95 at the top of the ramp, 120 req/s | **15.1 s** | **15.6 s** |
 | Ready pods, nodes | 2, 2 throughout | 2, 2 throughout |
 | First dropped iteration | 03:03:21Z — **4 minutes before** the capacity point | 03:31:08Z — **5 seconds before** it |
 | Busiest workstation CPU sample | 46% | 54% |
@@ -75,6 +76,11 @@ service at the moment its latency triples, which is why criterion #14 scales on 
 
 **That the flat region is the provider's own latency.** `FakeLLM`'s sleep has a p95 of 0.8 x exp(1.645 x 0.35) =
 **1.42 s**; measured, **1.43 s** and **1.45 s**. Below the knee the api adds nothing measurable.
+
+**What two fixed pods look like past their limit.** By the top of the ramp — 120 req/s offered against a ceiling
+of 93.9 — p95 had reached **15.6 s**, ten times the 1.43 s it holds below the knee, and nothing failed on the way
+there. That figure is the baseline stage 7 is measured against: the same service under an autoscaler held p95 at
+1.44–1.47 s at **267 req/s**, more than twice this load ([scaling](scaling.md#what-the-users-saw-nothing)).
 
 **Capacity, by the pre-registered rule: 88–89 req/s.** Both runs, one point apart, ~6% below the ceiling — the
 rate at which the queue has not yet formed.

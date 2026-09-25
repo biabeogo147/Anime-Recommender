@@ -10,14 +10,16 @@ test.
 | Phần | Kiểm tra điều gì |
 |---|---|
 | **A. Phỏng vấn** | Bạn trình bày được các quyết định của stage và lý do đằng sau từng quyết định, bằng lời của mình |
-| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về từng script trong `load/` và từng query, và chỉ viết được khi code đã có |
+| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về từng script trong `loadtest/k6/` và từng query; code đó đã có, nên phần này giờ viết được |
 
 Bộ liên quan: [tổng quan project](../common/questions.md), [SLO](../6-slo/questions.md),
 [scaling](../7-scaling/questions.md), [progressive delivery](../5-delivery/questions.md). Ý tưởng của stage:
 [README](README.md) · [concepts](concepts.md).
 
-**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **đang chạy dở**: T đã đo, capacity chưa. Câu
-trả lời tốt nói rõ phương pháp và lý do, nói T bằng số, và nói capacity là chưa có chứ không đoán.
+**Cách dùng.** Trả lời thành tiếng trước khi mở đáp án. Stage này **đã chạy xong**: #6 (T) pass, #7 (capacity)
+**đo được một nửa** — trần 93.9 req/s thì vững, còn capacity 88–89 req/s có điều kiện hợp lệ trượt ở cả hai lần ramp,
+nên **chỉ quote trần**; và in-flight tại điểm gãy (170.5 so với 117.5) thì không bao giờ quote. Câu trả lời tốt nói rõ
+phương pháp, nói T bằng số, và nói rõ nửa nào của capacity trượt.
 
 ---
 
@@ -75,7 +77,7 @@ trả lời tốt nói rõ phương pháp và lý do, nói T bằng số, và n�
 
 ### A5. Hai chế độ
 
-**A5.1** Vì sao baseline dùng Gemini còn bài capacity dùng fake provider?
+**A5.1** Vì sao baseline dùng model thật (OpenAI `gpt-4o-mini`) còn bài capacity dùng fake provider?
 
 **A5.2** Vì sao không bao giờ so p95 của chế độ fake với T?
 
@@ -107,3 +109,9 @@ trả lời tốt nói rõ phương pháp và lý do, nói T bằng số, và n�
 
 [Đáp án](answers.md) · [README](README.md) · [Concepts](concepts.md) ·
 [Design §4.5](../eks-sre-llmops-design.md#45-autoscaling-and-load-testing)
+
+---
+
+### A10. Câu đào sâu — vì sao trần là 40 luồng
+
+**A10.1** Một service chỉ chờ I/O mạng thì vì sao lại bị chặn ở một thread pool 40 luồng? Sao không viết async?

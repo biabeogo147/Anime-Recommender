@@ -5,9 +5,9 @@ ngôi thứ nhất, thường là đủ. *Nếu được hỏi thêm* dùng khi 
 bạn, không nói ra. Tham chiếu dạng `Terraform A5.2` trỏ tới bộ tương ứng của Anime.
 
 Phía Medical **đã dựng và đã chạy** — kể bằng kinh nghiệm được, nhưng chỉ những gì evidence của Medical ghi. Phía Anime
-tính tới **2026-09-23** đã chạy tới stage 4 (criteria #1, #3, #4, #5, #6 đóng có bằng chứng trong
-[`docs/evidence/`](../evidence/)); phần canary, SLO, autoscaler và tracing **mới thiết kế** — phần đó kể bằng "tôi thiết
-kế", "tôi chọn". Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật;
+tính tới **2026-09-23** đã chạy **hết tám stage**: criteria #1, #2, #3, #4, #5, #6, #8, #9, #10, #11, #12, #14, #15,
+#16 đóng có bằng chứng trong [`docs/evidence/`](../evidence/); #7 **partly measured**, và #13 (cổng eval chất lượng,
+hạng P1) **chưa làm**. Nên cả hai project đều kể bằng kinh nghiệm. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật;
 ghi chú **[kiểm chứng]** là hành vi của dịch vụ cần xác nhận trước khi nói chắc. Số thập phân viết bằng dấu chấm.
 
 Thuật ngữ dùng thống nhất trong bộ này: **self-managed** cho cụm kubeadm của Medical; **managed** cho EKS và các dịch vụ
@@ -22,13 +22,21 @@ cho IAM role.
 | RTO khôi phục etcd của Medical | 7 m 02 s | A2.1 |
 | Chi phí Medical khi chạy | khoảng 0.53 USD/giờ | A2.6 |
 
+**Số liệu của Anime đã có** — từ [`docs/evidence/`](../evidence/), được phép nói:
+
+| Số | Giá trị | Dùng ở |
+|---|---|---|
+| Dựng ba stack Terraform từ con số không | 0m55s + 12m18s + 1m14s, 15 + 92 + 2 resource | A2.1 |
+| Page của fast burn tới được người | 9 m 30 s | A2.1 |
+| Canary xấu tự abort | 167 s ở bước 10%, 1.36% toàn bộ request lỗi | A2.1 |
+| Scale 2 → 8 pod, 2 → 3 node | 6 m 35 s ra, 10 m 02 s về, 0 request lỗi | A2.1 |
+
 **Còn phải điền:**
 
 | Chỗ cần điền | Lấy từ | Dùng ở |
 |---|---|---|
-| RTO khôi phục etcd của Medical | Drill khôi phục etcd của Medical | A2.1 |
-| Thời gian dựng lại cụm EKS từ con số không | Lần dựng đầu của Anime | A2.1 |
-| Chi phí Anime mỗi giờ khi chạy | Lần dựng đầu của Anime | A2.6 |
+| Thời gian dựng lại **toàn bộ** nền tảng Anime từ stack cụm rỗng | Phép đo M8, **chưa chạy** | A2.1 |
+| Chi phí Anime mỗi giờ khi chạy | Cost Explorer, **chưa đọc** | A2.6 |
 
 ---
 
@@ -38,11 +46,13 @@ cho IAM role.
 
 **A1.1** **Ý chính:** "Vì một project không dạy tốt được cả hai thứ: vận hành cụm, và vận hành service chạy trên cụm.
 Medical tự dựng cụm bằng kubeadm, nên trọng tâm là vận hành cụm: etcd, chứng chỉ, nâng cấp, chuỗi cung ứng. Anime dùng EKS,
-nên trọng tâm dời sang vận hành service: SLO, canary, autoscaling, quan sát LLM. Medical tôi đã dựng và chạy xong. Anime
-tôi đã dựng tới stage 4 — cụm, GitOps và CI/CD đang chạy — còn canary, SLO, autoscaling và tracing thì mới thiết kế."
+nên trọng tâm dời sang vận hành service: SLO, canary, autoscaling, quan sát LLM. Cả hai tôi đã dựng và chạy xong: Anime đi hết tám
+stage trong hai ngày 22 và 23 tháng 9, **mười một** tiêu chí đóng bằng số đo trích dẫn được, ba tiêu chí nữa (#2, #15, #16) pass nhưng không giữ output, một tiêu chí đo được một nửa, và một tiêu
+chí — cổng eval chất lượng — tôi chủ động chưa làm."
 
-**Mẹo:** câu cuối quan trọng. Nói rõ phần nào đã chạy, phần nào mới thiết kế, ngay từ đầu — và đọc trạng thái hiện tại ở
-[`docs/evidence/`](../evidence/) trước buổi phỏng vấn, đừng tin câu này nếu nó cũ hơn lần chạy gần nhất.
+**Mẹo:** câu cuối quan trọng. Nói rõ cái gì đã đo, cái gì đo được một nửa, cái gì chưa làm, ngay từ đầu — và đọc
+trạng thái hiện tại ở [`docs/evidence/`](../evidence/) trước buổi phỏng vấn, đừng tin câu này nếu nó cũ hơn lần chạy
+gần nhất.
 
 **A1.2** **Ý chính:** "Năm chỗ chính. Cụm: kubeadm trên EC2 so với EKS với node group Spot. CI: Jenkins trong cụm
 so với GitHub Actions. Ký image: khoá KMS so với keyless. Danh tính pod: IRSA dựng tay so với Pod Identity. Chứng
@@ -55,7 +65,7 @@ quyền đúng, và chứng minh nó chạy. Một policy IAM quá rộng trên 
 
 **A1.4** **Ý chính:** "Những câu cần một control plane của chính mình. *Dựng lại cụm từ đầu* — kubeadm trên ba EC2,
 API server sau NLB nội bộ, chạy Ansible lần hai thì `changed=0`. *Khôi phục khi mất state* — snapshot etcd theo lịch
-lên S3, và một drill khôi phục đo được RTO 7 phút 02 giây. *Nâng cấp Kubernetes* — một playbook đi từng node; nói thẳng là drill mới đi đường patch, minor upgrade chưa chạy. *Chặn
+lên S3, và một drill khôi phục đo được RTO 7 phút 02 giây. *Nâng cấp Kubernetes* — một playbook đi từng node; nói thẳng là nó chưa chạy lần nào, vì 1.36.4 đã là bản patch mới nhất, nên #14 là *not measured*. *Chặn
 image chưa ký ở admission* — Kyverno từ chối trong prod, tức không chỉ ký mà còn chặn. *Vận hành chứng chỉ* —
 cert-manager với wildcard Let's Encrypt qua DNS-01. Trên EKS không có cái nào trong số đó để mà làm: không có control
 plane để dựng, không có etcd để snapshot, chứng chỉ do ACM cấp và gia hạn."
@@ -105,8 +115,10 @@ phần đó; tôi không đăng nhập vào máy control plane nào và không v
 tôi."
 
 *Nếu được hỏi thêm:* RTO khôi phục etcd của Medical là 7 phút 02 giây (`Medical-RAG-Chatbot/docs/evidence/drills.md`);
-thời gian dựng lại EKS `[điền: thời gian dựng lại]` — phép đo M8, chưa chạy. Nâng cấp Kubernetes thì nói cho đúng: drill
-mới đi đường **patch**, còn minor upgrade như criterion #14 yêu cầu thì chưa chạy (`drills.md`).
+thời gian dựng lại EKS `[điền: thời gian dựng lại]` — phép đo M8, chưa chạy. Nâng cấp Kubernetes thì nói cho đúng:
+playbook chưa chạy lần nào, vì không có bản patch nào mới hơn 1.36.4, nên criterion #14 **của Medical** là *not measured*;
+minor upgrade như #14 yêu cầu còn cần nâng Rancher trước (`drills.md`). Ở repo này #14 là
+Autoscaling.
 
 **A2.2** **Ý chính:** "Truy cập trực tiếp vào etcd — không có snapshot nào để lấy, nên khôi phục trên EKS nghĩa
 là dựng lại từ Terraform và Git. Cờ của API server, admission plugin, audit policy. Metric của etcd. Chứng chỉ
@@ -123,9 +135,9 @@ giống cụm chết là khi lệnh update-kubeconfig ghi đè địa chỉ serv
 
 *Nếu được hỏi thêm:* Terraform A3.4.
 
-**A2.4** **Ý chính:** "Ở Medical, cụm đang ghim một bản 1.36 và chưa nâng cấp lần nào. Playbook nâng cấp tôi đã
-thiết kế: từng node một, drain, `kubeadm upgrade`, nâng kubelet, uncordon, chờ Ready và Argo CD khoẻ mới sang
-node sau. Lần chạy thật là một drill còn lại. Ở Anime, tôi thiết kế nâng theo thứ tự: control plane lên một minor
+**A2.4** **Ý chính:** "Ở Medical, cụm đang ghim một bản 1.36 và chưa nâng cấp lần nào. Playbook nâng cấp đã viết
+(`upgrade.yml`): từng node một, drain, `kubeadm upgrade`, nâng kubelet, uncordon, chờ Ready và Argo CD khoẻ mới sang
+node sau. Nó qua `--syntax-check` nhưng chưa chạy, vì 1.36.4 đã là bản patch mới nhất. Ở Anime, tôi thiết kế nâng theo thứ tự: control plane lên một minor
 — AWS làm và không quay lui được — rồi các add-on, rồi node group rolling update, tôn trọng PDB. Tôi ghim minor
 để thời điểm nâng minor do tôi quyết; bản vá trong một minor thì AWS tự áp **[kiểm chứng]**."
 
@@ -136,7 +148,7 @@ AWS, hoặc khi việc học chính cách vận hành cụm là mục tiêu — 
 dựng control plane là trả một gánh vận hành lớn cho một thứ người dùng không bao giờ thấy."
 
 **A2.6** **Ý chính:** "Medical khi chạy tốn khoảng 0.53 USD mỗi giờ. Anime cộng phí control plane của EKS, NAT,
-hai ALB và node Spot: `[điền: USD mỗi giờ]`. Cả hai được huỷ khi không dùng, nên thứ đáng so là chi phí mỗi giờ
+hai ALB và node Spot: **ước tính 0.4–0.6 USD mỗi giờ** (thiết kế §10 — *ước tính, chưa đo*; chưa đọc Cost Explorer cho một phiên nào). Cả hai được huỷ khi không dùng, nên thứ đáng so là chi phí mỗi giờ
 chạy cộng phần còn lại qua đêm — và với Anime, control plane là khoản không tắt được chừng nào cụm còn."
 
 ### A3. Danh tính của pod
@@ -174,8 +186,8 @@ tôi tin là IAM — chỉ role CI được ký. Chữ ký không ghi vào log c
 dùng một khoá tạm, Sigstore cấp chứng chỉ ngắn hạn gắn khoá đó với danh tính OIDC của workflow, và chữ ký được
 ghi vào log public. Verify thì tin vào root của Sigstore và vào danh tính ghi trong chứng chỉ."
 
-*Nếu được hỏi thêm:* hiện cả hai đều chưa có gì trong cụm verify chữ ký. Ở Medical, Kyverno là việc đã lên kế
-hoạch; Anime cố ý không verify trong cụm, chỉ verify tay một lần ở tiêu chí #3.
+*Nếu được hỏi thêm:* ở Medical, Kyverno verify chữ ký lúc admission: `Deny` ở prod, `Audit` ở dev, và đã chặn được
+một image chưa ký (phase drills). Anime cố ý không verify trong cụm, chỉ verify tay một lần ở tiêu chí #3.
 
 **A4.2** **Ý chính:** "Vì ký keyless *công bố*: digest, repo, workflow và danh tính được ghi vĩnh viễn vào một
 log public. Image của Medical là private, và những thông tin đó không có lý do gì để công khai. Ở Anime, repo vốn
@@ -280,3 +292,39 @@ Rollout và phân tích, KEDA, Sloth và các SLO, OpenTelemetry. Phần mang đ
 ---
 
 [Câu hỏi](questions.md) · [Design, bảng so sánh](../eks-sre-llmops-design.md#1-goal)
+
+---
+
+### A10. Câu đào sâu — chi phí và bán kính ảnh hưởng
+
+**A10.1** **Ý chính:** "Một cụm Anime đang chạy **ước tính** khoảng **0.4 tới 0.6 USD một giờ** — và tôi nói rõ *ước
+tính*, không phải đo: tôi chưa đọc Cost Explorer cho một phiên. Khoản không tắt được là control plane của EKS; cộng
+thêm NAT gateway, hai ALB, và node Spot. Nền tảng chạy trên tín dụng của Free plan, **91.64 USD còn lại tính tới
+22/09**, dùng chung với Medical, và account bị đóng khi tiêu hết hoặc khi plan hết hạn 13/02/2027."
+
+*Nếu được hỏi thêm:* việc kiểm soát chi phí không phải một dashboard, nó là `make down` cuối mỗi phiên. Và budget được
+đặt theo cách đáng nói: nó cảnh báo trên **phần chi của riêng Anime, tính trước khi trừ tín dụng** — `include_credit
+= false` — nên nó bắn *trong lúc* tín dụng vẫn đang trả tiền, tức là tôi biết trước khi hoá đơn thật xuất hiện. Mốc
+50 và 100 USD. Tín dụng còn lại được đọc ngay đầu mỗi phiên.
+
+Và đây là câu đáng nhớ nhất của cả chủ đề chi phí: ở đúng mức tải tôi đã đo, **nền tảng tốn mỗi giờ nhiều hơn model
+tốn mỗi nghìn request** — 0.4 tới 0.6 USD một giờ so với 0.42 USD cho một nghìn request. Nó đảo ngược trực giác mà
+con số `$0.42` tạo ra, và nó chính là lý do thật của việc huỷ cụm mỗi khi không dùng. Cũng chính là lý do không SLO
+nào ở đây được phép nói là "đã đạt".
+
+**Mẹo:** ba chữ "ước tính, không phải đo" phải nằm trong câu đầu. Đây là chỗ duy nhất trong cả bộ mà một con số tròn
+trịa lại không có phép đo đứng sau, nên nói trước thì nó là sự trung thực, nói sau khi bị hỏi thì nó là chỗ hở.
+
+**A10.2** **Ý chính:** "Bán kính ảnh hưởng vượt qua ranh giới giữa hai project, và tôi ghi nó lại đúng vì vậy. Ba
+đường. Một: **tín dụng dùng chung**, nên phần chi của một project có thể đóng account của project kia. Hai: **zone
+Route 53 thuộc stack `shared` của Medical**, Anime chỉ ghi record vào đó — nên một zone bị xoá hoặc bị tạo lại làm
+bản ghi xác thực ACM mất hiệu lực, chứng chỉ đứng ở `PENDING_VALIDATION`, ALB không có listener HTTPS, và **Ingress
+vẫn trông khoẻ trong khi cổng 443 không trả lời gì**. Ba: cùng một zone nghĩa là controller load balancer có thể tự
+tìm ra một chứng chỉ *khác* bằng host match — đó là false pass mà tiêu chí #15 nêu tên."
+
+*Nếu được hỏi thêm:* tôi chấp nhận đánh đổi này để không phải mua tên miền thứ hai, và cái tôi làm là ghi nó ra chứ
+không giả vờ hai project độc lập. Nếu đây là chỗ làm thật thì đây là thứ đầu tiên tôi tách: account riêng cho mỗi
+môi trường, nối bằng AWS Organizations, và budget theo từng account chứ theo tag như hiện nay.
+
+**Mẹo:** người phỏng vấn hỏi câu này để xem bạn có nghĩ ở mức account hay chỉ mức cụm. Nói ra được rằng "bán kính ảnh
+hưởng vượt ranh giới project nên tôi ghi lại" là câu trả lời, phần kỹ thuật chỉ là minh hoạ.

@@ -27,11 +27,10 @@ evidence dùng cho lần cố ý làm phép kiểm index đỏ — về bản ch
 
 | Chỗ cần điền | Lấy từ | Dùng ở |
 |---|---|---|
-| Thời gian một lần pipeline trên `main` | Lần chạy CI đầu | A1.3 |
-| Kích thước hai image do CI push | Lần chạy CI đầu | A7.1 |
-| Dòng lỗi khi CSV bị cắt ngắn trong CI | Lần kiểm #5 | A3.2 |
-| Kết quả positive control của Trivy, và tổng số critical so với số có bản vá | Lần chạy positive control | A3.5 |
-| `hit@4` của baseline và của pull request làm giảm chất lượng | Lần kiểm #13, nếu eval gate được dựng | A7.2 |
+| Thời gian một lần pipeline trên `main` | Lần chạy CI, vẫn *pending* trong `evidence/cicd.md` | A1.3 |
+| `hit@4` của baseline và của pull request làm giảm chất lượng | Lần kiểm #13 — eval gate là P1, chưa dựng | A7.2 |
+
+Kích thước hai image, dòng lỗi khi CSV bị cắt và positive control của Trivy đã có trong `evidence/cicd.md`.
 
 ---
 
@@ -51,7 +50,7 @@ token OIDC lấy quyền AWS, push theo digest, ký và gắn SBOM, rồi commit
 gì chưa scan rời khỏi runner, và chữ ký mang nghĩa "đã qua gate". Digest được push có trùng với digest đã scan không
 thì phải kiểm **[kiểm chứng: registry tính digest lúc push]**.
 
-**Mẹo:** tách rõ "đã đo local" với "thiết kế cho CI". Người phỏng vấn sẽ hỏi con số, và bạn có vài con số thật.
+**Mẹo:** tách rõ "đã đo local" với "đo trên CI". Người phỏng vấn sẽ hỏi con số, và cả hai loại giờ đều có số thật.
 
 **A1.2** **Ý chính:** "Image được build bằng tay trên một laptop. Ai build được thì ship được; không ai nói được
 trong image có gì, hay nó được build từ commit nào; và một lần release là có người gõ digest vào file values rồi
@@ -106,7 +105,9 @@ chính *dữ liệu*, tức là đúng cái lỗi sẽ thật sự xảy ra — 
 
 *Nếu được hỏi thêm:* cách cắt cũng phải chọn kỹ. Cắt còn không byte nào thì lỗi là thiếu cột, không phải
 `IndexValidationError`. Cắt giữa phần tóm tắt của dòng cuối thì có thể vẫn còn đủ 269 dòng. Nên cắt phải giữ header và
-bỏ nguyên dòng **[kiểm chứng]**. Dòng lỗi trong CI `[điền: dòng lỗi khi CSV bị cắt ngắn]`.
+bỏ nguyên dòng **[kiểm chứng]**. Dòng lỗi trong CI đọc đúng như thế, với `drop_rows` 10:
+`IndexValidationError: Loaded 259 documents from /app/data/anime_with_synopsis.csv, expected 269`, và job xanh vì
+build đã fail *đúng bằng lỗi được nêu tên* — fail vì lý do khác thì job đỏ.
 
 **A3.3** **Ý chính:** "Vì một lần build thất bại vì cả chục lý do không liên quan gì tới index — thiếu token, lỗi
 mạng. Nếu đếm mọi thất bại là 'phép kiểm đã bắn', thì một lần mất mạng cũng được tính là bằng chứng. Đòi đúng dòng
@@ -122,7 +123,10 @@ bản vá còn chưa ra."
 ghi là chưa chứng minh, cho tới khi có một lần positive control: hạ ngưỡng severity tới khi một lỗ hổng *có* bản vá
 lọt vào phạm vi, và lần chạy đó phải đỏ."
 
-*Nếu được hỏi thêm:* kết quả `[điền: positive control, tổng critical và số có bản vá]`. Medical sau đó chuyển base
+*Nếu được hỏi thêm:* positive control đã chạy. Hạ ngưỡng xuống `MEDIUM,HIGH,CRITICAL` thì gate **đỏ**:
+`anime-api` 169 finding với 5 có bản vá, `anime-ui` 165 với 5. Ở `HIGH,CRITICAL` và ở `CRITICAL` — ngưỡng dùng trên
+mọi build — gate xanh, vì ở mức CRITICAL không finding nào có bản vá, đúng như thiết kế dự đoán cho Debian 12. Nên
+gate xanh vì *không có gì sửa được*, chứ không phải vì gate không biết đỏ. Medical sau đó chuyển base
 lên Debian 13 và hết cả năm lỗ hổng đó; với Anime đó là một lựa chọn còn để ngỏ. Một cái bẫy nữa từ Medical: gate
 phải là chính lệnh scan — `trivy convert`, dùng để đọc lại một report đã lưu, không có `--ignore-unfixed`.
 
@@ -175,7 +179,7 @@ lúc verify cũng ghim người ký, y như khi verify image."
 
 **A4.6** **Ý chính:** "Không. Kyverno nằm ngoài phạm vi, nên không có admission control nào từ chối image chưa ký.
 Chữ ký chứng minh một image *có thể* được kiểm — #3 kiểm nó một lần, bằng tay — chứ không chứng minh mọi image *đã*
-được kiểm. Medical định đóng khoảng hở đó bằng Kyverno; Anime để ngỏ nó, và ghi rõ ra."
+được kiểm. Medical đã đóng khoảng hở đó bằng Kyverno ở prod; Anime để ngỏ nó, và ghi rõ ra."
 
 **Mẹo:** đừng để người nghe tưởng "ký image" nghĩa là "cụm chỉ chạy image đã ký". Tự nói ra trước.
 
@@ -185,12 +189,11 @@ Chữ ký chứng minh một image *có thể* được kiểm — #3 kiểm nó
 lệ duy nhất của quy tắc đó, và là ngoại lệ bắt buộc — nó chạy sau CI, việc của nó là ghi vào đó. Kỷ luật ở đây là giữ
 ngoại lệ đúng bằng một dòng trong ruleset, gọi tên một danh tính, thay vì nới quy tắc cho mọi người."
 
-*Nếu được hỏi thêm:* danh tính nào thì chưa chốt — chốt khi viết ruleset.
+*Nếu được hỏi thêm:* danh tính đã chốt: một deploy key (`RELEASE_DEPLOY_KEY`), là bypass duy nhất của ruleset.
 
 **A5.2** **Ý chính:** "Có. Push bằng token của chính workflow thì không khởi động run mới; push bằng credential khác —
-deploy key, token của app — thì có. Nếu ruleset không cho token của workflow đi qua **[kiểm chứng]**, bot phải dùng
-loại credential thứ hai. Lúc đó, trong thiết kế hiện tại, `[skip ci]` là lớp duy nhất ngăn commit đó kéo theo một
-vòng lặp vô tận. Nếu cho qua được, nó là lớp bảo vệ thứ hai. Trường hợp nào thì dấu đó cũng ở lại."
+deploy key, token của app — thì có. Bot ở đây dùng deploy key, nên push của nó có khởi động run, và `[skip ci]` là lớp
+duy nhất ngăn commit đó kéo theo một vòng lặp vô tận."
 
 *Nếu được hỏi thêm:* có thể thêm một lớp nữa — workflow bỏ qua các thay đổi chỉ nằm trong `deploy/`.
 
@@ -214,7 +217,8 @@ hay scan."
 dùng tới. Sau khi tách và build nhiều tầng: api 619 MB, ui 559 MB. CI phải đo lại chính hai image nó push, và nói cả
 *hai* so với một image cũ mà chúng thay thế."
 
-*Nếu được hỏi thêm:* kích thước trong CI `[điền: kích thước hai image do CI push]`. Chỉ nói con số của API — mức giảm
+*Nếu được hỏi thêm:* kích thước trong CI là `anime-api` **619 MB** và `anime-ui` **559 MB** — cộng 1.18 GB, so
+với **6.45 GB** của một image duy nhất trước đó. Chỉ nói con số của API — mức giảm
 90% — là đúng cái pass sai mà tiêu chí này cảnh báo: so một image với hai. Cũng phải so cùng một phương pháp: CI đo
 bằng `docker image ls` trên runner, không lấy kích thước trong ECR, vì ECR báo kích thước nén.
 
@@ -225,7 +229,7 @@ Face, nên cần token, có thể bị giới hạn tốc độ, và bị bỏ q
 
 *Nếu được hỏi thêm:* với 20 câu, trượt một câu là `hit@4` tụt 0.05. Muốn nó thật sự chặn, nó phải là một required
 check trong ruleset **[kiểm chứng: một required check chỉ chạy theo đường dẫn thì pull request không chạm tới đường dẫn
-đó có bị kẹt chờ không]**. Kết quả `[điền: hit@4 của baseline và của pull request làm giảm chất lượng]`.
+đó có bị kẹt chờ không]**. Kết quả: chưa có — eval gate là P1 và chưa dựng.
 
 **A7.3** **Ý chính:** "Nếu một pull request sinh lại baseline cùng với thay đổi của nó, thì nó đang so thay đổi với
 chính nó, và luôn pass. Commit của baseline phải có trước base của pull request."
@@ -242,10 +246,15 @@ baseline nào, workflow nào. Cách sửa lần nào cũng giống nhau: bắt b
 
 **Mẹo:** câu này nối thẳng với GitOps A7.4. Hai stage, cùng một kỷ luật.
 
-**A8.3** **Ý chính:** "Khi các tiêu chí chạy xong, stage này sẽ chứng minh: một thay đổi đã merge thành image đã ký và
-một commit một dòng mà không ai phải đụng tay; phép kiểm index bắt được một file bị cắt ngắn; chữ ký verify đúng với
-workflow này, trên nhánh này. Nó vẫn giả định: gate scan có thể thất bại, cho tới khi positive control chạy; một image
-đã ký là image an toàn, điều mà không gì thực thi; và image để rollback vẫn còn trong registry."
+**A8.3** **Ý chính:** "Stage này đã chứng minh: một thay đổi đã merge thành image đã ký và một commit một dòng mà
+không ai phải đụng tay — một pull request tầm thường được merge và cả vòng chạy lại với digest mới; phép kiểm index
+bắt được một file bị cắt ngắn, với đúng dòng `IndexValidationError`; và chữ ký verify đúng với workflow này, trên
+nhánh này, còn chữ ký kiểm theo danh tính của nhánh khác thì bị từ chối. Gate scan cũng đã được chứng minh là biết
+thất bại: positive control ở ngưỡng MEDIUM làm nó đỏ.
+
+Hai điều vẫn là giả định, và tôi không đòi hơn: rằng một image đã ký là một image an toàn — không có gì thực thi
+điều đó, chữ ký chỉ nói ai build; và rằng image để rollback vẫn còn trong registry. Một chỗ còn thiếu số: thời
+lượng pipeline của lần chạy đó không được ghi lại."
 
 ### A9. Giới hạn và nhìn lại
 
@@ -254,8 +263,7 @@ sập thì `main` cũng không ship được; registry của base image; và Sig
 bại. Đó là cái giá của việc không giữ khoá nào: không có khoá để mất, nhưng có thêm dịch vụ bên ngoài phải chờ."
 
 **A9.2** **Ý chính:** "Verify chữ ký ở admission, để 'đã ký' trở thành 'chỉ chạy image đã ký' — đó là khoảng hở lớn nhất
-tôi đã ghi ra. Sau đó là chạy positive control của Trivy như một job định kỳ thay vì một lần, và chốt danh tính của bot
-trong ruleset."
+tôi đã ghi ra. Sau đó là chạy positive control của Trivy như một job định kỳ thay vì một lần."
 
 *Nếu được hỏi thêm:* stage này cũng gỡ submodule `MLops-Common`, khi không còn gì trong CI gọi các script on-premises
 nằm trong đó.

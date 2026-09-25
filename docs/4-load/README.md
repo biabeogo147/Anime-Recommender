@@ -120,6 +120,9 @@ fixed replica count, no new pod is ever asked for. That ceiling belongs to the a
 pod had in flight. That — not a figure chosen in advance — is what the autoscaler's threshold is set just below,
 in [stage 7](../eks-sre-llmops-design.md#9-build-order), so scaling begins before the knee rather than at it.
 
+**Changed after the runs:** that reading did not reproduce (170.5 against 117.5), so the threshold (30) comes from the
+limit it stood in for: 40 threads per pod, which the 93.9 req/s ceiling corroborates ([evidence](../evidence/load.md)).
+
 ## Decision 5 — two modes, and a number per consumer
 
 *Concept: [§7 the fake provider as a load source](concepts.md#7-the-fake-provider-as-a-load-source).*
@@ -127,7 +130,7 @@ in [stage 7](../eks-sre-llmops-design.md#9-build-order), so scaling begins befor
 ```mermaid
 flowchart LR
     GEM["real-mode baseline"] --> T(["T"]) --> SLO["The SLO · stage 6"]
-    FAKE["fake-mode ramp"] --> KNEE(["in-flight per pod at the knee"]) --> KEDA["The autoscaler · stage 7"]
+    FAKE["fake-mode ramp"] --> KNEE(["ceiling, and the 40-thread limit it confirms"]) --> KEDA["The autoscaler · stage 7"]
     FAKE -.->|"never compared with T"| T
 
     classDef argo fill:#fde3cf,stroke:#c2602a,color:#1b1430;
@@ -151,8 +154,9 @@ over nothing read as all-clear.
 
 ## What this stage proves, and what it only assumes
 
-**Proves:** the api is scraped; T, read server-side from enough real requests, with the failure count beside it;
-the capacity of the minimum deployment and the in-flight load per pod at its knee, with the generator ruled out.
+**Proves:** the api is scraped; T, read server-side from enough real requests, with the failure count beside it; a
+93.9 req/s ceiling for two pods, measured twice, with the generator ruled out. **Does not:** a valid capacity figure
+(its drop condition failed in both runs) or a reproducible in-flight reading at the knee.
 
 **Assumes:** that one afternoon's latency from the provider represents other days — T is re-measured, not
 re-used, if the model or its tier changes; and that the workstation, in another VPC, reaches the public door the way
