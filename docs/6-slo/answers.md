@@ -42,7 +42,6 @@ cặp đã được hiệu chuẩn, cái có cửa sổ một giờ chứa đún
 
 | Chỗ còn trống | Vì sao | Dùng ở |
 |---|---|---|
-| `alertname` đúng nguyên văn | Evidence ghi severity và SLO, không ghi chuỗi tên | A1.1, A6.5 |
 | Chu kỳ đánh giá rule | Không đặt trong `deploy/` — là default của chart, chưa đọc lại | A6.5 |
 
 ---
@@ -93,7 +92,8 @@ khác với các SLO khác nhau. Burn rate chuẩn hoá điều đó, nên một
 thừa hưởng phỏng đoán. Còn một chi tiết kỹ thuật: SLI đếm counter tại `le=T`, nên T phải là một ranh giới bucket, nếu không
 query trả về rỗng và alert không bao giờ bắn."
 
-*Nếu được hỏi thêm:* `le` là một chuỗi, nên cách viết con số cũng phải khớp **[kiểm chứng]**; bucket không tồn tại thì cả
+*Nếu được hỏi thêm:* `le` là một chuỗi, nên cách viết con số cũng phải khớp — ở đây là `le="8.0"`
+(`deploy/slo/anime-api.sloth.yaml`); bucket không tồn tại thì cả
 biểu thức rỗng. Chi tiết ở Load A3.4.
 
 **A2.4** **Ý chính:** "Nó là một định nghĩa, không phải thứ đo được. Không cửa sổ 28 ngày nào tồn tại ở đây. Chu kỳ đó quyết
@@ -120,7 +120,8 @@ giữ receiver rỗng của chart, nên alert nào không khớp hai route đó 
 khoảng 0.93. Các con số quen thuộc 14.4, 6, 3, 1 là cùng các phần đó trên 720 giờ — chu kỳ 30 ngày."
 
 *Nếu được hỏi thêm:* Sloth tự tính bộ cho 28 ngày khi được chạy với chu kỳ 28 ngày. Mặc định của nó là 30 ngày, nên chu kỳ
-phải nằm cả trong lệnh CI chạy lại, nếu không rule đã commit lặng lẽ mang hệ số 30 ngày **[kiểm chứng]**.
+phải nằm cả trong lệnh CI chạy lại, nếu không rule đã commit lặng lẽ mang hệ số 30 ngày. Ở đây Makefile truyền
+`--default-slo-period=28d`, và rule sinh ra mang 13.44 và 5.6.
 
 **Mẹo:** người phỏng vấn biết 14.4 từ sách của Google. Giải thích được vì sao ở đây là 13.44 là một điểm cộng rõ ràng.
 
@@ -151,14 +152,14 @@ request thật sự nằm trong cửa sổ. Nên một rule mang tên một ngà
 bắn vì một đợt ngắn mà nó được dựng ra để bỏ qua. Trước khi có dữ liệu nào, mọi cửa sổ đều rỗng và không gì bắn
 được. Không trạng thái nào tự lộ ra; chỉ nhận ra bằng cách kiểm mỗi cửa sổ thật sự đang chứa bao nhiêu dữ liệu."
 
-**A5.2** **Ý chính:** "Chỉ cặp 1h/5m được hiệu chỉnh cho phần lớn một phiên. Nhưng Sloth gộp hai cặp page vào
-cùng một alert bằng phép `or` **[kiểm chứng]**, nên tôi không chọn được cặp — cặp nào vượt ngưỡng trước thì bắn.
-Theo tính toán, nếu Prometheus chỉ chứa một giờ traffic sạch, nhánh 6h/30m vượt ngưỡng sau khoảng bốn phút, sớm
-hơn tám phút của cặp 1h/5m. Nên drill chạy khoảng ba giờ traffic sạch trước, để cặp 1h/5m về trước, và ghi lại
-burn của từng cửa sổ lúc page bắn. Cặp nào bắn là điều tôi đọc ra, không phải điều tôi đoán từ tên alert."
+**A5.2** **Ý chính:** "Chỉ cặp 1h/5m được hiệu chỉnh cho phần lớn một phiên. Sloth gộp hai cặp page vào cùng một
+alert bằng phép `or` — đã xác nhận trên file sinh ra — nên tôi không chọn được cặp, cặp nào vượt ngưỡng trước thì bắn.
+Tôi từng tính rằng với một giờ sạch, nhánh 6h/30m sẽ bắn trước ở khoảng bốn phút. Drill chạy trên một giờ sạch, nhưng
+store đã chứa nhiều giờ traffic sạch trước đó, nên cửa sổ 6h chỉ lên 5.30 so với 5.6 và cặp 1h/5m page ở 9 phút 30 giây.
+Cặp nào bắn là điều tôi đọc ra từ burn của từng cửa sổ, không phải điều tôi đoán từ tên alert."
 
-*Nếu được hỏi thêm:* với ba giờ sạch, cửa sổ sáu giờ cần khoảng mười một phút — cặp một giờ thắng với khoảng cách
-vài phút, cũng là tính toán. Hai cặp ticket vượt ngưỡng trong vài phút đầu dù thế nào, với tiêu đề `[TICKET]`, và được
+*Nếu được hỏi thêm:* điều quyết định là store chứa bao nhiêu traffic sạch, không phải drill chạy bao lâu trước lỗi:
+mẫu số của cửa sổ 6h lớn thì lỗi 50% cần khoảng hai mươi phút mới đẩy nó qua 5.6. Hai cặp ticket vượt ngưỡng trong vài phút đầu dù thế nào, với tiêu đề `[TICKET]`, và được
 ghi là chưa hiệu chỉnh.
 
 **Mẹo:** đây là chỗ mà chính việc rà lại thiết kế đã tìm ra lỗi. Kể được "ban đầu tôi nghĩ một giờ sạch là đủ, tính lại thì
@@ -166,13 +167,13 @@ không" là một câu chuyện tốt.
 
 ### A6. Drill
 
-**A6.1** **Ý chính:** "Một bản ở chế độ fake với 50% lỗi, promote thẳng lên toàn bộ traffic, sau khoảng ba giờ
-traffic sạch. Rồi đo thời gian tới khi page tới Discord, chia theo từng phần, và ghi `alertname`, severity, SLO
+**A6.1** **Ý chính:** "Một bản ở chế độ fake với 50% lỗi, promote thẳng lên toàn bộ traffic, sau một giờ traffic
+sạch. Rồi đo thời gian tới khi page tới Discord, chia theo từng phần, và ghi `alertname`, severity, SLO
 và burn của từng cửa sổ."
 
 *Nếu được hỏi thêm:* bản đó phải ghim cả `LLM_PROVIDER=fake`, vì tỉ lệ lỗi chỉ được fake provider đọc — Delivery
-A8.2. Tên alert của page và ticket có thể giống nhau, chỉ khác label severity **[kiểm chứng]** — nên tên alert
-một mình không đủ.
+A8.2. Page và ticket mang **cùng** tên alert, `AnimeApiAvailabilityBudgetBurn`, chỉ khác label `severity`
+(`deploy/slo/generated/anime-api.yaml`) — nên tên alert một mình không đủ.
 
 **A6.2** **Ý chính:** "Vì alert đọc tỉ lệ lỗi của cả service. Ở mức canary 10%, 50% lỗi thành 5% tổng — burn rate 10. Như vậy dưới ngưỡng 13.44 của cặp 1h/5m, nên cặp đó không bao giờ bắn; cặp 6h/30m với ngưỡng 5.6 chỉ bắn sau
 hơn một tiếng, theo tính toán — lâu hơn một drill. Sự im lặng trong khoảng đó sẽ bị đọc nhầm thành alert hỏng.
@@ -192,7 +193,7 @@ cặp nào bắn, như ở A5.2."
 
 **A6.5** **Ý chính:** "Lần scrape đầu mang request lỗi; recording rule biến counter thành tỉ lệ, theo chu kỳ
 riêng của nó; lần đánh giá alert rule đầu tiên thấy cả hai cửa sổ vượt ngưỡng — rule của Sloth không có thời gian
-chờ thêm, nên nó bắn luôn **[kiểm chứng]**; thời gian gom nhóm của Alertmanager; và thời gian Discord gửi. Chỉ
+chờ thêm (không có `for:`), nên nó bắn luôn; thời gian gom nhóm của Alertmanager; và thời gian Discord gửi. Chỉ
 phần số học cửa sổ là về SLO; phần còn lại là cấu hình. Ghi từng phần mới biến 'từ lỗi tới tin nhắn mất X phút'
 thành thứ có thể làm nhanh hơn."
 
@@ -279,8 +280,8 @@ với burn 13.44 thì budget 28 ngày hết trong khoảng **hai ngày**, với 
 trừ 1h/5m đều tính trên ít dữ liệu hơn cái tên nó mang** — phải đọc burn rate từng cửa sổ trước khi tin cặp nào đã
 bắn.
 
-Và một điều runbook **còn phải thêm** — tôi đã đo mà chưa viết vào đó: **page sẽ không tắt cùng lúc với bản
-sửa.** Drill đo được 26 phút 06. Người vận hành chờ nó tắt ngay sẽ kết luận bản sửa không ăn và đi tìm một sự cố thứ hai không
+Và một điều runbook giờ đã ghi, từ phép đo: **page sẽ không tắt cùng lúc với bản sửa.** Drill đo được 26 phút 06,
+do cặp 6h/30m giữ. Người vận hành chờ nó tắt ngay sẽ kết luận bản sửa không ăn và đi tìm một sự cố thứ hai không
 tồn tại.
 
 **Mẹo:** "một alert tới mà không kèm hướng dẫn thì là một lần bị ngắt, không phải một tín hiệu" — câu đó ở đầu

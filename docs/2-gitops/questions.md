@@ -10,7 +10,7 @@ của stage này đều cần một phép kiểm thứ hai đi kèm.
 | Phần | Kiểm tra điều gì |
 |---|---|
 | **A. Phỏng vấn** | Bạn trình bày được các quyết định của stage và lý do đằng sau từng quyết định, bằng lời của mình |
-| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về từng file trong `deploy/argocd/`, và chỉ viết được khi code đã có |
+| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về từng file trong `deploy/argocd/`; code đó đã có, nên phần này giờ viết được |
 
 Bộ liên quan: [tổng quan project](../common/questions.md), [managed so với self-managed](../aws/questions.md),
 [Terraform](../1-terraform/questions.md), [CI/CD](../3-cicd/questions.md),

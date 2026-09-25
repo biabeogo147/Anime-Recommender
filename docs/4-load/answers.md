@@ -125,11 +125,11 @@ giữa hai ranh giới thì selector không khớp series nào, và SLO trả v�
 phải số không. Một SLO như vậy không bao giờ được tính và không bao giờ báo động, trong khi file rule trông hoàn toàn
 hợp lý."
 
-*Nếu được hỏi thêm:* selector khớp chuỗi chính xác, nên cách viết con số cũng phải khớp — ví dụ `3.0` so với `3`
-**[kiểm chứng: định dạng `le` mà client Python xuất ra]**.
+*Nếu được hỏi thêm:* selector khớp chuỗi chính xác, nên cách viết con số cũng phải khớp — ví dụ `3.0` so với `3`.
+Client Python xuất `le="8.0"`, và rule SLO viết đúng như vậy (`deploy/slo/anime-api.sloth.yaml`).
 
-**A3.5** **Ý chính:** "Chúng quá thô. Hiện là 0.1, 0.25, 0.5, 1, 2, 4, 8, 16, 32 giây, nên T chỉ nhảy được từ 2 lên 4
-lên 8. Tệ hơn là cổng latency của canary: với latency của fake provider, gate viết là 1.2 lần thực tế chỉ bắn ở khoảng
+**A3.5** **Ý chính:** "Chúng từng quá thô. Trước stage này là 0.1, 0.25, 0.5, 1, 2, 4, 8, 16, 32 giây, nên T chỉ nhảy được từ 2
+lên 4 lên 8 — nay là 16 ranh giới (`src/anime/metrics.py`). Tệ hơn là cổng latency của canary: với latency của fake provider, gate viết là 1.2 lần thực tế chỉ bắn ở khoảng
 1.43 lần. Lý do là ước lượng không vượt được ranh giới 2 giây cho tới khi hơn 5% request vượt nó. Bucket mới dày hơn
 quanh 1 tới 3 giây — thêm 0.75, 1.25, 1.5, 1.75, 2.5, 3 và 6 — để gate bắn ở khoảng 1.22 lần và T có thể là 2.5 hay 3.
 Đó là một thay đổi trong code metric của app, làm trước cả hai lần chạy của stage này, vì T được đọc từ chính các
@@ -191,9 +191,9 @@ service cần — một chi phí trả vào mỗi giờ cao điểm, cho một c
 **A4.4** **Ý chính:** "Không. Số replica cố định, nên không có pod mới nào được yêu cầu, và node group không bao giờ bị
 chạm tới trần. Trần đó thuộc về lần chạy autoscaling ở stage sau."
 
-**A4.5** **Ý chính:** "Tại điểm gãy, lần ramp biết mỗi pod đang giữ bao nhiêu request in-flight. Ngưỡng của autoscaler
-được đặt thấp hơn con số đó một chút, để scale bắt đầu *trước* điểm gãy chứ không phải *tại* nó. CPU và memory mỗi pod
-đo trong lần ramp cũng là căn cứ cho resource request."
+**A4.5** **Ý chính:** "Thiết kế định đọc số in-flight mỗi pod tại điểm gãy rồi đặt ngưỡng autoscaler thấp hơn một chút.
+Nhưng con số đó không lặp lại được giữa hai lần chạy, nên ngưỡng — 30 — lấy từ giới hạn nó thay mặt: 40 thread mỗi pod,
+mà trần 93.9 req/s xác nhận. CPU và memory mỗi pod đo trong lần ramp là căn cứ cho resource request."
 
 *Nếu được hỏi thêm:* nó ra **170.5** ở lần 1 và **117.5** ở lần 2 — lệch 45%, nên tôi không dùng con số này.
 Cụm cư xử giống nhau cả hai lần, trần 93.9 req/s chứng minh điều đó, nên chỗ bất định nằm ở *dụng cụ đo* chứ không ở
@@ -204,13 +204,14 @@ chạy, nên nó đếm cả request đang xếp hàng chờ thread — middlewa
 ghi nó cạnh số thread. Vì sao scale theo in-flight chứ không theo CPU nằm ở stage Scaling.
 
 **A4.6** **Ý chính:** "Trước stage này `/healthz`, `/readyz` và `/metrics` là handler đồng bộ, nên chúng chạy chung một thread pool
-có giới hạn với các lời gọi model của `/recommend` — bốn mươi thread, mặc định của thư viện bên dưới **[kiểm chứng]**.
+có giới hạn với các lời gọi model của `/recommend` — bốn mươi thread, mặc định của thư viện bên dưới, và trần 93.9 req/s
+khớp đúng phép tính 40 thread (`evidence/load.md`).
 Lúc bão hoà, một lần scrape phải xếp hàng sau các thread đang bận và timeout, nên series in-flight biến mất khỏi kết quả
 query đúng lúc autoscaler cần nó. Probe cũng xếp hàng như vậy: readiness có thể rút một pod đang bận khỏi load balancer,
 còn liveness có thể khiến kubelet khởi động lại nó — tệ hơn nữa. Cả ba không làm việc chặn nào, nên chúng đã chuyển thành
 `async def` và chạy trên event loop, trước lần ramp."
 
-*Nếu được hỏi thêm:* chính thread pool đó có lẽ là giới hạn capacity ở chế độ fake — một trần về đồng thời chứ không
+*Nếu được hỏi thêm:* chính thread pool đó là giới hạn capacity ở chế độ fake (đã xác nhận: trần 93.9 req/s, 0.23 core mỗi pod) — một trần về đồng thời chứ không
 phải CPU. Đó là lý do một điểm gãy ở chế độ fake vẫn nói được điều gì đó về việc scale ở chế độ thật.
 
 ### A5. Hai chế độ

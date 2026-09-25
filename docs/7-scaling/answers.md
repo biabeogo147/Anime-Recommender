@@ -68,7 +68,7 @@ nhiên. Câu đáng nhớ nhất của stage này không phải "cụm đã scal
 con số cố định ghi trong Git, bất kể traffic."
 
 **A1.3** **Ý chính:** "Chạy lại lần ramp với ScaledObject và Cluster Autoscaler đang hoạt động: replica tăng dần
-về 8, node về 4, rồi cả hai quay về. Bằng chứng là replica và node theo thời gian, giá trị của trigger, độ trễ
+về 8, node về phía 4 (đo được: lên 3), rồi cả hai quay về. Bằng chứng là replica và node theo thời gian, giá trị của trigger, độ trễ
 scale out của pod và của node tách riêng, thời điểm scale in của pod so với cửa sổ của HPA, và thời điểm bớt node
 so với hai mốc mười phút của Cluster Autoscaler."
 
@@ -83,29 +83,30 @@ thêm. Trigger chạy từ 0 lên 249 *trước khi* `desired` rời khỏi 2.
 đợi phía sau. HPA theo CPU sẽ ngồi ở vài phần trăm trong khi request chồng chất, không bao giờ scale, và dashboard còn bảo
 service đang được dùng ít. Số request đang xử lý mới là thứ tăng đúng lúc service đuối."
 
-**A2.2** **Ý chính:** "Từ lần ramp ở stage Load: tại điểm gãy, lần chạy đó sẽ đọc thẳng từ gauge xem mỗi pod đang
-giữ bao nhiêu request. Trigger được đặt thấp hơn con số đó một khoảng. Định luật Little — số request đang xử lý
-bằng tốc độ đến nhân thời gian trung bình — là phép đối chiếu, để chắc con số đọc được khớp với tốc độ và latency
-đo cùng lúc."
+**A2.2** **Ý chính:** "Từ giới hạn kiến trúc: 40 thread mỗi pod, mỗi request một thread, nên in-flight trên 40 nghĩa là
+có hàng đợi. Trigger là 30, thấp hơn giới hạn đó một khoảng. Thiết kế ban đầu định đọc thẳng số in-flight tại điểm gãy
+ở stage Load, nhưng hai lần ramp ra 170.5 và 117.5 — không tái lập. Định luật Little — số request đang xử lý bằng tốc
+độ đến nhân thời gian trung bình — là phép đối chiếu: 40 thread chia 0.85 giây là 47 req/s mỗi pod, khớp trần 93.9
+req/s cho hai pod."
 
 *Nếu được hỏi thêm:* dùng latency *trung bình*, không phải p95 — p95 thổi phồng số request một pod giữ. Và ở mép
-một ramp đang tăng, hệ thống không hẳn ổn định, nên phép đối chiếu chỉ gần đúng; gauge mới là số đọc chính. Kết quả: ngưỡng trigger là **30**, và tôi *không* lấy nó từ in-flight tại điểm gãy — con số đó ra 170.5 rồi 117.5
-ở hai lần ramp, lệch 45%, không tái lập. Ngưỡng lấy từ giới hạn kiến trúc mà nó đang thay mặt: 40 luồng mỗi pod. Khi
+một ramp đang tăng, hệ thống không hẳn ổn định, nên phép đối chiếu chỉ gần đúng. Khi
 chạy, gauge đo được **31–31.9** in-flight mỗi pod ở 7 replica và **27.7–28.9** ở 8 — đúng hai bên ngưỡng 30, nên HPA
 dừng ở `maxReplicas`.
 
 **A2.3** **Ý chính:** "Vì tôi đo điểm gãy như một giới hạn về *đồng thời*, không phải về tốc độ. Một điểm gãy
 tính bằng request mỗi giây không mang được từ chế độ fake sang chế độ thật, vì model thật chậm hơn nhiều lần. Còn
 một giới hạn kiểu 'một pod giữ được tối đa bấy nhiêu request cùng lúc' thì không quan tâm mỗi request mất bao
-lâu. Thread pool của api nhiều khả năng chính là giới hạn đó — nên ngưỡng được viết bằng in-flight chứ không bằng
+lâu. Thread pool của api chính là giới hạn đó, như lần ramp xác nhận — nên ngưỡng được viết bằng in-flight chứ không bằng
 tốc độ."
 
-*Nếu được hỏi thêm:* "nhiều khả năng" là thật — nếu điểm gãy ở chế độ fake hoá ra là CPU chứ không phải thread pool, lập luận
-này yếu đi, và bản ghi phải nói vậy. Load A4.6.
+*Nếu được hỏi thêm:* phép đo đã trả lời: ở trần, mỗi pod chỉ dùng 0.23 core — giới hạn là thread pool, không phải CPU
+(`evidence/load.md`). Load A4.6.
 
 **A2.4** **Ý chính:** "Vì trigger dùng kiểu giá trị trung bình, nghĩa là HPA tự chia tổng cho số pod. Nếu query
 đã chia rồi thì bị chia hai lần. Và fallback của KEDA chạy với kiểu trung bình đó — lý do thứ hai để giữ query là
-một `sum` đơn giản **[kiểm chứng: fallback hỗ trợ những kiểu nào ở phiên bản KEDA được ghim]**."
+một `sum` đơn giản. ScaledObject đặt fallback `currentReplicasIfHigher` và cụm chấp nhận nó trên phiên bản KEDA
+được ghim; nhánh fallback thì chưa từng chạy (`Fallback=False` suốt lần đo)."
 
 ### A3. Một vòng điều khiển có độ trễ
 
@@ -121,9 +122,9 @@ không, HPA tự kéo giá trị từ KEDA khi cần.
 **A3.2** **Ý chính:** "Vì khoảng cách giữa trigger và điểm gãy là thứ trả tiền cho mọi độ trễ ở trên. Đặt trigger
 đúng điểm gãy thì mọi lần scale out đều tới muộn — capacity tới sau lúc cần nó."
 
-**A3.3** **Ý chính:** "Hai điều. Hiện endpoint health và metrics còn chạy chung thread pool với request thật. Lúc
-bão hoà, lần scrape và probe xếp hàng sau công việc: tín hiệu biến mất, và một pod đang bận bị đánh dấu không sẵn
-sàng đúng ở điểm gãy. Thiết kế chuyển chúng thành `async def` trước lần ramp. Điều thứ hai: ở chế độ thật, pod
+**A3.3** **Ý chính:** "Hai điều. Endpoint health và metrics từng chạy chung thread pool với request thật. Lúc bão hoà,
+lần scrape và probe xếp hàng sau công việc: tín hiệu biến mất, và một pod đang bận bị đánh dấu không sẵn sàng đúng ở
+điểm gãy. Chúng đã được chuyển thành `async def` trước lần ramp. Điều thứ hai: ở chế độ thật, pod
 mới khởi động phải gọi API embedding. Nếu provider đó sập thì pod mới không bao giờ sẵn sàng, scale out đứng lại,
 còn pod cũ vẫn chạy tiếp."
 
@@ -172,8 +173,8 @@ service này tối thiểu là hai. Nên #14 so thời điểm scale in với c�
 giờ áp dụng."
 
 *Nếu được hỏi thêm:* ra nhanh, vào chậm — thêm capacity muộn thì người dùng chịu, bớt sớm thì một phút sau phải
-scale out lại và trả lại toàn bộ độ trễ khởi động. Mặc định của HPA cho scale out không chờ, mỗi mười lăm giây
-tăng được gấp đôi hoặc thêm bốn pod; sau cửa sổ scale in, ScaledObject chỉ cho bớt một pod mỗi phút, để scale in không
+scale out lại và trả lại toàn bộ độ trễ khởi động. ScaledObject đặt scale out không chờ (cửa sổ 0), thêm tối đa hai
+pod mỗi 30 giây; sau cửa sổ scale in, ScaledObject chỉ cho bớt một pod mỗi phút, để scale in không
 rút nhiều pod cùng lúc. Thời điểm quay về: lần giảm đầu 8 → 7 lúc 13:45:14Z, **5 phút 12** sau khi tải dừng — đúng cửa sổ stabilisation
 300 giây — rồi về `minReplicas` 2 lúc 13:50:04Z, tổng **10 phút 02**.
 
@@ -193,7 +194,8 @@ lúc 13:56:45Z. Log của Cluster Autoscaler cho thấy nó *từ chối* bớt 
 **A5.3** **Ý chính:** "Đó là một chỗ design ban đầu bỏ sót, và tôi đã thêm vào. Bớt một pod là bỏ địa chỉ IP của
 nó khỏi ALB, nhưng việc gỡ đăng ký mất thời gian, trong khi pod đã được bảo dừng. Không có một khoảng trễ nhỏ
 trước khi dừng và một thời gian ân hạn dài hơn thời gian gỡ, mỗi lần scale in sẽ trả lỗi cho những request còn
-đang trên đường — lỗi mà SLO sẽ đếm. Các con số cụ thể đặt khi viết chart **[kiểm chứng]**."
+đang trên đường — lỗi mà SLO sẽ đếm. Chart đặt `preStop` ngủ 15 giây, grace 45 giây, và deregistration delay 30 giây;
+lần scale in đo được 0 lỗi trên 4,935 request."
 
 ### A6. Khi tín hiệu biến mất
 
@@ -213,7 +215,8 @@ một fallback kiểu 'chạy n replica' sẽ scale *xuống* n dễ như scale 
 tại nếu nó cao hơn. Tín hiệu biến mất thì phải giữ nguyên, không được dịch chuyển."
 
 *Nếu được hỏi thêm:* cụ thể là `ignoreNullValues: false`, rồi `failureThreshold`, số replica fallback, và chế độ
-`currentReplicasIfHigher` — chỉ có ở một số phiên bản KEDA, nên phiên bản được ghim lúc dựng **[kiểm chứng]**.
+`currentReplicasIfHigher` — chỉ có ở một số phiên bản KEDA; phiên bản được ghim chấp nhận nó, nhưng nhánh fallback
+chưa từng chạy trong lần đo.
 Còn một lỗ hổng: mất *một phần* series — scrape của một pod timeout — thì kết quả không rỗng, chỉ thấp đi, và
 không phép kiểm nào bắt được. Chỉ cửa sổ scale in đỡ được, nếu lần mất ngắn hơn cửa sổ.
 

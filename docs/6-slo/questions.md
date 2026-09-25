@@ -10,7 +10,7 @@ chứng minh được gì.
 | Phần | Kiểm tra điều gì |
 |---|---|
 | **A. Phỏng vấn** | Bạn trình bày được các quyết định của stage và lý do đằng sau từng quyết định, bằng lời của mình |
-| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về spec Sloth, rule sinh ra và route của Alertmanager, khi code đã có |
+| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về spec Sloth, rule sinh ra và route của Alertmanager; code đó đã có, nên phần này giờ viết được |
 
 Bộ liên quan: [tổng quan project](../common/questions.md), [Load](../4-load/questions.md),
 [progressive delivery](../5-delivery/questions.md). Ý tưởng của stage: [README](README.md) · [concepts](concepts.md).

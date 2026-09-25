@@ -9,7 +9,7 @@ người nghe chọn chỗ đào sâu dựa vào những gì bạn nói ở đâ
 | Phần | Kiểm tra điều gì |
 |---|---|
 | **A. Phỏng vấn** | Bạn kể được cả project một cách mạch lạc, trung thực về trạng thái của nó, và dẫn người nghe tới đúng stage |
-| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về code của app và cấu trúc repo, khi phần hạ tầng đã có |
+| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về code của app và cấu trúc repo; code đó đã có, nên phần này giờ viết được |
 
 Bộ theo stage: [Terraform](../1-terraform/questions.md) · [GitOps](../2-gitops/questions.md) · [CI/CD](../3-cicd/questions.md)
 · [Load](../4-load/questions.md) · [Delivery](../5-delivery/questions.md) · [SLO](../6-slo/questions.md) ·

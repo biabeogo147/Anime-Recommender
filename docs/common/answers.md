@@ -111,17 +111,20 @@ Kubernetes bằng kubeadm."
 **Mẹo:** câu này phải gọn — khoảng 50 giây, **hai** con số, không phải tám. Người phỏng vấn sẽ hỏi tiếp; để dành số
 cho lúc đó. Và nói hai chỗ chưa trọn ngay trong một phút đầu, vì mọi câu sau sẽ dựa trên nó.
 
-**A1.2** **Ý chính:** "App tách thành hai: một API FastAPI giữ index vector 269 anime và gọi Gemini, và một UI
+**A1.2** **Ý chính:** "App tách thành hai: một API FastAPI giữ index vector 269 anime và gọi OpenAI `gpt-4o-mini`
+(Gemini vẫn chọn được), và một UI
 Streamlit mỏng. Phase app sửa sáu lỗi thật và đo kết quả: một image 6.45 GB thành hai image cộng lại 1.18 GB,
 token không lọt vào layer nào, và tôi cố tình làm phép kiểm index thất bại để chắc nó bắt được lỗi.
 
 Rồi tôi thiết kế tám stage hạ tầng, mỗi stage giải quyết thứ stage trước để lại — thứ tự ở A3.4. Ba cơ chế SRE là
 phần lõi. Một: SLO availability 99.5% trên 28 ngày, alert khi burn rate vượt 13.44 lần trên cặp cửa sổ một giờ và
 năm phút. Hai: canary 10, 50, 100 phần trăm, mỗi mức phải có tỉ lệ thành công ít nhất 99% và p95 không quá 1.2
-lần bản stable. Ba: KEDA scale api từ 2 tới 8 pod theo số request đang xử lý, với ngưỡng lấy từ phép đo.
+lần bản stable. Ba: KEDA scale api từ 2 tới 8 pod theo số request đang xử lý, với ngưỡng 30 đặt dưới giới hạn 40 thread
+mỗi pod, mà các lần ramp xác nhận.
 
-Xuyên suốt, mỗi stage có một mục riêng: nó có thể pass mà vẫn hỏng theo cách nào. Tất cả mới là thiết kế; con số đầu tiên của
-hạ tầng sẽ là số resource của Terraform, ghi trước rồi mới so."
+Xuyên suốt, mỗi stage có một mục riêng: nó có thể pass mà vẫn hỏng theo cách nào. Cả tám stage đã dựng và đã chạy trên
+AWS; con số đầu tiên của hạ tầng là số resource của Terraform — 15, 92 và 2 — ghi trước rồi mới so, và plan lại thì không
+đổi gì."
 
 *Nếu được hỏi thêm:* thứ tự ở A3.4, pass sai ở A4.2.
 
@@ -154,8 +157,8 @@ ngoài, embedding qua Hugging Face rồi chat qua OpenAI, nên **T = 8 giây là
 model. Cả hai nhánh đều có phân loại lỗi riêng: `recommender.py` bắt lỗi retrieval thành `UpstreamError(stage="retrieval")`,
 đếm vào `anime_upstream_errors_total{stage}` và trả **503 "Retrieval unavailable"**, còn nhánh model trả 503 "Upstream
 model unavailable". Nhờ nhãn `stage` đó mà runbook bước 2 tách được "provider hỏng" khỏi "index hỏng" khỏi "api tự
-hỏng". Thiết kế §5 vẫn ghi nhánh này là 500 chưa phân loại — đó là chỗ tài liệu cũ hơn code.
-Ghi prompt vào trace thì chưa viết.
+hỏng". Thiết kế §5 giữ nguyên câu cũ là 500 chưa phân loại, kèm một ghi chú "Changed before stage 4".
+Ghi prompt vào trace đã viết, sau cờ `OTEL_CAPTURE_CONTENT` đang bật trong chart.
 
 **Mẹo:** "cộng lại giảm khoảng 82%" — không nói "giảm 90%". 90% chỉ là của api, so một image với một nửa thứ thay nó.
 
@@ -188,8 +191,9 @@ rồi mới thấy thì đắt hơn nhiều — A7.1."
 **A3.1** **Ý chính:** "Ngoài cùng là hai cửa. Một ALB public cho app qua HTTPS, một ALB nội bộ cho bốn UI quản
 trị, chỉ tới được qua WireGuard; cả hai dùng một chứng chỉ ACM. API của Kubernetes không có địa chỉ public nào —
 tôi vào nó bằng tunnel SSM từ ops workstation. Bên trong là EKS với node group Spot từ hai tới bốn node. Argo CD
-kéo mọi thứ từ Git theo wave. Prometheus với rule SLO do Sloth sinh sẵn — `make slo-generate` chạy ngoài CI, tôi commit
-output vào Git, còn CI chỉ chạy `make slo-check` và fail nếu file đã commit lệch so với bản sinh lại — Alertmanager
+kéo mọi thứ từ Git theo wave. Prometheus với rule SLO do Sloth sinh sẵn — Sloth chỉ chạy trong container; CI chạy
+`make slo-check`, fail nếu file đã commit lệch so với bản sinh lại, và rule đang commit chính là bản CI sinh ra
+(artifact `slo-regenerated`) — Alertmanager
 gửi tới Discord. Argo Rollouts; KEDA và Cluster Autoscaler; OpenTelemetry Collector tới Tempo và Langfuse.
 Terraform giữ phần AWS, chia ba stack theo vòng đời."
 
@@ -201,9 +205,9 @@ canary theo trọng số. Pod api — đăng ký bằng IP — embed câu hỏi 
 trả lời; cả hai lời gọi ra ngoài đều đi qua NAT. Trên đường đi, histogram ghi latency cho SLI và gate, gauge ghi
 số request đang xử lý cho KEDA, và span đi tới collector."
 
-*Nếu được hỏi thêm:* UI gọi API qua ALB hay qua Service trong cụm là một điểm design còn mở. Nó quyết định
-traffic của người dùng thật có đi theo trọng số canary hay không; drill thì không bị ảnh hưởng, vì k6 gọi thẳng
-`api.anime`.
+*Nếu được hỏi thêm:* UI gọi API qua ALB hay qua Service trong cụm đã chốt ở stage 5: UI gọi Service **stable**
+`anime-api-stable`, nên người dùng thật chỉ gặp canary qua `api.anime`, đúng theo trọng số của ALB
+(`deploy/argocd/root/templates/app.yaml`). Drill thì không bị ảnh hưởng, vì k6 gọi thẳng `api.anime`.
 
 **A3.3** **Ý chính:** "Merge vào `main`. GitHub Actions lint, test, build index và kiểm số tài liệu, build hai
 image, scan, rồi — chỉ trên `main` — đổi token OIDC lấy quyền push, push theo digest, ký keyless, gắn SBOM, và
@@ -335,13 +339,13 @@ quan trọng — để đọc được."
 
 ### A7. Nhìn lại
 
-**A7.1** **Ý chính:** "Câu chuyện tôi thích kể nhất: tôi từng nghĩ drill alert chỉ cần một giờ traffic sạch. Tính
-lại, thì với một giờ sạch, cặp 6h/30m chưa hiệu chỉnh sẽ vượt ngưỡng trước cặp 1h/5m, vì cửa sổ sáu giờ chỉ chứa
-đúng giờ sạch đó cộng phần lỗi — theo tính toán, với giả định Sloth gộp hai cặp bằng `or` **[kiểm chứng]**. Nên
-drill giờ chạy khoảng ba giờ sạch và ghi burn của từng cửa sổ. Những lỗi khác cũng tìm ra khi rà lại: endpoint
-public với danh sách IP được thay bằng đóng hẳn; External Secrets suýt được đọc `anime/*`, tức đọc được cả key
-VPN; và Argo Rollouts không có điều kiện riêng cho inconclusive, nên chặn kết quả rỗng phải viết vào cả hai điều
-kiện **[kiểm chứng]**."
+**A7.1** **Ý chính:** "Câu chuyện tôi thích kể nhất: tôi dự đoán sai cặp nào sẽ page. Tính trên giấy, với một giờ
+sạch, cặp 6h/30m chưa hiệu chỉnh sẽ vượt ngưỡng trước, ở khoảng 4 phút. Chạy thật thì store đã có nhiều giờ traffic
+sạch từ trước, nên cửa sổ 6h chỉ lên 5.30 so với ngưỡng 5.6 và không thắng được; cặp 1h/5m đã hiệu chỉnh page ở
+9 phút 30 giây. Sloth gộp hai cặp bằng `or` — đã xác nhận trên file sinh ra. Những lỗi khác cũng tìm ra khi rà lại:
+endpoint public với danh sách IP được thay bằng đóng hẳn; External Secrets suýt được đọc `anime/*`, tức đọc được cả
+key VPN; và Argo Rollouts không có điều kiện riêng cho inconclusive, nên chặn kết quả rỗng phải viết vào cả hai điều
+kiện (`analysistemplate.yaml`)."
 
 *Nếu được hỏi thêm:* health check cho Application thì là bài học mang từ Medical: bản đầu của Medical chỉ đọc
 Healthy và thả hết các wave cùng lúc, tốn một lượt cấp Let's Encrypt; Anime dùng bản đòi cả Synced ngay từ

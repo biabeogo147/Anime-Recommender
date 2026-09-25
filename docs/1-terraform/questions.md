@@ -10,7 +10,7 @@ chưa chứng minh được gì.
 | Phần | Kiểm tra điều gì |
 |---|---|
 | **A. Phỏng vấn** | Bạn trình bày được các quyết định của stage và lý do đằng sau từng quyết định, bằng lời của mình |
-| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về từng khối trong `infra/terraform/`, và chỉ viết được khi code đã có |
+| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về từng khối trong `infra/terraform/`; code đó đã có, nên phần này giờ viết được |
 
 Bộ liên quan: [tổng quan project](../common/questions.md), [managed so với self-managed](../aws/questions.md),
 [GitOps](../2-gitops/questions.md), [CI/CD](../3-cicd/questions.md). Ý tưởng của stage: [README](README.md) ·

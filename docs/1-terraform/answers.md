@@ -238,7 +238,7 @@ tiền hằng năm, và tôi ghi nó ra thành một ràng buộc đã biết th
 theo bản ghi mới, nhưng một laptop còn cache địa chỉ cũ sẽ bắt tay thất bại cho tới khi cache hết hạn — và lỗi đó trông
 như lỗi tường lửa.
 
-**A8.3** **Ý chính:** "Tiết kiệm chi phí, đổi lại là một điểm hỏng duy nhất cho mọi thứ pod gọi ra ngoài VPC: Gemini,
+**A8.3** **Ý chính:** "Tiết kiệm chi phí, đổi lại là một điểm hỏng duy nhất cho mọi thứ pod gọi ra ngoài VPC: OpenAI (hoặc Gemini),
 Hugging Face, Langfuse, webhook Discord. Mất zone chứa NAT là mất cả bốn, và SLI ghi nhận đó như lỗi của chính service."
 
 **A8.4** **Ý chính:** "Đúng với điều kiện bản ghi xác thực vẫn còn trong zone. Có thể còn một điều kiện nữa: chứng chỉ

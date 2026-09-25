@@ -23,9 +23,10 @@ một check; **nửa âm / nửa dương** cho hai nửa của #16 (tắt VPN ph
 | Bốn tên quản trị, tắt VPN, từ laptop | resolve ra địa chỉ `10.30.x.x` và không nối được | A6.2 |
 | Bốn tên quản trị, bật VPN | mở được cả bốn | A6.2 |
 
-Cây app-of-apps sau đó còn dài ra: stage 5 thêm `alerting-secret` và `slo`, stage 7 thêm `keda` và
-`cluster-autoscaler`, mỗi cái đều được ghi `Synced`/`Healthy` trong
-[scaling](../evidence/scaling.md) và [slo](../evidence/slo.md).
+Cây app-of-apps sau đó còn dài ra: stage 5 thêm `argo-rollouts`, stage 6 thêm `alerting-secret` và `slo`, stage 7
+thêm `keda` và `cluster-autoscaler`, stage 8 thêm `tracing-secret`, `tempo`, `opentelemetry-collector` và `dashboards`
+(`deploy/argocd/root/templates/`). Các stage đó đã chạy, nhưng trạng thái `Synced`/`Healthy` của chính các Application ấy
+không được ghi lại.
 
 | Chỗ còn trống | Vì sao | Dùng ở |
 |---|---|---|
@@ -139,7 +140,7 @@ Cùng lỗi đó giờ khiến pod mới không Ready, và rollout dừng lại 
 readiness gate đổi nó từ im lặng thành ồn ào."
 
 *Nếu được hỏi thêm:* health check mặc định gọi `GET /`, đường dẫn mà cả hai app đều không phục vụ, nên mỗi app
-khai rõ đường dẫn của mình — `/healthz` cho API, `/_stcore/health` cho UI. Gate chỉ được gắn vào pod tạo ra sau
+khai rõ đường dẫn của mình — `/readyz` cho API (pod chưa nạp index thì không nhận traffic), `/_stcore/health` cho UI. Gate chỉ được gắn vào pod tạo ra sau
 khi target group binding đã tồn tại, nên những pod đầu tiên của lần dựng đầu có thể lọt qua **[kiểm chứng]**.
 
 **Mẹo:** đây là câu thể hiện rõ nhất cách nghĩ của cả project — "khi một cấu hình sai là có thể xảy ra, hãy làm
@@ -215,7 +216,8 @@ và nửa dương của #16 thất bại vì một lý do không liên quan gì 
 điều đã chứng minh."
 
 *Nếu được hỏi thêm:* cách vòng qua là đưa một DNS server vào profile WireGuard, hoặc dùng mạng khác — tức là đúng
-cái giá mà bản ghi public được chọn để tránh. Mạng nhà của tôi `[điền: có chặn hay không]`.
+cái giá mà bản ghi public được chọn để tránh. Mạng laptop dùng lúc kiểm không chặn (evidence không ghi là mạng nào): tắt VPN, cả bốn tên vẫn resolve ra
+`10.30.x.x` từ laptop (`evidence/gitops.md`).
 
 **A6.3** **Ý chính:** "Hai chỗ. Gateway không bật IP forwarding thì gói từ tunnel bị bỏ ngay ở gateway, không tới
 được VPC. Có forwarding mà không có masquerade — viết lại địa chỉ nguồn thành địa chỉ của gateway — thì request tới
@@ -251,8 +253,8 @@ Argo CD đã *tải về*, có thể chậm hơn `main`. Và 'tất cả đều 
 gọi đúng tên từng Application, đếm số lượng, so revision với `main`, và đọc một trường readiness thật cho mỗi kiểu
 custom."
 
-*Nếu được hỏi thêm:* khi stage đóng là **8 trên 8**. Các stage sau còn thêm vào — stage 5 thêm
-`alerting-secret` và `slo`, stage 7 thêm `keda` và `cluster-autoscaler`, cả bốn đều được ghi `Synced`/`Healthy`. Cây
+*Nếu được hỏi thêm:* khi stage đóng là **8 trên 8**. Các stage sau còn thêm vào — stage 5 thêm `argo-rollouts`, stage 6
+thêm `alerting-secret` và `slo`, stage 7 thêm `keda` và `cluster-autoscaler`, stage 8 thêm bốn cái của tracing. Cây
 đầy đủ **theo thiết kế** là 17 Application; đó là con số phép đo M8 chờ, và M8 chưa chạy, nên tôi không nói 17 như
 một số đã đếm.
 
@@ -262,7 +264,7 @@ dù không rule nào khớp hay không target group nào healthy, nên phải ki
 chứng chỉ ACM khác, như ở A3.7. Và kiểm một tên trong khi tuyên bố hai. Nên phép kiểm so serial của chứng chỉ đang
 được phục vụ với chứng chỉ ACM, đọc lại từ listener."
 
-*Nếu được hỏi thêm:* kết quả so serial `[điền: serial trên listener so với ACM]`.
+*Nếu được hỏi thêm:* kết quả so serial: không ghi lại — đó là lý do #15 chỉ là "đã chạy, không trích được".
 
 **A7.3** **Ý chính:** "Vì timeout cũng là hình dạng của một load balancer chưa bao giờ được dựng. Nếu Ingress nội
 bộ không có load balancer nào, nửa âm pass y hệt. Nên hai nửa phải chạy trong cùng một phiên, trên cả bốn tên:

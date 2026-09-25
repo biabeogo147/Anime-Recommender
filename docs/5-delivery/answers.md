@@ -83,7 +83,8 @@ bước nằm trong chuỗi: Rollout chờ nó xong mới đi tiếp. Việc ch�
 ở trọng số mới. Đo ngay sau khi chuyển thì con số chủ yếu mô tả traffic cũ."
 
 *Nếu được hỏi thêm:* lần đo đầu chạy ngay, rồi cách 30 giây, nên bốn lần đo rơi vào giây 0, 30, 60 và 90. Tính ra, mỗi mức
-mất khoảng ba phút rưỡi, và drill rollback nên abort khoảng hai phút rưỡi sau khi chuyển sang 10% **[kiểm chứng]**.
+mất khoảng ba phút rưỡi, và drill rollback nên abort khoảng hai phút rưỡi sau khi chuyển sang 10%. Đo được: **167 giây** từ
+lúc tạo canary tới abort (`evidence/delivery.md`).
 
 **A2.3** **Ý chính:** "Vì như vậy tỉ lệ là tỉ lệ *request*, không phải tỉ lệ pod. Không có router thì một pod mới cạnh
 hai pod cũ nhận một phần ba traffic, bất kể bước đó ghi gì — tỉ lệ trở thành tác dụng phụ của việc scale, chứ không phải
@@ -129,7 +130,7 @@ query latency đọc cả hai hash."
 *Nếu được hỏi thêm:* vì sao là PodMonitor — Load A2.4.
 
 **A4.2** **Ý chính:** "Query trả về rỗng, và mỗi lần đo báo lỗi. Quá giới hạn lỗi liên tiếp — mặc định là bốn — AnalysisRun
-kết thúc ở trạng thái Error, và Rollout abort y như khi thất bại **[kiểm chứng]**. Nghĩa là một lỗi đường ống không lặng lẽ
+kết thúc ở trạng thái Error, và Rollout abort y như khi thất bại. Nghĩa là một lỗi đường ống không lặng lẽ
 promote bản xấu. Nó abort *mọi* bản, ồn ào, và mỗi lần abort trông như lỗi của bản mới."
 
 **A4.3** **Ý chính:** "Khi mọi release đều bị abort, sẽ có người 'sửa' phân tích: cho query trả về không khi không tìm thấy
@@ -151,13 +152,13 @@ Bốn lần đo cách nhau 30 giây, mỗi lần nhìn lại hai phút, nên cá
 ### A5. Ngưỡng trên giấy và ngưỡng thật
 
 **A5.1** **Ý chính:** "Vì p95 của mỗi bản là *ước lượng* từ bucket, và ước lượng không vượt được một ranh giới bucket cho
-tới khi đủ nhiều request vượt nó. Với latency của fake provider và bucket hiện tại, p95 ước lượng của stable nằm ngay dưới
+tới khi đủ nhiều request vượt nó. Với latency của fake provider và bucket cũ, p95 ước lượng của stable nằm ngay dưới
 ranh giới 2 giây, còn 1.2 lần của nó rơi ngay trên. Canary bị ghim ở ranh giới đó cho tới khi nó tệ hơn nhiều. Tính ra,
 gate viết là 1.2 lần thực tế chỉ bắn ở khoảng 1.43 lần — một bản chậm hơn 40% vẫn lọt. Bucket dày hơn đưa nó về khoảng
 1.22 lần."
 
-*Nếu được hỏi thêm:* đây là tính toán, không phải số đo; nó giả định canary chậm đều theo một hệ số. Thay đổi bucket được
-lên kế hoạch trước stage Load, nên nếu nó vào đúng hạn thì lúc chạy delivery gate là khoảng 1.22 lần — cũng là tính toán.
+*Nếu được hỏi thêm:* đây là tính toán, không phải số đo; nó giả định canary chậm đều theo một hệ số. Bucket dày hơn đã vào
+trước stage Load, nên lúc chạy delivery gate là khoảng 1.22 lần — cũng là tính toán.
 Chỉ một drill với một bản cố ý *chậm hơn* — không phải bản lỗi — mới đo được độ nhạy thật, và drill đó không nằm trong
 tiêu chí. Bucket ở Load A3.5.
 
@@ -187,12 +188,13 @@ canary thì khác: không phải số không mà là kết quả rỗng, và r�
 success và failure đều phải đòi kết quả khác rỗng trước khi so, để kết quả rỗng không khớp điều kiện nào."
 
 *Nếu được hỏi thêm:* không có request mà series vẫn còn thì query đếm trả về không, và ngưỡng tối thiểu bắt được. Còn tỉ lệ
-thì ra NaN — không chia được — và cũng phải được điều kiện xử lý **[kiểm chứng]**.
+thì ra NaN — không chia được — và cũng phải được điều kiện xử lý: cả hai điều kiện đều có `!isNaN(result[0])`
+(`analysistemplate.yaml`).
 
 **A6.3** **Ý chính:** "Nếu Spot lấy node duy nhất của canary, mẫu của nó có thể trôi khỏi cửa sổ và query trở thành rỗng.
 Không có quy tắc riêng thì lần đo báo lỗi, và release có thể bị abort vì một sự kiện capacity. Argo Rollouts không có trường
 riêng cho inconclusive, nên cả hai điều kiện đều đòi kết quả khác rỗng — rỗng không khớp điều kiện nào và thành
-inconclusive. Cú pháp chính xác tôi sẽ kiểm lại theo đúng phiên bản **[kiểm chứng]**."
+inconclusive. Cả hai điều kiện bắt đầu bằng `len(result) > 0` (`analysistemplate.yaml`)."
 
 *Nếu được hỏi thêm:* rỗng chỉ xảy ra khi pod mới chưa kịp Ready và được scrape trong lúc mẫu của pod cũ đã trôi khỏi cửa
 sổ hai phút. Một khoảng trống ngắn chỉ gây vài lần đo lỗi, chưa vượt giới hạn lỗi liên tiếp. Spot báo trước hai phút.
@@ -205,7 +207,8 @@ sự bất đồng nằm ở health, không nằm ở trạng thái sync. Đó l
 có người sửa, và nó nhìn thấy được. Đó là khác biệt giữa rollback và drift."
 
 **A7.2** **Ý chính:** "Bằng Git: revert thay đổi, hoặc sửa nó. Revert về digest cũ thì hash quay về hash của stable, và
-Rollout trở lại khoẻ mà không phải đi lại các mức canary **[kiểm chứng]**. Sync lại thì không làm gì, vì chẳng có gì lệch
+Rollout trở lại khoẻ mà không phải đi lại các mức canary — drill thấy đúng vậy: không canary nào khởi động
+(`evidence/delivery.md`). Sync lại thì không làm gì, vì chẳng có gì lệch
 sync. Cách sai là đẩy rollout qua bằng tay với lệnh promote toàn phần: nó xoá Degraded và ship đúng bản mà phân tích đã từ
 chối, mà không ai quyết định bản đó ổn cả. Trạng thái Degraded tồn tại chính để bắt người ta nghĩ lại trước bước đó."
 
@@ -253,7 +256,7 @@ Nó vẫn *tính ra* nhưng **không đo** độ nhạy thật của gate latenc
 drill với bản cố ý chậm hơn, và drill đó không nằm trong tiêu chí."
 
 **A9.3** **Ý chính:** "Ba điều. Controller load balancer nằm trên đường đi của mọi release — nó không áp được trọng số thì
-không gì di chuyển. Cho tới khi bucket đổi, gate latency lỏng hơn 1.2 lần rất nhiều. Và chỉ một người trả lời mọi lần dừng —
+không gì di chuyển. Gate latency là 1.22 lần theo tính toán, chưa đo. Và chỉ một người trả lời mọi lần dừng —
 inconclusive chỉ an toàn nếu có người nhận ra nó. Thêm nữa, UI không có canary."
 
 **A9.4** **Ý chính:** "Đưa lần dừng inconclusive thành một thông báo tới người trực, thay vì chờ ai đó mở dashboard. Rồi thêm

@@ -10,7 +10,7 @@ test.
 | Phần | Kiểm tra điều gì |
 |---|---|
 | **A. Phỏng vấn** | Bạn trình bày được các quyết định của stage và lý do đằng sau từng quyết định, bằng lời của mình |
-| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về từng script trong `load/` và từng query, và chỉ viết được khi code đã có |
+| **B. Chi tiết** | *Chưa viết.* Phần này hỏi về từng script trong `loadtest/k6/` và từng query; code đó đã có, nên phần này giờ viết được |
 
 Bộ liên quan: [tổng quan project](../common/questions.md), [SLO](../6-slo/questions.md),
 [scaling](../7-scaling/questions.md), [progressive delivery](../5-delivery/questions.md). Ý tưởng của stage:

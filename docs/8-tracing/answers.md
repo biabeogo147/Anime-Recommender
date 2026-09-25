@@ -5,7 +5,7 @@ ngôi thứ nhất, thường là đủ. *Nếu được hỏi thêm* dùng khi 
 bạn, không nói ra. Tham chiếu dạng `Load A5.2` trỏ tới bộ tương ứng.
 
 Stage này **đã chạy**: criteria #11 (một trace thật ở cả hai nơi nhận, token khác không) và #12 (chi phí mỗi nghìn
-request ở real mode) đều **pass**, 2026-09-23 ([evidence](../evidence/tracing.md)). Ghi prompt vẫn **chưa viết**. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi
+request ở real mode) đều **pass**, 2026-09-23 ([evidence](../evidence/tracing.md)). Ghi prompt **đã viết**, sau cờ `OTEL_CAPTURE_CONTENT` đang bật trong chart, nhưng chưa có evidence riêng. Chỗ `[điền: …]` là số liệu phải lấy từ lần chạy thật trước khi
 dùng — đừng nói con số bạn chưa đo. Ghi chú **[kiểm chứng]** là hành vi của công cụ cần xác nhận trước khi nói chắc. Số
 thập phân viết bằng dấu chấm.
 
@@ -55,8 +55,8 @@ không bao giờ nhầm một con số có mặt với một con số có nghĩa
 
 *Nếu được hỏi thêm:* tách theo pod ở A3.2, chi phí ở A6.1, con số có mặt mà vô nghĩa ở A6.3.
 
-**Mẹo:** câu đầu tiên đặt khung cho cả buổi. Ở stage này giờ chỉ còn hai trạng thái — **đã dựng và đã đo**, và
-**ghi prompt thì chưa viết**. Nói rõ cả hai.
+**Mẹo:** câu đầu tiên đặt khung cho cả buổi. Ở stage này có hai trạng thái — **đã dựng và đã đo** (#11, #12), và
+**ghi prompt đã dựng nhưng chưa có evidence riêng**. Nói rõ cả hai.
 
 **A1.2** **Ý chính:** "Metrics đã tách được thời gian retrieval với thời gian model ở mức tổng, vì mỗi phần có histogram
 riêng. Nhưng chúng không nói được *một request cụ thể* chậm ở đâu, và không có cách nào đi từ một điểm chậm trên đồ thị tới
@@ -85,9 +85,10 @@ lời, nên một request mà ai đó phàn nàn có thể được tìm ra. Pro
 instrument, vì chúng chạy liên tục và sẽ lấn át trace thật.
 
 **A2.2** **Ý chính:** "Là bộ tên attribute mà OpenTelemetry thống nhất cho AI tạo sinh: tên thao tác, model, provider, số
-token, và quy tắc đặt tên span. Span generation theo quy tắc tên và mang thao tác, model và token. Còn hai chỗ chưa theo: nó
-chưa có `gen_ai.provider.name` — bản cũ của quy ước gọi là `gen_ai.system` — và dùng loại span `INTERNAL` mặc định thay vì
-`CLIENT`. Bản thân bộ quy ước vẫn đang ở trạng thái phát triển, nên tôi kiểm theo phiên bản được ghim lúc dựng."
+token, và quy tắc đặt tên span. Span generation theo quy tắc tên, mang thao tác, model và token, có
+`gen_ai.provider.name` — bản cũ của quy ước gọi là `gen_ai.system` — và dùng loại span `CLIENT`, không phải `INTERNAL`
+mặc định. Hai chỗ đó được sửa ở stage 8. Bản thân bộ quy ước vẫn đang ở trạng thái phát triển, nên tôi kiểm theo phiên
+bản được ghim lúc dựng."
 
 **A2.3** **Ý chính:** "Những con số project này dựa vào không nên phụ thuộc vào việc một thư viện có theo kịp LangChain hay
 không. Thư viện đó sẽ thêm chi tiết, và nó vẫn là một lựa chọn để đánh giá, nhưng không phải một phụ thuộc. Hai span viết tay
@@ -190,11 +191,9 @@ Phép kiểm đòi số token *khác không*, từ request model thật."
 *Nếu được hỏi thêm:* chế độ fake còn tệ hơn — fake provider bịa ra số token trông hợp lý, nên một ảnh chụp màn
 hình không chứng minh gì. Cùng họ với "rỗng không phải là không" ở Load A2.2.
 
-**A6.4** **Ý chính:** "Chỉ có số local. Sau hai request Gemini, 1829 token vào và 790 token ra, ước tính 0.0025
-USD theo giá niêm yết — khoảng 0.0013 USD mỗi request. Đó là giá của tier trả phí, trong khi project chạy trên
-tier miễn phí: nó là số tiền traffic *sẽ* tốn, không phải số đã trả. Số này đọc từ counter khi chạy local, chưa
-qua trace nào, và hai request thì quá ít để nhân lên thành chi phí mỗi nghìn request. Con số trên dashboard thì
-chưa có."
+**A6.4** **Ý chính:** "**$0.4186 mỗi nghìn request** thật trên `gpt-4o-mini`, giá đọc ngày 2026-09-22, từ 40 request
+ở real mode. Đó là ước tính theo giá niêm yết, không phải số trên hoá đơn. Con số local trước đó — hai request Gemini,
+0.0025 USD — chỉ là ước tính ban đầu: quá ít request để nhân lên, và là model khác."
 
 *Nếu được hỏi thêm:* panel hiện legend `model=gpt-4o-mini` với giá trị 0.42–0.45, khớp con số truy vấn trả về:
 **$0.4186** mỗi nghìn request, real mode, giá đọc **2026-09-22**. Và panel p95 ngay cạnh đó *giữ* `model=fake` lại —
@@ -247,8 +246,8 @@ traffic vẫn về pod real mode. Phép kiểm đúng cho cái cuối là `stabl
 
 ### A9. Nhìn lại
 
-**A9.1** **Ý chính:** "Ghi prompt chưa được viết. Tempo không giữ gì qua teardown. Chi phí là ước tính theo giá niêm yết, cho
-một project chạy trên tier miễn phí. Và hai pipeline dính nhau qua bộ nhớ của collector khi Langfuse sập lâu."
+**A9.1** **Ý chính:** "Ghi prompt đã viết nhưng chưa có evidence riêng. Tempo không giữ gì qua teardown. Chi phí là ước tính
+theo giá niêm yết, không phải số trên hoá đơn. Và hai pipeline dính nhau qua bộ nhớ của collector khi Langfuse sập lâu."
 
 **A9.2** **Ý chính:** "Tempo với storage bền — object storage — để trace sống qua đêm. Ghi nội dung có che thông
 tin cá nhân trước khi gửi ra ngoài, không chỉ một cờ bật tắt. Tail sampling ở collector thay vì giữ mọi trace.
