@@ -92,12 +92,11 @@ reached 100%.
 Both gates have a number, and both numbers can mean something other than what they say.
 
 **The latency ratio.** The latency of each version is estimated from a histogram, and an estimate cannot move past a
-bucket edge until enough requests have crossed it. With the fake provider's latency and the application's current
+bucket edge until enough requests have crossed it. With the fake provider's latency and the application's original
 buckets, the stable version's estimated p95 sits just below one edge, and 1.2 times it lands just above. So the
 canary's estimate is pinned at that edge until its latency is much worse — the gate written as **1.2×** actually
-trips at roughly **1.4×**, and a version forty per cent slower passes. The fix is finer buckets, which the design
-adds before the capacity run; with them, the gate trips close to where it says. Until then the true threshold is a
-property of the bucket layout, and the record says so.
+trips at roughly **1.4×**, and a version forty per cent slower passes. The fix is finer buckets, which landed before
+the capacity run (`src/anime/metrics.py`); with them, the gate trips near **1.22×** — computed, not measured.
 
 **The success-rate floor.** A 99% floor over a small window is a different, twitchier number: over sixty requests,
 one error is already below it. Because each probe looks back over a window longer than the gap between probes, that
@@ -118,8 +117,9 @@ pauses for a person and never promotes on silence. "No errors across four reques
 and the query becomes empty — which, as Decision 3 showed, errors rather than pauses, and would abort the release
 for a capacity event. Argo Rollouts has no separate condition for *inconclusive* — a measurement is inconclusive
 when it matches neither its success nor its failure condition — so **both** conditions have to require a non-empty
-result before comparing it. That guard exists only because a node can disappear, and its exact form is to be checked
-against the Argo Rollouts version in use.
+result before comparing it. That guard exists only because a node can disappear; in `analysistemplate.yaml` both
+conditions of `success-rate` and `latency-ratio` start with `len(result) > 0` and reject `NaN`, and the drills ran
+against them.
 
 ## Decision 6 — after an abort, Git and the cluster disagree on purpose
 

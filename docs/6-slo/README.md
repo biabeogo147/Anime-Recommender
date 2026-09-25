@@ -104,9 +104,9 @@ pair, computed from far less than six hours. So the drill runs about three hours
 the one-hour pair win, and records **each window's burn rate at the moment the page fired** — the only way to say
 which pair it was. A page from any other pair on a young store is a different claim.
 
-For time, this build runs the short drill instead: one clean hour. The six-hour pair then probably pages first, and
-the drill still reads the one-hour pair's own crossing, which one full clean hour already calibrates
-([guide](guide.md), section 3).
+For time, this build ran the short drill instead: one clean hour. The prediction was that the six-hour pair would page
+first; it did not. The store held hours of earlier clean traffic, the 6h leg reached 5.30 against 5.6, and the 1h/5m
+pair paged at 9 m 30 s ([evidence](../evidence/slo.md), [guide](guide.md) section 3).
 
 ## Decision 5 — a drill whose number is explicable
 

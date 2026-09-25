@@ -84,11 +84,12 @@ by setting the expected count off by one. Criterion #5 does something different 
 happen — a partial file — and it has to be the named error, since a build also fails for a dozen reasons that
 have nothing to do with the index.
 
-**The scanner has not been seen to fail, and on this base image it probably cannot.** It ignores findings with
+**The scanner had not been seen to fail, and on this base image it probably could not at CRITICAL.** It ignores findings with
 no fix, which is right: blocking on the unpatchable trains people to switch the check off. But both images
 start from Debian 12, where Medical found five critical findings and not one with a fix. On that base the gate
-passes every build by construction. So it is reported as **unproven** until one deliberate run, with the
-threshold lowered until a fixable finding is in scope, turns it red. The detail is in
+passes every build by construction. So it was reported as unproven until one deliberate run turned it red: **proven**
+— lowered to MEDIUM, it went red on 5 fixable findings per image; at CRITICAL it stays green because nothing there has
+a fix ([evidence](../evidence/cicd.md)). The detail is in
 [design §4.6](../eks-sre-llmops-design.md#46-cicd-github-actions-githubworkflows).
 
 ## Decision 3 — a signature has to name who, and where from
@@ -126,7 +127,7 @@ a feature branch, a pull request, the eval job. That is the same mistake stage 1
 So the check names three things: the digest Git recorded, the release workflow, and `main`.
 
 And it runs once, by hand. Nothing refuses an unsigned image at deploy time. The signature proves an image
-*could* be checked. Medical plans to close that gap with Kyverno, in production only; Anime leaves it open,
+*could* be checked. Medical closed that gap with Kyverno, in production only; Anime leaves it open,
 in writing.
 
 ## Decision 4 — one writer to `main` that is not a person
@@ -137,10 +138,9 @@ The rule for `main` is that only reviewed, green changes reach it. The bot commi
 by necessity — it runs after CI and its whole job is to write there. The discipline is to make the hole exactly
 one line in the ruleset, naming one identity, rather than weakening the rule for everyone.
 
-Which identity is not settled, and the choice has a consequence. If the ruleset can exempt the workflow's own
-token, the bot's push cannot start another run by itself, and `[skip ci]` is a second guard. If it cannot — and
-it may not — the bot needs a credential whose pushes *do* start runs, and `[skip ci]` becomes the only thing
-standing between one commit and an endless loop. Either way the marker stays.
+The identity is settled: a **deploy key** (`RELEASE_DEPLOY_KEY` in `ci.yml`), the ruleset's one bypass. Its pushes
+*do* start runs, so `[skip ci]` is the only thing standing between one commit and an endless loop. The marker
+stays.
 
 ## Decision 5 — what a pull request from outside can prove
 
@@ -184,8 +184,8 @@ error, which baseline, which workflow. Every fix is the same: make the record na
 **Proves:** a merged change becomes a signed image and a one-line commit with no person in the path; the index
 check catches a truncated file; the signature verifies against this workflow on this branch.
 
-**Assumes:** that the scanner can fail, until its positive control has run; that a signed image is a safe one,
-which nothing enforces; and that a rollback target still exists in the registry.
+**Assumes:** that a signed image is a safe one, which nothing enforces; and that a rollback target still exists in the
+registry. (That the scanner can fail is now proven by its positive control.)
 
 ## Known limits
 

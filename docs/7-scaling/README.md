@@ -26,10 +26,11 @@ the number of pods is whatever was committed, whatever the traffic.
 [§3 Little's law](concepts.md#3-littles-law).*
 
 A request here is mostly waiting — on the embedding API, on the model — so a busy pod has an idle CPU and a queue
-behind it. The signal that tracks load is requests in flight per pod, and the target for it is not a choice either:
-stage 4's capacity run read the in-flight count at the knee directly, and Little's law — rate times mean latency — is
-the cross-check that the reading makes sense. The trigger sits below that number, not at it, for the reason in the
-next decision.
+behind it. The signal that tracks load is requests in flight per pod. Stage 4's capacity run read the in-flight count
+at the knee, but the reading did not reproduce (170.5 against 117.5), so the trigger (30) sits below the limit that
+reading stood in for: 40 threads per pod, one request per thread ([evidence](../evidence/load.md)). Little's law — rate
+times mean latency — is the cross-check. The trigger sits below the limit, not at it, for the reason in the next
+decision.
 
 There is a subtlety that makes this transferable at all. The capacity run used the fake provider; production traffic
 uses the real one, several times slower. A knee measured in *requests per second* would not carry across modes. A
@@ -61,9 +62,9 @@ between the trigger and the knee is what pays for all of that; set the trigger a
 late.
 
 Two things make the loop fragile under exactly the conditions it exists for. The api's health and metrics endpoints
-still share a worker pool with the requests they report on, so at saturation the scrape and the probe would queue
-behind the work — the signal going stale and a busy pod marked unready at the knee. The design moves them off that
-pool before the capacity run. And in real-model mode a new pod's startup calls the embedding API, so if that provider is down, new pods cannot
+shared a worker pool with the requests they report on, so at saturation the scrape and the probe would queue
+behind the work — the signal going stale and a busy pod marked unready at the knee; they were made `async def` before
+the capacity run. And in real-model mode a new pod's startup calls the embedding API, so if that provider is down, new pods cannot
 become ready and scale-out stalls while existing pods carry on.
 
 ## Decision 3 — two autoscalers, and what decides whether the second ever acts

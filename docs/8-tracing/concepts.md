@@ -42,8 +42,7 @@ names for the operation, the model, the provider and the token counts, and a spa
 model". The set is still marked as in development.
 
 **How it runs here.** The generation span is named by that rule and carries the operation, model and token
-counts. It does not yet carry the provider attribute, and it uses the default span kind rather than the one the
-conventions expect; both are listed in the design as remaining work.
+counts, the provider attribute, and the `CLIENT` kind the conventions expect for a call out to a remote model.
 
 **What breaks without them.** Each backend needs a mapping from home-made names, and an LLM-aware tool sees the
 generation as an ordinary span — no model, no tokens, no cost.
@@ -87,8 +86,8 @@ graphs still draw, with nothing to click.
 **What it is.** Recording the prompt and the model's response as span attributes, so a trace shows *what* was
 said as well as how long it took. OpenTelemetry treats it as opt-in, because content can be sensitive.
 
-**How it runs here.** Not built yet. A flag will control it — on for this demonstration, off by default anywhere
-regulated — and only real-model traces will carry it to Langfuse.
+**How it runs here.** `OTEL_CAPTURE_CONTENT` controls it: off in the code, on in this chart for the demonstration, off
+by default anywhere regulated. Only real-model traces carry it to Langfuse.
 
 **What breaks either way.** Off, a bad answer can be timed but not read. On, whatever a user types into a
 free-text box is copied to a third party, whatever the box was meant for. The decision has to be made openly, not

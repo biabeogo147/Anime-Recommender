@@ -56,8 +56,8 @@ fixed version. A *gate* fails the build above a threshold. A *positive control* 
 that a working gate must fail.
 
 **How it runs here.** The gate counts critical findings that have a fix. Every run also records the total, so
-"nothing fixable" is visibly different from "nothing there". Until a positive control has turned it red, the gate
-is reported as unproven.
+"nothing fixable" is visibly different from "nothing there". A positive control turned it red at MEDIUM, so the gate
+is proven, not just passing.
 
 **Why the count alone is not enough.** The gate fails whenever the fixable count is above zero — so every run that
 passes records zero, by definition. A recorded zero is a restatement of the pass, not evidence about the gate.
@@ -125,8 +125,8 @@ pipeline again.
 from "pull requests only".
 
 **Why the marker stays.** A push made with the workflow's own token does not start new runs; a push made with any
-other credential — a deploy key, an app token — does. Whether the ruleset can exempt the workflow's own token
-decides which case this is. The marker covers both.
+other credential — a deploy key, an app token — does. The bot uses a deploy key, so its pushes do start runs, and
+the marker is the only guard.
 
 **What breaks without it.** Either an endless loop of builds and commits, or protection weakened for everyone so
 that one robot can write.

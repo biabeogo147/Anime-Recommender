@@ -51,7 +51,8 @@ problem has stopped. A short window alone fires on every spike. The pair is prom
 
 **What it is.** Two severities with two costs. A *page* interrupts someone now. A *ticket* is work for the coming days.
 
-**How it runs here.** The fast-burn pairs page, to one Discord channel; the slow-burn pairs open tickets, to another.
+**How it runs here.** The fast-burn pairs page and the slow-burn pairs open tickets, both to one Discord channel,
+told apart by `[PAGE]` and `[TICKET]` in the title.
 
 **What breaks without the split.** Everything pages, and people learn to ignore pages — or everything is a ticket, and
 an outage waits for Monday.

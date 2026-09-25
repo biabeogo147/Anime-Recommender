@@ -147,8 +147,8 @@ bash -n infra/terraform/cluster/wireguard-init.sh && echo "script syntax ok"
 Expected: three `Success! The configuration is valid.` and `script syntax ok`. **`VALIDATE FAILED` — stop and
 report.** A `fmt differs` is cosmetic: report `terraform fmt -recursive -diff infra/terraform` and continue.
 
-`init` leaves `.terraform.lock.hcl` files in the three folders; they are what pins the providers. Leave them; they get
-committed from the laptop later.
+`init` leaves `.terraform.lock.hcl` files in the three folders; they are what pins the providers. Leave them; they were
+committed on 2026-09-23 (`evidence/terraform.md`).
 
 ---
 
@@ -454,7 +454,7 @@ was ever created, use `make infra-destroy` instead.
 
 **Next session — ops:** `make plan` → `make infra` → `make kubeconfig` → `make tunnel` (window 2) → `make ready` →
 `make bootstrap-plan` → `make bootstrap`. Step 2 does not repeat. A fresh clone needs `bootstrap/terraform.tfvars`
-again (5.1) until the versions are pinned in Git. The VPN profile needs no change: `vpn.anime` follows the new Elastic IP.
+again (5.1): the versions are now pinned in Git, but `enabled_stages` and the other settings still live there. The VPN profile needs no change: `vpn.anime` follows the new Elastic IP.
 
 ---
 

@@ -250,7 +250,8 @@ requests; skip them. Read them in this order:
    - `vus max` was near `MAX_VUS`: the script's limit, so rerun with a larger `MAX_VUS`;
    - the workstation was pinned: the generator's limit. The number then describes the test, and it is not used.
 4. **Error ratio up to the knee:** reported beside the capacity.
-5. **In-flight per pod at the knee:** the stage 7 threshold is set below this value (Load A4.5).
+5. **In-flight per pod at the knee:** record it, but the stage 7 threshold comes from the thread-pool limit, because
+   this reading did not reproduce across runs (`evidence/load.md`, Load A4.5).
 6. **CPU and memory per pod at the knee:** the api's resource requests come from these (Load A4.5).
 7. **Ready pods and nodes over the run:** they should stay at `2` and `2`. A change means a pod restarted or a node
    was lost during the run, and that has to be reported with the number.

@@ -39,13 +39,14 @@ interval look like the knobs for how fast replicas change; with a non-zero minim
 **What it is.** In a stable system, the average number of requests in progress equals the arrival rate times the
 *average* time each spends inside: *L = λ × W*.
 
-**How it runs here.** Stage 4's capacity run reads in-flight per pod directly from the gauge at the knee. Little's law,
-with the mean latency — not the p95 — is the cross-check that the reading is consistent with the rate and latency
-measured at the same moment.
+**How it runs here.** Stage 4's capacity run read in-flight per pod from the gauge at the knee, and the reading did not
+reproduce (170.5 against 117.5). Little's law, with the mean latency — not the p95 — and the 40-thread limit set the
+threshold instead: 40 threads over a mean of 0.85 s is 47 req/s per pod, which the measured 93.9 req/s ceiling for two
+pods matches.
 
 **What breaks without it.** A threshold picked by feel, or one computed from the wrong latency: the p95 in place of the
 mean overstates how many requests a pod holds. And at the edge of a rising ramp the system is not quite steady, so the
-cross-check is approximate — which is why the gauge, not the formula, is the primary reading.
+cross-check is approximate — and here the gauge, which was meant to be the primary reading, did not reproduce.
 
 ---
 
