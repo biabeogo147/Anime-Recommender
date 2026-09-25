@@ -27,9 +27,10 @@ Application is `Healthy` by default as soon as its resources exist, so the root 
 `Synced` together** — a tree that is Healthy while still drifting from Git is the false pass this criterion
 exists to exclude.
 
-Later sessions extend the same tree: stage 5 added `alerting-secret` and `slo`, stage 7 added `keda` and
-`cluster-autoscaler`, and every one of them is recorded `Synced`/`Healthy` in
-[scaling](scaling.md#scale-out) and [slo](slo.md).
+Later sessions extend the same tree: stage 5 added `argo-rollouts`, stage 6 added `alerting-secret` and `slo`, stage 7
+added `keda` and `cluster-autoscaler`, and stage 8 added `tracing-secret`, `tempo`, `opentelemetry-collector` and
+`dashboards` (`deploy/argocd/root/templates/`). Those stages ran and their evidence is in [slo](slo.md),
+[scaling](scaling.md) and [tracing](tracing.md), but the Applications' own `Synced`/`Healthy` state was not captured.
 
 ## #15 — HTTPS on the public names
 
