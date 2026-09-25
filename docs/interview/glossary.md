@@ -40,7 +40,7 @@ Một định nghĩa lỏng là một lời mời đào sâu. Nếu chỉ thuộ
 | **Multiwindow multi-burn-rate** | Một alert là phép **AND** của một cửa sổ dài và một cửa sổ ngắn; page là phép **OR** của hai cặp như vậy. Cửa sổ dài chống báo động giả, cửa sổ ngắn làm alert tắt nhanh. |
 | **Vì sao 13.44 chứ không 14.4** | 14.4 / 6 / 3 / 1 là bộ quen thuộc cho chu kỳ 30 ngày. Cùng tỉ lệ budget ấy trên **28 ngày** cho 13.44 / 5.6 / 2.8 / 0.93. |
 | **Cặp đã hiệu chuẩn** | Cặp có cửa sổ dài **không dài hơn tuổi của store**. Ở đây chỉ 1h/5m là hiệu chuẩn; hai cặp ticket 1d/2h và 3d/6h giữ nguyên ngưỡng mà đánh giá trên quãng ngắn hơn cái tên nó mang. |
-| **Page so với ticket** | Page gọi người **ngay**; ticket là việc của vài ngày tới. Hai kênh Discord khác nhau. Không tách thì mọi thứ thành page, và người ta học cách bỏ qua page. |
+| **Page so với ticket** | Page gọi người **ngay**; ticket là việc của vài ngày tới. Một webhook, một kênh Discord: tiêu đề ghi `[PAGE]` hay `[TICKET]`. Không tách thì mọi thứ thành page, và người ta học cách bỏ qua page. |
 | **`group_wait`** | Alertmanager giữ một nhóm mới 30 giây trước khi gửi — nằm trong 9 phút rưỡi, và là lý do biên dưới là 9:30 chứ không 9:00. |
 | **Rule được nạp so với được đánh giá** | Một `PrometheusRule` monitoring stack không chọn thì **được nhận và bị bỏ qua** — drill chạy vào đó sẽ im lặng hoàn toàn mà không lỗi ở đâu. Nên phép kiểm là *6 rule group, 34 rule, 0 lần đánh giá thất bại*. |
 

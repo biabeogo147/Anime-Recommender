@@ -117,7 +117,7 @@ không, và người phỏng vấn phân biệt được. Khi bị hỏi, nói r
 **4.1 Real mode đi *hai* cuộc gọi ra ngoài.** Mỗi request thật embed câu hỏi qua Hugging Face rồi chat qua OpenAI,
 nên **T = 8 s là độ trễ của cả hai**, không phải của riêng model. Cả hai nhánh đều có phân loại lỗi riêng:
 `recommender.py` bắt lỗi retrieval thành `UpstreamError(stage="retrieval")` và trả 503 *"Retrieval unavailable"*.
-Thiết kế §5 vẫn ghi nhánh này là 500 chưa phân loại — đó là chỗ tài liệu cũ hơn code.
+Thiết kế §5 giữ nguyên câu cũ là 500 chưa phân loại, kèm một ghi chú "Changed before stage 4".
 
 **4.2 `9 m 30 s` là biên dưới, vì hai lý do cùng chiều.** Discord chỉ hiện đến phút, nên tin nằm trong
 11:14:00–11:14:59Z; nó không thể đến trước alert lúc 11:14:23Z, và Alertmanager giữ nhóm mới 30 giây — còn lại

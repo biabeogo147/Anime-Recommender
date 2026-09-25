@@ -13,9 +13,9 @@ Nguồn: `latex-CV/sections/projects/film-recommender.tex`, `evidence/cv.md` (b�
 
 ## Dòng 1 — Cluster and access
 
-> **Cluster and access.** Terraform builds EKS in three stacks split by lifetime, so the expensive one is destroyed
-> when idle and rebuilt from code. No public API address — an SSM tunnel reaches it, admin interfaces only over
-> WireGuard. The 92-resource stack applies from empty and re-plans clean.
+> **Cluster and access.** Terraform splits the infrastructure into three stacks so the EKS stack can be destroyed
+> when idle and rebuilt from code. The Kubernetes API is private, reached through an SSM tunnel; admin interfaces
+> are available only over WireGuard.
 
 **Nói bằng lời thường.** Hạ tầng chia ba stack Terraform theo **thời gian sống**, không theo chức năng. `shared` giữ
 thứ phải sống qua mỗi lần xoá — ECR, secret, vai OIDC của CI, chứng chỉ ACM. `cluster` giữ VPC, EKS, node group,
@@ -105,9 +105,10 @@ người dùng thật, tôi sẽ đặt máy đích của tunnel vào một auto
 
 ## Dòng 2 — Canary releases
 
-> **Canary releases.** Argo Rollouts shifts 10%, then 50%, then 100% of traffic, with Prometheus judging the
-> canary's own pods rather than the service average. A drill build failing one request in five aborted itself in
-> 167 s at the 10% step, and 1.36% of all requests failed while it was live.
+> **Canary releases.** Argo Rollouts shifts 10%, then 50%, then 100% of traffic. Prometheus measures the canary's
+> success rate and compares its latency with the stable version. In a rollback test, a canary configured to fail 20%
+> of its requests was aborted automatically at the 10% stage after 167 s; 1.36% of all requests failed while it was
+> live.
 
 **Nói bằng lời thường.** Deployment của api đổi thành một `Rollout`. Mỗi bản mới nhận 10% traffic, dừng cho một
 `AnalysisRun` truy vấn Prometheus bốn lần, rồi lên 50%, dừng nữa, rồi 100%. **Ba** cổng mỗi bước: số request canary
@@ -134,7 +135,7 @@ trung bình toàn service thì 10% traffic xấu bị 90% tốt pha loãng và c
 | Drill promote: start → `Healthy` | **8 m 23 s** | `delivery.md` |
 | AnalysisRun của bản tốt | **2, cả hai `Successful`** | `delivery.md` |
 | `canary-hash` / `stable-hash` | `586cd55b4f` / `589794b4fd` — **khác nhau** | `delivery.md:18` |
-| Drill rollback: start → abort | **167 s** | `delivery.md:99` |
+| Drill rollback: start → abort | **167 s** | `delivery.md:100` |
 | `success-rate` của bản xấu | **0.813 · 0.819** (cổng 0.99) | `delivery.md` |
 | `latency-ratio` của bản xấu | **1.042 · 1.030 — đạt cổng cả hai lần** | `delivery.md` |
 | Canary nhận / canary lỗi | 250.9 / **45.0** — 17.9% traffic của chính nó, so với 20% cấu hình | `delivery.md` |
@@ -222,9 +223,10 @@ một cách vô tình.** 1.36% trong 167 giây là cái giá đã biết trướ
 
 ## Dòng 3 — Capacity
 
-> **Capacity.** k6 on a stand-in model put the ceiling at 94 requests a second for two pods, so KEDA scales on
-> in-flight requests, not CPU. At 267 a second it reached 8 pods on 3 nodes: p95 under 1.5 s across 224,396
-> requests, none failing, where two fixed pods had queued to 15.6 s at less than half that rate.
+> **Capacity.** k6 with a simulated model put the ceiling at 94 requests/s for two pods while CPU stayed low, so
+> KEDA scales on concurrent requests, not CPU. At 267 requests/s it scaled from 2 to 8 pods and 2 to 3 nodes,
+> holding p95 under 1.5 s across 224,396 requests with no failures; with two fixed pods, p95 had already reached
+> 15.6 s at less than half that load.
 
 **Nói bằng lời thường.** Trước khi bật autoscaling, tôi đo một "đơn vị" cố định: hai pod, không autoscaler, k6 gửi
 theo **arrival rate** tăng dần tới 120 req/s. Tốc độ *phục vụ* dừng ở 93.9 req/s trong khi tốc độ *gửi* vẫn leo —
@@ -359,17 +361,18 @@ request lỗi và thời gian tới khi đủ replica lại — y như scale-in 
 
 ## Dòng 4 — SLOs and alerting
 
-> **SLOs and alerting.** Burn-rate alerts on a 99.5% availability target and an 8-second latency target set from the
-> server-side p95 of 230 real gpt-4o-mini calls, with a runbook each. In a stand-in drill, failing half of all
-> requests paged Discord in 9.5 minutes — eight of them the alert's own burn window.
+> **SLOs and alerting.** A 99.5% availability SLO and an 8 s latency target rounded up from a server-side p95 of
+> 7.07 s over 230 real gpt-4o-mini requests, with burn-rate alerts on both. In a failure drill, a simulated model
+> returned errors for 50% of requests; the alert reached Discord in 9.5 minutes, 8 of them the 1-hour burn-rate
+> window filling.
 
 **Nói bằng lời thường.** Hai SLO: availability 99.5% và latency với ngưỡng T. T **không** do tôi chọn — nó đo được:
 230 request thật qua `gpt-4o-mini`, đọc p95 **phía server**, ra 7.07 s nội suy, và T là mép bucket ngay trên đó,
 **8 s**, vì SLI đọc counter ở `le=T` nên T buộc phải là một mép bucket có thật.
 
 Cảnh báo dùng **burn rate nhiều cửa sổ**: page là phép OR của hai cặp — 1h/5m hệ số 13.44 và 6h/30m hệ số 5.6, trên
-chu kỳ 28 ngày. Sloth sinh các rule đó, nhưng **`make slo-generate` chạy ngoài CI** và tôi commit output; CI chỉ chạy
-`make slo-check` và fail nếu file trong Git lệch bản sinh lại. Nên thứ Prometheus nạp luôn là thứ nằm trong Git, và
+chu kỳ 28 ngày. Sloth sinh các rule đó, chạy trong container; CI chạy `make slo-check` và fail nếu file trong Git lệch
+bản sinh lại, và rule đang commit chính là bản CI sinh ra. Nên thứ Prometheus nạp luôn là thứ nằm trong Git, và
 không có Sloth operator nào.
 
 **Khái niệm trong câu này.**
@@ -460,7 +463,7 @@ Vì lúc sửa xong thì cặp 1h/5m đã tự sai — `rate5m` rỗng đi trong
 Đây là tính chất nội tại của burn-rate alerting, không phải cấu hình sai: đúng những cửa sổ dài giúp một lỗi lẻ không
 gọi ai cũng là cửa sổ giữ page lại sau khi bản sửa đã lên. Cần biết **trước** chứ đừng biết trong lúc sự cố — một
 người vận hành chờ page tắt cùng lúc với bản sửa sẽ kết luận bản sửa không ăn và đi tìm một sự cố thứ hai không tồn
-tại. Đó cũng là dòng tôi **còn phải thêm vào runbook**.
+tại. Đó cũng là dòng runbook giờ đã ghi.
 
 Và tôi kiểm nó tắt *thật* chứ không phải tắt vì hết traffic: page cũng tắt khi mẫu số biến mất, và trên Discord hai
 thứ đó giống nhau. Traffic là 40 req/s ở cả hai mốc.
@@ -514,9 +517,9 @@ một `AnimeDeliveryTest` tiêm tay, để thấy đường tới Discord tự n
 
 ## Dòng 5 — Tracing and cost
 
-> **Tracing and cost.** OpenTelemetry traces into Tempo, where a point on a latency chart opens the trace behind it.
-> Only real-model traces reach Langfuse: none of 6,343 drill requests did. Token counts and published prices put
-> gpt-4o-mini at $0.42 per 1,000 requests.
+> **Tracing and cost.** OpenTelemetry sends traces to Tempo, and a Grafana latency chart links to the trace behind
+> each point. Only real-model traces reach Langfuse: none of 6,343 drill requests did. Token counts and published
+> prices put gpt-4o-mini at $0.42 per 1,000 requests.
 
 **Nói bằng lời thường.** Api **đẩy** span qua OTLP tới một OpenTelemetry Collector, và collector tách một luồng
 thành hai đích: **Tempo** nhận mọi span, trong cluster; **Langfuse** chỉ nhận span của LLM, và chỉ khi provider là

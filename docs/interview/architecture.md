@@ -128,7 +128,7 @@ flowchart TB
 
     PROM["Prometheus"] -->|"kéo · scrape /metrics"| API
     PROM -->|"kéo · scrape :8889 qua PodMonitor"| COL
-    SLOTH["make slo-generate<br/>chạy NGOÀI CI"] -->|"output commit vào Git"| RULES["PrometheusRule · 34 rule"]
+    SLOTH["Sloth trong container<br/>CI kiểm bằng slo-check"] -->|"output commit vào Git"| RULES["PrometheusRule · 34 rule"]
     RULES --> PROM
     CI["CI · make slo-check"] -.->|"fail nếu Git lệch bản sinh lại"| RULES
 
@@ -151,9 +151,9 @@ flowchart TB
 
 Ba chỗ đáng nói:
 
-- **Sloth không chạy trong CI.** `make slo-generate` chạy ngoài CI và tôi commit output; CI chỉ chạy `make slo-check`
-  — sinh lại vào file tạm và fail nếu khác file trong Git. Nên thứ Prometheus nạp **luôn là thứ nằm trong Git**, và
-  không có Sloth operator nào.
+- **Sloth chạy trong container, cả ở CI.** CI chạy `make slo-check` — sinh lại bằng Sloth vào file tạm và fail nếu
+  khác file trong Git — và rule đang commit chính là bản CI sinh ra (artifact `slo-regenerated`, commit `0ce2de8`).
+  Nên thứ Prometheus nạp **luôn là thứ nằm trong Git**, và không có Sloth operator nào.
 - **Connector spanmetrics là nguồn của 6076 span** trong phép đếm rò Langfuse — nó biến span thành metric, và
   **Prometheus scrape cổng `8889` của collector qua PodMonitor**; collector không đẩy metric đi đâu cả. Đó là cách
   tôi chứng minh trace *có tồn tại* trong lúc Langfuse trống.
@@ -213,7 +213,8 @@ flowchart TB
 
 **"8 trên 8" là cây lúc bootstrap stage 2, không phải cây hôm nay.** Đó là con số duy nhất evidence giữ
 (`evidence/gitops.md:24`), và nó đúng với thời điểm của nó. Cây hiện tại lớn hơn gấp đôi: stage 5 thêm
-`alerting-secret` và `slo`, stage 7 thêm `keda` và `cluster-autoscaler`, stage 8 thêm bốn Application tracing —
+`argo-rollouts`, stage 6 thêm `alerting-secret` và `slo`, stage 7 thêm `keda` và `cluster-autoscaler`, stage 8 thêm
+bốn Application tracing —
 **16 Application con, cộng chính `root` là 17**. Con số 17 là *thuộc tính của manifest*, đếm được từ
 `deploy/argocd/root/templates/`; nó **không phải một phép đo**, vì không có lần chạy nào ghi lại cả 17 cùng
 `Synced/Healthy` trong một output.
@@ -291,12 +292,13 @@ phút.
 WireGuard. Nhưng nói cho đúng: phép kiểm đó chứng minh **khả năng tới được**, không chứng minh phân quyền —
 Prometheus và Alertmanager không có xác thực nào.
 
-**"Cụm này chịu được gì?"** → Ba node Spot ở nhiều AZ; pod api tối thiểu 2 replica có `topologySpreadConstraints`
+**"Cụm này chịu được gì?"** → Hai node Spot (co giãn 2–4) ở hai AZ; pod api tối thiểu 2 replica có `topologySpreadConstraints`
 `ScheduleAnyway`, và PodDisruptionBudget `minAvailable: 1` — nhưng PDB chỉ ăn vào **eviction tự nguyện** như drain,
 không ăn vào một lần thu hồi Spot. Và trong hai ngày chạy **không có lần thu hồi nào**, nên cả ba lớp là *cấu hình*,
 chưa lớp nào được kiểm chứng.
 
-**"Dựng lại mất bao lâu?"** → **Chưa đo.** Đó là M8, phép đo có bấm giờ duy nhất còn thiếu. Con số tôi *có* là ba
+**"Dựng lại mất bao lâu?"** → **Chưa đo.** Đó là M8, một trong hai phép đo còn thiếu (cái kia là thời lượng
+pipeline của #3). Con số tôi *có* là ba
 stack Terraform dựng từ trống trong 0m55s + 12m18s + 1m14s, và cây Argo CD lên 8/8.
 
 ---
